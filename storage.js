@@ -79,9 +79,9 @@ export async function saveSnapshot(priceMap) {
 
 export async function loadHistory(itemId, sinceTs = 0) {
   try {
-    log(`[loadHistory] item=${itemId} since=${sinceTs}`);
+    const t0h = Date.now();
     const rows = await invoke("load_price_history", { itemId: Number(itemId), sinceTs: sinceTs });
-    log(`[loadHistory] item=${itemId} got ${rows.length} rows`);
+    log(`[loadHistory] item=${itemId} got ${rows.length} rows in ${Date.now()-t0h}ms`);
     return rows.map(r => ({ ts: r.ts, sell: r.sell, buy: r.buy, sellQty: r.sell_qty, buyQty: r.buy_qty }));
   } catch (e) { warn("[loadHistory] failed:", e); return []; }
 }
@@ -89,8 +89,10 @@ export async function loadHistory(itemId, sinceTs = 0) {
 // Single-query replacement for the per-item alert scan — returns 7-day max + row count per item
 export async function getPriceAlertData(itemIds, sinceTs) {
   try {
+    const t0 = Date.now();
     const rows = await invoke("get_price_alert_data", { itemIds: itemIds.map(Number), sinceTs });
-    return rows; // [{ item_id, seven_day_max, row_count }]
+    log(`[getPriceAlertData] ${rows.length} rows for ${itemIds.length} items in ${Date.now()-t0}ms`);
+    return rows;
   } catch (e) { warn("[getPriceAlertData] failed:", e); return []; }
 }
 
@@ -236,7 +238,11 @@ export function loadMarketSummary() {
   log(`[loadMarketSummary] START — invoking Rust get_market_summary`);
   _marketSummaryInFlight = (async () => {
     try {
-      const raw = await invoke("get_market_summary");
+      // 8s timeout belt-and-suspenders with Rust-side timeout
+      const raw = await Promise.race([
+        invoke("get_market_summary"),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("market summary timeout")), 20000)),
+      ]);
       const velocity = {};
       for (const v of raw.velocity) {
         velocity[v.item_id] = { sellFillsPerHr: v.sell_fills_per_hr, buyFillsPerHr: v.buy_fills_per_hr, observations: v.observations, windowHrs: v.window_hrs };

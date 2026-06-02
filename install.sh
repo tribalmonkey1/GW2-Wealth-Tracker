@@ -474,7 +474,7 @@ fn get_api_url() -> String {
 fn api_get(path: &str) -> Result<serde_json::Value, String> {
     let url = format!("{}{}", get_api_url(), path);
     let resp = ureq::get(&url)
-        .timeout(std::time::Duration::from_secs(30))
+        .timeout(std::time::Duration::from_secs(20))
         .call()
         .map_err(|e| format!("API request failed: {}", e))?;
     resp.into_json::<serde_json::Value>()
@@ -484,7 +484,7 @@ fn api_get(path: &str) -> Result<serde_json::Value, String> {
 fn api_post(path: &str, body: &serde_json::Value) -> Result<serde_json::Value, String> {
     let url = format!("{}{}", get_api_url(), path);
     let resp = ureq::post(&url)
-        .timeout(std::time::Duration::from_secs(60))
+        .timeout(std::time::Duration::from_secs(30))
         .send_json(body)
         .map_err(|e| format!("API request failed: {}", e))?;
     resp.into_json::<serde_json::Value>()
@@ -653,7 +653,7 @@ pub fn get_market_summary() -> Result<MarketSummary, String> {
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis() as i64;
-    let cache_ttl_ms: i64 = 60 * 1000;
+    let cache_ttl_ms: i64 = 90 * 1000;
 
     let (cached_result, should_spawn) = {
         let cache = market_cache().lock().unwrap();
@@ -686,7 +686,14 @@ pub fn get_market_summary() -> Result<MarketSummary, String> {
 }
 
 fn fetch_market_summary_from_api() -> Result<MarketSummary, String> {
-    let val = api_get("/market-summary")?;
+    // Short timeout — if NAS is unreachable, fail fast rather than blocking for 30s
+    let url = format!("{}/market-summary", get_api_url());
+    let resp = ureq::get(&url)
+        .timeout(std::time::Duration::from_secs(20))
+        .call()
+        .map_err(|e| format!("API request failed: {}", e))?;
+    let val: serde_json::Value = resp.into_json()
+        .map_err(|e| format!("API response parse failed: {}", e))?;
 
     let velocity = val["velocity"].as_array().unwrap_or(&vec![]).iter().filter_map(|v| {
         Some(VelocityResult {
@@ -1023,6 +1030,55 @@ if [ -f "$SCRIPT_DIR/market-worker.js" ]; then
   echo "  ✓ market-worker.js copied"
 else
   echo "  ⚠ market-worker.js not found next to install.sh — skipping"
+fi
+
+if [ -f "$SCRIPT_DIR/MysticForgeTab.jsx" ]; then
+  cp "$SCRIPT_DIR/MysticForgeTab.jsx" "$INSTALL_DIR/src/MysticForgeTab.jsx"
+  echo "  ✓ MysticForgeTab.jsx copied"
+else
+  echo "  ⚠ MysticForgeTab.jsx not found next to install.sh — skipping"
+fi
+
+if [ -f "$SCRIPT_DIR/mystic-forge-data.js" ]; then
+  cp "$SCRIPT_DIR/mystic-forge-data.js" "$INSTALL_DIR/src/mystic-forge-data.js"
+  echo "  ✓ mystic-forge-data.js copied"
+else
+  echo "  ⚠ mystic-forge-data.js not found next to install.sh — skipping"
+fi
+
+if [ -f "$SCRIPT_DIR/legendary-data.js" ]; then
+  cp "$SCRIPT_DIR/legendary-data.js" "$INSTALL_DIR/src/legendary-data.js"
+  echo "  ✓ legendary-data.js copied"
+else
+  echo "  ⚠ legendary-data.js not found next to install.sh — skipping"
+fi
+
+if [ -f "$SCRIPT_DIR/legendary-data-gen2.js" ]; then
+  cp "$SCRIPT_DIR/legendary-data-gen2.js" "$INSTALL_DIR/src/legendary-data-gen2.js"
+  echo "  ✓ legendary-data-gen2.js copied"
+else
+  echo "  ⚠ legendary-data-gen2.js not found next to install.sh — skipping"
+fi
+
+if [ -f "$SCRIPT_DIR/legendary-data-gen3.js" ]; then
+  cp "$SCRIPT_DIR/legendary-data-gen3.js" "$INSTALL_DIR/src/legendary-data-gen3.js"
+  echo "  ✓ legendary-data-gen3.js copied"
+else
+  echo "  ⚠ legendary-data-gen3.js not found next to install.sh — skipping"
+fi
+
+if [ -f "$SCRIPT_DIR/legendary-data-armor.js" ]; then
+  cp "$SCRIPT_DIR/legendary-data-armor.js" "$INSTALL_DIR/src/legendary-data-armor.js"
+  echo "  ✓ legendary-data-armor.js copied"
+else
+  echo "  ⚠ legendary-data-armor.js not found next to install.sh — skipping"
+fi
+
+if [ -f "$SCRIPT_DIR/legendary-data-other.js" ]; then
+  cp "$SCRIPT_DIR/legendary-data-other.js" "$INSTALL_DIR/src/legendary-data-other.js"
+  echo "  ✓ legendary-data-other.js copied"
+else
+  echo "  ⚠ legendary-data-other.js not found next to install.sh — skipping"
 fi
 
 if [ -f "$SCRIPT_DIR/main.jsx" ] && [ ! -f "$INSTALL_DIR/src/main.jsx" ]; then

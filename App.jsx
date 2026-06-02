@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import MysticForgeTab from "./MysticForgeTab.jsx";
+import { buildForgeRecipeMap } from "./mystic-forge-data.js";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 // API key loaded from personal.db on startup — see apiKey state
@@ -222,6 +224,19 @@ async function fetchPrices(ids) {
   return map;
 }
 
+// Filter item IDs to only those that can actually appear on the TP.
+// Skips AccountBound, SoulbindOnAcquire, and MonsterOnly items — they never have listings.
+const NON_TRADEABLE_FLAGS = new Set(["AccountBound", "SoulbindOnAcquire", "MonsterOnly"]);
+function filterTradeable(ids, itemMap) {
+  if (!itemMap || Object.keys(itemMap).length === 0) return ids; // no itemMap yet, fetch all
+  return ids.filter(id => {
+    const item = itemMap[id];
+    if (!item) return true; // unknown item — try fetching, API will 404 if untradeable
+    const flags = item.flags || [];
+    return !flags.some(f => NON_TRADEABLE_FLAGS.has(f));
+  });
+}
+
 // ── Character inventory aggregation ──────────────────────────────────────────
 // Returns { itemId: count } from all character bags (not material storage)
 function extractCharacterItems(characters) {
@@ -263,6 +278,29 @@ function extractCharacterDisciplines(characters) {
     if (discs.length > 0) byChar[char.name] = discs;
   }
   return byChar;
+}
+
+// Extract forge-relevant currencies from wallet by fetching currency names once
+// Returns { spirit_shards, volatile_magic, unbound_magic, karma, laurels }
+let _currencyMap = null; // name(lowercase) -> currency_id, cached after first fetch
+// Verified currency IDs from GW2 wiki /v2/currencies
+const CURRENCY_IDS = {
+  spirit_shards:  23,
+  volatile_magic: 45,
+  unbound_magic:  32,
+  karma:          2,
+  laurels:        3,
+};
+function extractForgeWallet(walletArr) {
+  if (!Array.isArray(walletArr)) return {};
+  const get = (id) => walletArr.find(w => w.id === id)?.value || 0;
+  return {
+    spirit_shards:  get(CURRENCY_IDS.spirit_shards),
+    volatile_magic: get(CURRENCY_IDS.volatile_magic),
+    unbound_magic:  get(CURRENCY_IDS.unbound_magic),
+    karma:          get(CURRENCY_IDS.karma),
+    laurels:        get(CURRENCY_IDS.laurels),
+  };
 }
 
 // Build a Set of crafted item IDs from the dailycrafting API response
@@ -476,27 +514,6 @@ function checkFulfillment(itemId, needed, resolvedRecipes, ownedMap, depth = 0) 
 // - Any item that appears in a known recipe (output or ingredient)
 // - Materials you own (always track what you have)
 const TRACKED_RARITIES = new Set(["Rare", "Exotic", "Ascended", "Legendary"]);
-function filterPriceMapForSnapshot(priceMap, itemMap, resolvedRecipes, ownedMap) {
-  // Build set of all recipe-related item IDs
-  const recipeItemIds = new Set();
-  for (const recipe of Object.values(resolvedRecipes || {})) {
-    recipeItemIds.add(recipe.output_item_id);
-    for (const ing of (recipe.ingredients || [])) recipeItemIds.add(ing.item_id);
-  }
-  // Build set of owned item IDs
-  const ownedIds = new Set(Object.keys(ownedMap || {}).map(Number));
-
-  const filtered = {};
-  for (const [idStr, priceData] of Object.entries(priceMap)) {
-    const id = Number(idStr);
-    const item = itemMap?.[id];
-    const rarity = item?.rarity;
-    if (TRACKED_RARITIES.has(rarity)) { filtered[idStr] = priceData; continue; }
-    if (recipeItemIds.has(id)) { filtered[idStr] = priceData; continue; }
-    if (ownedIds.has(id)) { filtered[idStr] = priceData; continue; }
-  }
-  return filtered;
-}
 
 function buildCraftItems(recipes, resolvedRecipes, itemMap, priceMap, ownedMap) {
   const items = [];
@@ -504,7 +521,8 @@ function buildCraftItems(recipes, resolvedRecipes, itemMap, priceMap, ownedMap) 
     const outputId = recipe.output_item_id;
     const outputCount = recipe.output_item_count || 1;
     const outputPrice = priceMap[outputId];
-    if (!outputPrice) continue;
+    // Don't skip recipes with no TP price — show them with 0 sell price so user
+    // can see all recipes. Account-bound/untradeable outputs will show negative profit.
 
     const tree = buildTreeSync(outputId, 1, resolvedRecipes);
     const leaves = flatLeaves(tree, ownedMap);
@@ -548,8 +566,8 @@ function buildCraftItems(recipes, resolvedRecipes, itemMap, priceMap, ownedMap) 
       });
     }
 
-    const outSell = outputPrice.sells?.unit_price || 0;
-    const outBuy = outputPrice.buys?.unit_price || 0;
+    const outSell = outputPrice?.sells?.unit_price || 0;
+    const outBuy = outputPrice?.buys?.unit_price || 0;
     const profitGross = outSell * outputCount - totalMustBuyCostSell;
     const profitNet = Math.floor(outSell * outputCount * 0.85) - totalMustBuyCostSell;
 
@@ -952,11 +970,16 @@ function PriceChart({ itemId, itemName }) {
     { key: "30d", label: "30D",   ms: 30 * 24 * 60 * 60 * 1000 },
   ];
 
+  const [noData, setNoData] = useState(false);
   useEffect(() => {
     if (!itemId) return;
+    setNoData(false);
     const p = PERIODS.find(p => p.key === period);
     const sinceTs = Date.now() - p.ms;
-    loadHistory(itemId, sinceTs).then(setD).catch(() => setD([]));
+    loadHistory(itemId, sinceTs).then(rows => {
+      setD(rows);
+      if (rows.length === 0) setNoData(true); // don't retry empty results
+    }).catch(() => { setD([]); setNoData(true); });
   }, [itemId, period]);
 
   const fmtDate = (ts) => {
@@ -997,7 +1020,11 @@ function PriceChart({ itemId, itemName }) {
     ))}
     </div>
     </div>
-    <div className="hist-empty">No data for this period yet.</div>
+    <div className="hist-empty">
+      {noData
+        ? "No price history collected for this item — only Rare/Exotic/Ascended/Legendary items are tracked."
+        : "No data for this period yet."}
+    </div>
     </div>
   );
 
@@ -1187,6 +1214,7 @@ export default function App() {
   const [secsAgo, setSecsAgo] = useState(0);
   const [toast, setToast] = useState(null);
   const [priceAlerts, setPriceAlerts] = useState([]);
+  const [forgeWallet, setForgeWallet] = useState({}); // spirit_shards, volatile_magic, unbound_magic, karma, laurels
   const [alertSort, setAlertSort] = useState("totalNet"); // totalNet | cur | pctOfMax
   const [dailyCrafted, setDailyCrafted] = useState(new Set()); // item IDs crafted today
   const [utcMidnightMs, setUtcMidnightMs] = useState(0); // next reset timestamp
@@ -1199,6 +1227,7 @@ export default function App() {
   const [flipSummary, setFlipSummary] = useState({}); // itemId -> { p10..p90, spreadNet, swing, etc }
   const [manualDailyCrafted, setManualDailyCrafted] = useState(new Set()); // set of itemIds confirmed crafted via count delta
   const [weeklyKeyDone, setWeeklyKeyDone] = useState(false); // whether weekly level 10 key has been earned this week
+  const [legendaryAchievements, setLegendaryAchievements] = useState({}); // achievementId -> { done, current, max }
   const [pendingFlips, setPendingFlips] = useState([]); // loaded from IndexedDB
   const [flipHistory, setFlipHistory] = useState([]); // loaded from IndexedDB
   // Track items that were "buy now" in last 2 refreshes for auto-pending
@@ -1212,7 +1241,6 @@ export default function App() {
 
   const [activeTab, setActiveTab] = useState("materials");
   const [activeDisc, setActiveDisc] = useState(null);
-  const [showMissing, setShowMissing] = useState(true);
   const [sortCraft, setSortCraft] = useState({ k: "profitNet", d: -1 });
   const [showRecMaterials, setShowRecMaterials] = useState(false);
   const [showRecDaily, setShowRecDaily] = useState(true);
@@ -1238,9 +1266,13 @@ export default function App() {
   const [extraDailyItems, setExtraDailyItems] = useState({}); // itemId -> {name, icon} for non-TP items
 
   const prog = (pct, msg) => setLoadState({ phase: "loading", pct, msg });
+  const fullLoadInProgressRef = useRef(false);
 
   // ── Full load ───────────────────────────────────────────────────────────────
   const fullLoad = useCallback(async () => {
+    if (fullLoadInProgressRef.current) return; // prevent double-load from HMR/StrictMode
+    if (cacheRef.current.itemMap && Object.keys(cacheRef.current.itemMap).length > 0) return; // already loaded
+    fullLoadInProgressRef.current = true;
     setError(null);
     // Prune old snapshots in background (fixes 5-year retention bug — clears bloat)
     pruneOldSnapshots();
@@ -1284,7 +1316,15 @@ export default function App() {
         // Populate cacheRef immediately — background live update needs it
         const cachedResolvedRecipes = {};
         cachedAllRecipes.forEach(r => { cachedResolvedRecipes[r.output_item_id] = r; });
-        cacheRef.current = { itemMap: cachedItemMap, priceMap: cachedPriceMap, resolvedRecipes: cachedResolvedRecipes, recipes: cachedAllRecipes, knownRecipeIds: cachedKnownIds?.value || [], ownedMap: cachedOwnedMap, allItemIds: Object.keys(cachedPriceMap).map(Number), disciplineLevels: cachedDiscLevels?.value || {}, charInventoryByChar: {}, charDisciplines: {}, timegatedList: [] };
+        // Build allItemIds from recipes + owned items (not just cached prices) so we always
+        // re-fetch prices for ALL recipe outputs even if they had no TP listing last time
+        const _allRecipeItemIds = [...new Set([
+          ...cachedAllRecipes.map(r => r.output_item_id),
+          ...Object.values(cachedResolvedRecipes).flatMap(r => r.ingredients?.map(i => i.item_id) || []),
+          ...Object.keys(cachedOwnedMap).map(Number),
+          ...Object.keys(cachedPriceMap).map(Number),
+        ])];
+        cacheRef.current = { itemMap: cachedItemMap, priceMap: cachedPriceMap, resolvedRecipes: cachedResolvedRecipes, recipes: cachedAllRecipes, knownRecipeIds: cachedKnownIds?.value || [], ownedMap: cachedOwnedMap, allItemIds: _allRecipeItemIds, disciplineLevels: cachedDiscLevels?.value || {}, charInventoryByChar: {}, charDisciplines: {}, timegatedList: [] };
 
         // Kick off heavy worker tasks in parallel
         console.log(`[startup] kicking off workers. recipes:${cachedAllRecipes.length} items:${Object.keys(cachedItemMap).length} prices:${Object.keys(cachedPriceMap).length}`);
@@ -1354,6 +1394,7 @@ export default function App() {
                                                                                                                          fetchSoldHistory().catch(() => []),
       ]);
       const goldCopper = wallet.find(w => w.id === 1)?.value || 0;
+      setForgeWallet(extractForgeWallet(wallet));
       // dailycrafting returns array of item name strings like "glob_of_elder_spirit_residue"
       // We'll store as a raw array and look up against recipe output IDs via the API's item IDs
       const nowDate = new Date();
@@ -1462,7 +1503,13 @@ export default function App() {
           prog(68, "Caching recipes & items for faster future startup...");
           await Promise.all([
             cacheSet("allRecipes", allRecipes),
-                            cacheSet("itemMap", itemMap),
+                            // Strip itemMap to name+icon+rarity+flags+type only — reduces cache from ~5MB to ~1MB
+                            cacheSet("itemMap", Object.fromEntries(
+                              Object.entries(itemMap).map(([id, item]) => [id, {
+                                id: item.id, name: item.name, icon: item.icon,
+                                rarity: item.rarity, type: item.type, flags: item.flags,
+                              }])
+                            )),
                             cacheSet("disciplineLevels", disciplineLevels),
                             cacheSet("knownRecipeIds", knownRecipeIds),
           ]);
@@ -1474,20 +1521,25 @@ export default function App() {
         prog(70, `Fetching ${missingItemIds.length} new item details...`);
         const newItems = await fetchIds("/items", missingItemIds);
         newItems.forEach(i => { itemMap[i.id] = i; });
-        // Update cache with newly discovered items
-        cacheSet("itemMap", itemMap);
+        // Update cache with newly discovered items (stripped)
+        cacheSet("itemMap", Object.fromEntries(
+          Object.entries(itemMap).map(([id, item]) => [id, {
+            id: item.id, name: item.name, icon: item.icon,
+            rarity: item.rarity, type: item.type, flags: item.flags,
+          }])
+        ));
       }
 
       // Prices always fetched live regardless of recipe/item cache
       prog(72, "Fetching live trading post prices...");
-      const priceMap = await fetchPrices(allItemIds);
+      const priceMap = await fetchPrices(filterTradeable(allItemIds, itemMap));
 
       prog(88, "Building crafting data...");
       const ownedMap = Object.fromEntries(materials.map(m => [m.id, m.count]));
       // Expand allItemIds to include all owned items (bank, inventory, materials) for accurate wealth
       const charItems_startup = extractCharacterItems(characters_startup);
       const expandedIds = [...new Set([...allItemIds, ...Object.keys(ownedMap).map(Number), ...Object.keys(charItems_startup).map(Number)])];
-      const extraPrices = await fetchPrices(expandedIds.filter(id => !priceMap[id]));
+      const extraPrices = await fetchPrices(filterTradeable(expandedIds.filter(id => !priceMap[id]), itemMap));
       Object.assign(priceMap, extraPrices);
       allItemIds = expandedIds;
       cacheRef.current = { ...cacheRef.current, allItemIds };
@@ -1588,10 +1640,13 @@ export default function App() {
       setLastPrice(now); setLastRecipe(now);
       setNextPriceIn(PRICE_REFRESH_MS); setNextRecipeIn(RECIPE_REFRESH_MS);
       setSecsAgo(0);
+      cacheSet("lastRecipeRefresh", now);
       setLoadState({ phase: "done", pct: 100, msg: "" });
     } catch (e) {
       setError(e.message);
       setLoadState({ phase: "done", pct: 0, msg: "" });
+    } finally {
+      fullLoadInProgressRef.current = false;
     }
   }, []);
 
@@ -1603,14 +1658,28 @@ export default function App() {
     // ── Wave 1: fast account data (no character inventories) + prices ──
     // characters?ids=all is the slowest call — fetch it separately so it doesn't
     // block wallet/materials/prices from showing up quickly.
-    const [wallet, rawMaterials, rawDailyCrafted, rawListings, rawSoldHistory] = await Promise.all([
+    const [wallet, rawMaterials, rawDailyCrafted, rawAchievements, rawListings, rawSoldHistory] = await Promise.all([
       apiFetch(`${BASE}/account/wallet`),
-                                                                                                   apiFetch(`${BASE}/account/materials`),
-                                                                                                   apiFetch(`${BASE}/account/dailycrafting`).catch(() => []),
-                                                                                                   apiFetch(`${BASE}/commerce/transactions/current/sells`).catch(() => null),
-                                                                                                   fetchSoldHistory().catch(() => []),
+      apiFetch(`${BASE}/account/materials`),
+      apiFetch(`${BASE}/account/dailycrafting`).catch(() => []),
+      apiFetch(`${BASE}/account/achievements?ids=3489,3522`).catch(() => []),
+      apiFetch(`${BASE}/commerce/transactions/current/sells`).catch(() => null),
+      fetchSoldHistory().catch(() => []),
     ]);
+    // Process legendary achievement progress (Aurora II: Empowering = 3489, Aurora: Awakening = 3522)
+    if (Array.isArray(rawAchievements)) {
+      const achMap = {};
+      for (const ach of rawAchievements) {
+        achMap[ach.id] = {
+          done: ach.done || false,
+          current: ach.bits?.length || ach.current || 0,
+          max: ach.id === 3489 ? 21 : 7,
+        };
+      }
+      setLegendaryAchievements(achMap);
+    }
     const goldCopper = wallet.find(w => w.id === 1)?.value || 0;
+    setForgeWallet(extractForgeWallet(wallet));
     const nowDate = new Date();
     setDailyCrafted(buildDailyCraftedSet(rawDailyCrafted, itemMap));
     setUtcMidnightMs(Date.UTC(nowDate.getUTCFullYear(), nowDate.getUTCMonth(), nowDate.getUTCDate() + 1));
@@ -1620,7 +1689,7 @@ export default function App() {
     for (const m of rawMaterials) { if (m.count > 0) matAgg[m.id] = (matAgg[m.id] || 0) + m.count; }
 
     // Fetch prices in parallel with character fetch (below)
-    const pricePromise = fetchPrices(allItemIds);
+    const pricePromise = fetchPrices(filterTradeable(allItemIds, itemMap));
 
     // ── Wave 2: slow character fetch (runs in parallel with price fetch) ──
     const charPromise = apiFetch(`${BASE}/characters?ids=all`).catch(() => []);
@@ -1763,6 +1832,14 @@ export default function App() {
         setApiKey(e.value);
         setSettingsApiKey(e.value);
         window.__gw2ApiKey = e.value;
+        // Check when recipes were last refreshed — if >4h ago, trigger refresh after load
+        invoke("cache_get", { key: "lastRecipeRefresh" }).then(re => {
+          if (re?.value) {
+            const lastRecipeTs = Number(re.value);
+            const elapsed = Date.now() - lastRecipeTs;
+            setLastRecipe(elapsed > RECIPE_REFRESH_MS ? 0 : Date.now() - elapsed);
+          }
+        }).catch(() => {});
         fullLoad();
       } else {
         // No API key — show setup screen immediately
@@ -1811,7 +1888,7 @@ export default function App() {
         apiFetch(`${BASE}/account/wallet`),
                                                                                                                                   apiFetch(`${BASE}/account/materials`),
                                                                                                                                   apiFetch(`${BASE}/characters?ids=all`),
-                                                                                                                                  fetchPrices(allItemIds),
+                                                                                                                                  fetchPrices(filterTradeable(allItemIds, itemMap)),
                                                                                                                                   apiFetch(`${BASE}/account/dailycrafting`).catch(() => []),
                                                                                                                                   apiFetch(`${BASE}/commerce/transactions/current/sells`).catch(() => null),
                                                                                                                                   fetchSoldHistory().catch(() => []),
@@ -1821,6 +1898,7 @@ export default function App() {
       const now2 = new Date();
       setUtcMidnightMs(Date.UTC(now2.getUTCFullYear(), now2.getUTCMonth(), now2.getUTCDate() + 1));
       const goldCopper = wallet.find(w => w.id === 1)?.value || 0;
+      setForgeWallet(extractForgeWallet(wallet));
       // Aggregate material storage + character bag inventories, deduplicate
       const matAgg2 = {};
       for (const m of rawMats) { if (m.count > 0) matAgg2[m.id] = (matAgg2[m.id] || 0) + m.count; }
@@ -1835,7 +1913,7 @@ export default function App() {
       const missingPriceIds = Object.keys(ownedMap).map(Number).filter(id => !freshPrices[id]);
       if (missingPriceIds.length > 0) {
         const [extraPrices, extraItems] = await Promise.all([
-          fetchPrices(missingPriceIds),
+          fetchPrices(filterTradeable(missingPriceIds, itemMap)),
           fetchIds("/items", missingPriceIds.filter(id => !itemMap[id])),
         ]);
         Object.assign(freshPrices, extraPrices);
@@ -1890,17 +1968,16 @@ export default function App() {
           buyNowWindowRef.current = newBuyNow;
         }).catch(() => {});
       } // end market summary throttle
-      // Price alert scanning — throttled to every 5 min, single bulk Rust query (no per-item IPC)
-      if (Date.now() - (cacheRef.current.lastAlertScan || 0) >= 5 * 60 * 1000) {
+      // Price alert scanning — throttled to every 15 min (heavy query on large DB)
+      if (Date.now() - (cacheRef.current.lastAlertScan || 0) >= 15 * 60 * 1000) {
         cacheRef.current.lastAlertScan = Date.now();
         const _alertSevenDaysAgo = Date.now() - SEVEN_DAYS_MS;
-        const alertItemIds = dedupedMats
-        .filter(mat => freshPrices[mat.id]?.sells?.unit_price)
-        .map(mat => mat.id);
+        // Send all owned material IDs — file filters to tracked items with sufficient history
+        const alertItemIds = dedupedMats.map(mat => mat.id);
         getPriceAlertData(alertItemIds, _alertSevenDaysAgo).then(rows => {
           const alertMap = {};
           for (const row of rows) {
-            if (row.row_count < 5) continue;
+            // row_count already filtered to >=5 by collector when writing price_alerts.json
             const id = row.item_id;
             const cur = freshPrices[id]?.sells?.unit_price;
             if (!cur) continue;
@@ -1974,7 +2051,9 @@ export default function App() {
       const newIds = await apiFetch(`${BASE}/account/recipes`);
       const added = newIds.filter(id => !oldIds.includes(id));
       cacheRef.current.knownRecipeIds = newIds;
-      setLastRecipe(Date.now()); setNextRecipeIn(RECIPE_REFRESH_MS);
+      const recipeNow = Date.now();
+      setLastRecipe(recipeNow); setNextRecipeIn(RECIPE_REFRESH_MS);
+      cacheSet("lastRecipeRefresh", recipeNow);
       if (!added.length) return;
       const newRecipes = await fetchIds("/recipes", added);
       const allRecipes = [...recipes, ...newRecipes];
@@ -1983,7 +2062,7 @@ export default function App() {
       if (newItemIds.length) {
         const ni = await fetchIds("/items", newItemIds);
         ni.forEach(i => { itemMap[i.id] = i; });
-        const np = await fetchPrices(newItemIds);
+        const np = await fetchPrices(filterTradeable(newItemIds, itemMap));
         Object.assign(priceMap, np);
       }
       cacheRef.current = { ...cacheRef.current, itemMap, priceMap, resolvedRecipes, recipes: allRecipes, ownedMap };
@@ -2049,22 +2128,38 @@ export default function App() {
   // ── History ─────────────────────────────────────────────────────────────────
   // Tick every 60s to refresh open charts with new collector data
   // Fetch item data for daily/timegated items that aren't on the TP (no icon in itemMap)
+  // Also fetches icons for legendary components (account-bound, never in priceMap/itemMap)
   useEffect(() => {
     if (!data?.itemMap) return;
+    const LEGENDARY_ITEM_IDS = [19626, 19674, 19673, 19672, 19678, 19677, 19676, 70801, 75299, 71123, 75744, 71655, 71787, 73236, 73196, 76530, 70867, 19621, 19622, 19623, 19624, 19631, 19632, 19639, 19638, 19627, 19630, 19656, 19659, 19664, 19665, 19667, 19669, 19670, 19648, 19647, 19645, 29185, 29169, 29178, 29181, 29170, 29173, 29172, 29175, 29176, 29177, 29166, 29184, 29180, 29182, 29183, 29168, 88567, 88933, 73239, 86036, 74927, 76427, 70797, 74300, 77086, 79419, 79839, 72083, 90893, 89445, 85744, 71383, 72713, 76158, 78556, 79802, 79562, 81957, 86098, 87109, 90551, 89854, 81908, 81729, 81796, 81861, 71820, 46743, 46742, 82008, 70528, 71581, 73137, 71994, 73248, 70820, 20797, 46683, 81815, 82036, 79280, 80332, 81706, 81127, 79899, 79469, 91604, 91520, 91407, 91607, 91559, 91584, 91594, 91443, 91509, 91420, 91488, 91382, 19687, 19682, 19686, 19684,
+    // Mystic Forge vendor items + unnamed flip market items
+    20796, 20799, 97983, 71581];
     const allDailyIds = [
       ...Object.values(MANUAL_DAILY_MAP).map(v => v.itemId),
-            ...Object.values(DAILY_CRAFT_MAP).map(v => v.itemId),
+      ...Object.values(DAILY_CRAFT_MAP).map(v => v.itemId),
+      ...LEGENDARY_ITEM_IDS,
     ];
-    const missing = allDailyIds.filter(id => !data.itemMap[id]);
+    const missing = [...new Set(allDailyIds)].filter(id => id && !data.itemMap[id]);
     if (missing.length === 0) return;
-    fetch(`https://api.guildwars2.com/v2/items?ids=${missing.join(",")}`)
-    .then(r => r.json())
-    .then(items => {
+    // Fetch in chunks of 200
+    const chunks = [];
+    for (let i = 0; i < missing.length; i += 200) chunks.push(missing.slice(i, i + 200));
+    Promise.all(chunks.map(chunk =>
+      fetch(`https://api.guildwars2.com/v2/items?ids=${chunk.join(",")}`)
+      .then(r => r.json()).catch(() => [])
+    )).then(results => {
       const map = {};
-      for (const item of items) map[item.id] = { name: item.name, icon: item.icon };
+      for (const batch of results) {
+        if (!Array.isArray(batch)) continue;
+        for (const item of batch) map[item.id] = { name: item.name, icon: item.icon };
+      }
       setExtraDailyItems(map);
-    })
-    .catch(() => {});
+      // Also merge into cacheRef itemMap so legendary recipes can resolve icons
+      if (Object.keys(map).length > 0) {
+        cacheRef.current.itemMap = { ...cacheRef.current.itemMap, ...map };
+        setData(prev => prev ? { ...prev, itemMap: { ...prev.itemMap, ...map } } : prev);
+      }
+    }).catch(() => {});
   }, [!!data?.itemMap]);
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -2345,8 +2440,7 @@ export default function App() {
                                  ...matCandidates,
     ].filter(i => showRecDaily || !dailyIds.has(i.outputId))
     .filter(i => showRecDailyOutputs || !dailyIds.has(i.outputId))
-    // Only show items with enough velocity data AND actual sell activity
-    .filter(i => i.isMaterial || (velocitySummary[i.outputId]?.observations >= 5 && velocitySummary[i.outputId]?.sellFillsPerHr > 0));
+
 
     // Score all items
     const MIN_OBS = 5;
@@ -2484,9 +2578,9 @@ export default function App() {
         </span>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-        <label style={{ fontSize: 12, color: "var(--text3)", display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}>
+        <label style={{ fontSize: 12, color: "var(--text3)", display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }} title="Also applies to individual profession tabs">
         <input type="checkbox" checked={showRecMissing} onChange={e => setShowRecMissing(e.target.checked)} />
-        Show missing
+        Show missing materials
         </label>
         <label style={{ fontSize: 12, color: "var(--text3)", display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}>
         <input type="checkbox" checked={showRecMaterials} onChange={e => setShowRecMaterials(e.target.checked)} />
@@ -2640,6 +2734,26 @@ export default function App() {
     const discs = DISCIPLINES.filter(d => data.byDisc[d]?.length > 0);
     const disc = activeDisc || discs[0];
 
+    // Build forge recipe map for cross-tab integration
+    const { MATERIAL_PROMOTION_RECIPES: mpRecipes } = (typeof window !== 'undefined' && window.__forgeRecipes) ? window.__forgeRecipes : { MATERIAL_PROMOTION_RECIPES: [] };
+    // We use a simple name-based lookup built from priceMap + the hardcoded forge recipe IDs
+    // forgeableIds: set of item IDs that have a Mystic Forge material promotion recipe
+    const forgeableOutputIds = new Set([
+      19739,19741,19743,19748,19745, // wool/cotton/linen/silk/gossamer scrap
+      19728,19730,19731,19729,19732, // leather sections thin-hardened
+      19699,19698,19702,19700,19701, // iron/gold/platinum/mithril/orichalcum ore
+      19726,19727,19724,19722,19725, // soft/seasoned/hard/elder/ancient wood log
+      19740,19742,19744,19747,19746, // bolts wool-gossamer
+      19733,19734,19736,19735,19737, // cured leather squares
+      19687,19683,19682,19688,19686,19684,19685, // silver/iron/gold/steel/platinum/mithril/orichalcum ingot
+      19713,19714,19711,19709,19712, // soft/seasoned/hard/elder/ancient wood plank
+      24273,24274,24275,24276,24277, // shimmering-crystalline dust
+      24343,24344,24345,24341,24358, // bone shard/bone/heavy bone/large bone/ancient bone
+      24347,24348,24349,24350,24351, // small-vicious claw
+      24353,24354,24355,24356,24357, // small-vicious fang
+      24285,24286,24287,24288,24289, // small-armored scale
+    ]);
+
     // Find which characters can perform the active discipline
     const crafterNames = data.charDisciplines
     ? Object.entries(data.charDisciplines)
@@ -2667,7 +2781,7 @@ export default function App() {
       return others; // [{ name, count }, ...]
     };
     let items = data.byDisc[disc] || [];
-    if (!showMissing) items = items.filter(i => i.canCraft);
+    if (!showRecMissing) items = items.filter(i => i.canCraft);
 
     // Recommendation score — uses accumulated global market velocity data
     // sellFillsPerHr: how many sell listings are getting snapped up by buyers per hour (global)
@@ -2753,12 +2867,15 @@ export default function App() {
       };
     });
 
+    // Show all recipes — items without velocity data get score=0 and sort to bottom
+    // This ensures the user sees every recipe they have, not just ones with market data
     const filtered = items
-    .filter(i => velocitySummary[i.outputId]?.observations >= MIN_OBS && velocitySummary[i.outputId]?.sellFillsPerHr > 0)
     .filter(i => i.name.toLowerCase().includes(searchCraft.toLowerCase()));
-    // Sort by recommendation score (same algorithm as Recommended tab)
-    // This respects the TP priority system — high-volume markets rank well when absolute rate is high
-    const sorted = [...filtered].sort((a, b) => b.score - a.score);
+    // Sort by score desc (velocity-informed), then by profitNet desc for items with no velocity data
+    const sorted = [...filtered].sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return b.profitNet - a.profitNet;
+    });
 
     return (
       <div>
@@ -2792,8 +2909,8 @@ export default function App() {
       value={searchCraft}
       onChange={e => { setSearchCraft(e.target.value); setCraftPage(0); }}
       />
-      <label className="cbl">
-      <input type="checkbox" checked={showMissing} onChange={e => setShowMissing(e.target.checked)} />
+      <label className="cbl" title="Also applies to the Recommended tab">
+      <input type="checkbox" checked={showRecMissing} onChange={e => setShowRecMissing(e.target.checked)} />
       Show missing materials
       </label>
       <div style={{ marginLeft:"auto", fontSize:11, color:"var(--text3)", fontFamily:"Cinzel,serif", letterSpacing:1 }}>
@@ -3032,6 +3149,14 @@ export default function App() {
                   {m?.vendorPrice && m?.tpSell > 0 && isMustBuy && m?.bestSource === "tp" && (
                     <span className="src-tp">📊 TP cheaper than vendor</span>
                   )}
+                  {isMustBuy && forgeableOutputIds.has(child.itemId) && (
+                    <span
+                      title="This item can be made cheaper in the Mystic Forge — check the ⚗ Mystic Forge tab"
+                      onClick={e => { e.stopPropagation(); setActiveTab("mysticforge"); }}
+                      style={{ fontSize: 10, color: "#a060e0", background: "rgba(160,90,220,.15)", border: "1px solid rgba(160,90,220,.35)", borderRadius: 3, padding: "1px 6px", cursor: "pointer", fontFamily: "Cinzel,serif", letterSpacing: 0.5 }}>
+                      ⚗ Mystic Forge
+                    </span>
+                  )}
                   {onOther && onOther.map(c => (
                     <span key={c.name} style={{ fontSize: 11, color: "var(--gold2)", background: "rgba(200,150,42,0.1)", border: "1px solid rgba(200,150,42,0.3)", borderRadius: 3, padding: "1px 6px", fontFamily: "Cinzel,serif", letterSpacing: 0.5 }}>
                     📦 {c.count} on {c.name}
@@ -3222,7 +3347,7 @@ export default function App() {
         </>}
         </div>
     );
-  }, [data, activeDisc, showMissing, searchCraft, expanded, dailyCrafted, manualDailyCrafted, resetCountdown, myListings, mySoldHistory, velocitySummary, trendSummary, craftingChartItem, craftPage]);
+  }, [data, activeDisc, showRecMissing, searchCraft, expanded, dailyCrafted, manualDailyCrafted, resetCountdown, myListings, mySoldHistory, velocitySummary, trendSummary, craftingChartItem, craftPage]);
 
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
@@ -3499,6 +3624,7 @@ export default function App() {
       <div className="nav">
       <button className={`ntab${activeTab === "materials" ? " on" : ""}`} onClick={() => setActiveTab("materials")}>Materials</button>
       <button className={`ntab${activeTab === "crafting" ? " on" : ""}`} onClick={() => setActiveTab("crafting")}>Crafting Profits</button>
+      <button className={`ntab${activeTab === "mysticforge" ? " on" : ""}`} onClick={() => setActiveTab("mysticforge")}>⚗ Mystic Forge</button>
       <button className={`ntab${activeTab === "listings" ? " on" : ""}`} onClick={() => setActiveTab("listings")}>
       Trading Post
       {Object.keys(myListings).length > 0 && <span style={{ marginLeft: 7, fontSize: 10, opacity: .8 }}>{Object.keys(myListings).length}</span>}
@@ -3523,6 +3649,17 @@ export default function App() {
 
       {activeTab === "materials" && MaterialsTab}
       {activeTab === "crafting" && CraftingTab}
+      {activeTab === "mysticforge" && data && (
+        <MysticForgeTab
+          data={data}
+          priceMap={data.priceMap}
+          ownedMap={data.ownedMap}
+          velocitySummary={velocitySummary}
+          trendSummary={trendSummary}
+          wallet={forgeWallet}
+          legendaryAchievements={legendaryAchievements}
+        />
+      )}
       {activeTab === "flipping" && data && (() => {
         const itemMap = data.itemMap || {};
 

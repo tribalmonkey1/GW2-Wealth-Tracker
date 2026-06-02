@@ -189,7 +189,7 @@ function buildCraftItems(recipes, resolvedRecipes, itemMap, priceMap, ownedMap) 
     const outputId = recipe.output_item_id;
     const outputCount = recipe.output_item_count || 1;
     const outputPrice = priceMap[outputId];
-    if (!outputPrice) continue;
+    // Don't skip recipes with no TP price — show all recipes, 0 sell = untradeable/unlisted
     const tree = buildTreeSync(outputId, 1, resolvedRecipes);
     const leaves = flatLeaves(tree, ownedMap);
     let canCraft = true;
@@ -220,8 +220,8 @@ function buildCraftItems(recipes, resolvedRecipes, itemMap, priceMap, ownedMap) 
       }
       matDetails.push({ itemId: leaf.itemId, name: item?.name || `Item ${leaf.itemId}`, needed, owned, tpSell, tpBuy, vendorPrice, bestBuyPrice, bestSource, rarity: item?.rarity, status });
     }
-    const outSell = outputPrice.sells?.unit_price || 0;
-    const outBuy = outputPrice.buys?.unit_price || 0;
+    const outSell = outputPrice?.sells?.unit_price || 0;
+    const outBuy = outputPrice?.buys?.unit_price || 0;
     const profitGross = outSell * outputCount - totalMustBuyCostSell;
     const profitNet = Math.floor(outSell * outputCount * 0.85) - totalMustBuyCostSell;
     let matSellTotal = 0;
