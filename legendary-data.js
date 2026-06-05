@@ -126,6 +126,30 @@ const ID = {
   ETERNITY:                 88933,
   THE_BIFROST:              88567,
 
+  // The Legend precursor chain [wiki verified June 2026]
+  // Tier 1 (The Bifrost I: achievement 2530)
+  ESSENCE_OF_ANCIENT_MYSTICISM: 77190,  // from Chest of Ancient Mysticism (achievement reward)
+  EXPERIMENTAL_STAFF_HEAD:   71932,     // crafted, recipe from Box of Recipes First Tier
+  EXPERIMENTAL_STAFF_SHAFT:  73748,     // crafted, recipe from Box of Recipes First Tier
+  LEGENDARY_INSCRIPTION:     72261,     // crafted, recipe from Box of Recipes First Tier
+  BOX_OF_RECIPES_LEGEND_1:   71677,     // Box of Recipes: The Legend (First Tier) — from Chest of Ancient Mysticism
+  // Tier 2 (The Bifrost II: achievement 2500)
+  SPIRIT_OF_LEGEND_EXPERIMENT: 75535,  // from salvaging The Legend Experiment
+  THE_LEGEND_EXPERIMENT:     73431,     // crafted via Tier 1 collection
+  EXPERTISE_IN_STAFF_CRAFTING: 77139,  // from Tricks and Tips for Advanced Staff Crafting
+  JAR_OF_LUMINESCE_POLISH:   75316,    // crafted, recipe from Box of Recipes Second Tier
+  PRISMATIC_LODESTONE:       73517,    // crafted, recipe from Box of Recipes Second Tier
+  TRICKS_AND_TIPS:           74094,    // Tricks and Tips for Advanced Staff Crafting — achievement reward
+  BOX_OF_RECIPES_LEGEND_2:   75752,    // Box of Recipes: The Legend (Second Tier) — from Tricks and Tips
+  // Tier 3 (The Bifrost III: achievement 2187)
+  ESSENCE_OF_RAINBOWS:       74378,    // from Chest of Rainbows (achievement reward)
+  SPIRIT_OF_PERFECTED_STAFF: 76891,   // from salvaging Perfected Staff
+  PERFECTED_STAFF:           76027,    // crafted via Tier 2 collection
+  BOX_OF_RECIPES_LEGEND_3:   75752,   // same box, reused — Second Tier box unlocks Tier 3 recipes too
+  CARVED_TEAR_DROP:          73809,   // crafted, recipe from Box of Recipes: The Legend (74301)
+  CARVED_BEAM:               73875,   // crafted, recipe from Box of Recipes: The Legend (74301)
+  BOX_OF_RECIPES_LEGEND_MAIN: 74301,  // Box of Recipes: The Legend — from Chest of Rainbows
+
   // Gen 1 precursors [API scan + wiki verified]
   DUSK:                     29185,   // Twilight
   DAWN:                     29169,   // Sunrise
@@ -406,7 +430,7 @@ const GIFT_OF_COLOR = forge(ID.GIFT_OF_COLOR, 'Gift of Color', 1, [
   tp(ID.OPAL_ORB,                 'Opal Orb',                 100),
   tp(ID.PILE_OF_CRYSTALLINE_DUST, 'Pile of Crystalline Dust', 250),
   collection(ID.GIFT_OF_ZHAITAN,  'Gift of Zhaitan',          1,
-    'Purchase from Dungeon Merchant for 500 Arah tokens'),
+    'Purchase from Dungeon Merchant for 500 Tales of Dungeon Delving (Arah dungeon currency) — also available via Arah PvP/WvW reward track'),
 ]);
 
 // Gift of Ice [API verified] — sub of Gift of Frostfang
@@ -754,8 +778,9 @@ export const LEGENDARY_RECIPES = [
     inputs: [
       tp(null,                        'Twilight',                   1),
       tp(null,                        'Sunrise',                    1),
-      tp(ID.MYSTIC_COIN,              'Mystic Coin',                100),
-      tp(ID.PILE_OF_CRYSTALLINE_DUST, 'Pile of Crystalline Dust',   250),
+      tp(ID.PILE_OF_CRYSTALLINE_DUST, 'Pile of Crystalline Dust',   5),
+      { itemId: 20796, name: "Philosopher's Stone", count: 10, source: 'currency',
+        note: '10 for 1 Spirit Shard from Miyani', inputs: [] },
     ],
   },
 
@@ -962,7 +987,183 @@ export const LEGENDARY_RECIPES = [
     itemId: ID.THE_BIFROST,
     rarity: 'Legendary', weaponType: 'Staff', generation: 1,
     inputs: [
-      precursor(ID.THE_LEGEND, 'The Legend'),
+      // ── The Legend precursor — 3-tier collection chain ─────────────────────
+      // Achievement chain: Bifrost I (2530) → Bifrost II (2500) → Bifrost III (2187)
+      {
+        itemId: ID.THE_LEGEND,
+        name: 'The Legend',
+        count: 1,
+        source: 'collection',
+        accountBound: true,
+        achievementId: 2187,   // The Bifrost III: The Legend
+        note: 'Crafted via 3-tier collection chain. Complete The Bifrost III: The Legend achievement.',
+        inputs: [
+          // ── Tier 3: The Bifrost III: The Legend (achievement 2187) ──────────
+          // Chest of Rainbows — reward for completing Bifrost III achievement
+          {
+            itemId: ID.ESSENCE_OF_RAINBOWS,
+            name: 'Essence of Rainbows',
+            count: 1,
+            source: 'collection',
+            accountBound: true,
+            achievementId: 2187,
+            note: 'Obtained from Chest of Rainbows — reward for completing The Bifrost III: The Legend achievement',
+            inputs: [],
+          },
+          // Spirit of the Perfected Staff — salvage Perfected Staff
+          {
+            itemId: ID.SPIRIT_OF_PERFECTED_STAFF,
+            name: 'Spirit of the Perfected Staff',
+            count: 1,
+            source: 'collection',
+            accountBound: true,
+            note: 'Salvage Perfected Staff (ID 76027) with any salvage kit',
+            inputs: [
+              // Perfected Staff is crafted via Tier 2 collection (Bifrost II)
+              {
+                itemId: ID.PERFECTED_STAFF,
+                name: 'Perfected Staff',
+                count: 1,
+                source: 'collection',
+                accountBound: true,
+                achievementId: 2500,  // The Bifrost II: The Perfected Staff
+                note: 'Crafted via The Bifrost II: The Perfected Staff collection. Recipe from Box of Recipes: The Legend (Second Tier).',
+                inputs: [
+                  collection(ID.EXPERTISE_IN_STAFF_CRAFTING, 'Expertise in Staff Crafting', 1,
+                    'From Tricks and Tips for Advanced Staff Crafting (consumable) — reward for completing The Bifrost II achievement'),
+                  {
+                    itemId: ID.SPIRIT_OF_LEGEND_EXPERIMENT,
+                    name: 'Spirit of The Legend Experiment',
+                    count: 1,
+                    source: 'collection',
+                    accountBound: true,
+                    note: 'Salvage The Legend Experiment (ID 73431) with any salvage kit',
+                    inputs: [
+                      // The Legend Experiment is crafted via Tier 1 collection (Bifrost I)
+                      {
+                        itemId: ID.THE_LEGEND_EXPERIMENT,
+                        name: 'The Legend Experiment',
+                        count: 1,
+                        source: 'collection',
+                        accountBound: true,
+                        achievementId: 2530,  // The Bifrost I: The Experimental Staff
+                        note: 'Crafted via The Bifrost I: The Experimental Staff collection. Recipe from Box of Recipes: The Legend (First Tier).',
+                        inputs: [
+                          collection(ID.ESSENCE_OF_ANCIENT_MYSTICISM, 'Essence of Ancient Mysticism', 1,
+                            'From Chest of Ancient Mysticism (reward for completing The Bifrost I achievement) — or buy from Grandmaster Craftsman Hobbs in Trader\'s Forum, Lion\'s Arch for 10,003 Karma (after completing Bifrost I)'),
+                          // Experimental Staff Head — crafted (recipe from Box of Recipes First Tier)
+                          {
+                            itemId: ID.EXPERIMENTAL_STAFF_HEAD,
+                            name: 'Experimental Staff Head',
+                            count: 1,
+                            source: 'forge',
+                            accountBound: true,
+                            note: 'Crafted (Artificer 450) — recipe from Box of Recipes: The Legend (First Tier)',
+                            inputs: [
+                              { itemId: null, idName: 'Spiritwood Plank', name: 'Spiritwood Plank', count: 10, source: 'tp', inputs: [] },
+                              { itemId: null, idName: 'Memory of Battle', name: 'Memory of Battle', count: 100, source: 'wvw', accountBound: false, note: 'WvW participation currency', inputs: [] },
+                              { itemId: null, idName: 'Shard of Glory', name: 'Shard of Glory', count: 100, source: 'currency', note: 'PvP participation currency — buy from Miyani', inputs: [] },
+                            ],
+                          },
+                          // Experimental Staff Shaft — crafted (recipe from Box of Recipes First Tier)
+                          {
+                            itemId: ID.EXPERIMENTAL_STAFF_SHAFT,
+                            name: 'Experimental Staff Shaft',
+                            count: 1,
+                            source: 'forge',
+                            accountBound: true,
+                            note: 'Crafted (Artificer 450) — recipe from Box of Recipes: The Legend (First Tier)',
+                            inputs: [
+                              { itemId: null, idName: 'Spiritwood Plank', name: 'Spiritwood Plank', count: 25, source: 'tp', inputs: [] },
+                              { itemId: null, idName: 'Memory of Battle', name: 'Memory of Battle', count: 100, source: 'wvw', accountBound: false, note: 'WvW participation currency', inputs: [] },
+                              { itemId: null, idName: 'Shard of Glory', name: 'Shard of Glory', count: 100, source: 'currency', note: 'PvP participation currency — buy from Miyani', inputs: [] },
+                            ],
+                          },
+                          // Legendary Inscription — crafted (recipe from Box of Recipes First Tier)
+                          {
+                            itemId: ID.LEGENDARY_INSCRIPTION,
+                            name: 'Legendary Inscription',
+                            count: 1,
+                            source: 'forge',
+                            accountBound: true,
+                            note: 'Crafted (Artificer/Huntsman/Weaponsmith 450) — recipe from Box of Recipes: The Legend (First Tier)',
+                            inputs: [
+                              tp(ID.GLOB_OF_ECTOPLASM, 'Glob of Ectoplasm', 10),
+                              tp(ID.PILE_OF_CRYSTALLINE_DUST, 'Pile of Crystalline Dust', 5),
+                              { itemId: null, idName: 'Orichalcum Plated Dowel', name: 'Orichalcum Plated Dowel', count: 1, source: 'tp', inputs: [] },
+                              { itemId: null, idName: 'Elonian Leather Square', name: 'Elonian Leather Square', count: 10, source: 'tp', inputs: [] },
+                            ],
+                          },
+                        ],
+                      },
+                    ],
+                  },
+                  // Jar of Luminesce Polish — crafted (recipe from Box of Recipes Second Tier)
+                  {
+                    itemId: ID.JAR_OF_LUMINESCE_POLISH,
+                    name: 'Jar of Luminesce Polish',
+                    count: 1,
+                    source: 'forge',
+                    accountBound: true,
+                    note: 'Crafted (Artificer/Huntsman/Weaponsmith 400) — recipe from Box of Recipes: The Legend (Second Tier)',
+                    inputs: [
+                      { itemId: null, idName: 'Pile of Bloodstone Dust', name: 'Pile of Bloodstone Dust', count: 250, source: 'tp', inputs: [] },
+                      { itemId: null, idName: 'Amalgamated Gemstone', name: 'Amalgamated Gemstone', count: 1, source: 'tp', inputs: [] },
+                      { itemId: null, idName: 'Thermocatalytic Reagent', name: 'Thermocatalytic Reagent', count: 10, source: 'tp', inputs: [] },
+                      { itemId: null, idName: 'Master Maintenance Oil', name: 'Master Maintenance Oil', count: 10, source: 'tp', inputs: [] },
+                    ],
+                  },
+                  // Prismatic Lodestone — crafted (recipe from Box of Recipes Second Tier)
+                  {
+                    itemId: ID.PRISMATIC_LODESTONE,
+                    name: 'Prismatic Lodestone',
+                    count: 1,
+                    source: 'forge',
+                    accountBound: true,
+                    note: 'Crafted (Artificer/Huntsman/Weaponsmith 400) — recipe from Box of Recipes: The Legend (Second Tier). Combines 4 elemental lodestones.',
+                    inputs: [
+                      tp(ID.GLACIAL_LODESTONE,  'Glacial Lodestone',  1),
+                      tp(ID.MOLTEN_LODESTONE,   'Molten Lodestone',   1),
+                      tp(ID.ONYX_LODESTONE,     'Onyx Lodestone',     1),
+                      tp(ID.CHARGED_LODESTONE,  'Charged Lodestone',  1),
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+          // Carved Tear Drop — crafted (recipe from Box of Recipes: The Legend)
+          {
+            itemId: ID.CARVED_TEAR_DROP,
+            name: 'Carved Tear Drop',
+            count: 1,
+            source: 'forge',
+            accountBound: true,
+            note: 'Crafted (Artificer 500) — recipe from Box of Recipes: The Legend (from Chest of Rainbows)',
+            inputs: [
+              tp(ID.GLOB_OF_ECTOPLASM,        'Glob of Ectoplasm',        1),
+              { itemId: null, idName: 'Spiritwood Plank',  name: 'Spiritwood Plank',  count: 1, source: 'tp', inputs: [] },
+              { itemId: null, idName: "Sculptor's Tools",  name: "Sculptor's Tools",  count: 1, source: 'tp', inputs: [] },
+              tp(ID.PILE_OF_CRYSTALLINE_DUST, 'Pile of Crystalline Dust', 10),
+            ],
+          },
+          // Carved Beam — crafted (recipe from Box of Recipes: The Legend)
+          {
+            itemId: ID.CARVED_BEAM,
+            name: 'Carved Beam',
+            count: 1,
+            source: 'forge',
+            accountBound: true,
+            note: 'Crafted (Artificer 500) — recipe from Box of Recipes: The Legend (from Chest of Rainbows)',
+            inputs: [
+              tp(ID.ELDER_WOOD_PLANK,   'Elder Wood Plank',   50),
+              tp(ID.ANCIENT_WOOD_PLANK, 'Ancient Wood Plank', 50),
+              { itemId: null, idName: 'Spiritwood Plank', name: 'Spiritwood Plank', count: 1, source: 'tp', inputs: [] },
+              { itemId: null, idName: "Sculptor's Tools",  name: "Sculptor's Tools",  count: 1, source: 'tp', inputs: [] },
+            ],
+          },
+        ],
+      },
       { ...GIFT_OF_THE_BIFROST },
       { ...GIFT_OF_FORTUNE },
       { ...GIFT_OF_MASTERY },

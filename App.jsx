@@ -1662,18 +1662,21 @@ export default function App() {
       apiFetch(`${BASE}/account/wallet`),
       apiFetch(`${BASE}/account/materials`),
       apiFetch(`${BASE}/account/dailycrafting`).catch(() => []),
-      apiFetch(`${BASE}/account/achievements?ids=3489,3522`).catch(() => []),
+      apiFetch(`${BASE}/account/achievements?ids=3489,3522,2530,2500,2187`).catch(() => []),
       apiFetch(`${BASE}/commerce/transactions/current/sells`).catch(() => null),
       fetchSoldHistory().catch(() => []),
     ]);
     // Process legendary achievement progress (Aurora II: Empowering = 3489, Aurora: Awakening = 3522)
     if (Array.isArray(rawAchievements)) {
+      const achMax = { 3489: 21, 3522: 7, 2530: null, 2500: null, 2187: null }; // null = use API bits count
       const achMap = {};
       for (const ach of rawAchievements) {
         achMap[ach.id] = {
           done: ach.done || false,
           current: ach.bits?.length || ach.current || 0,
-          max: ach.id === 3489 ? 21 : 7,
+          max: achMax[ach.id] !== undefined && achMax[ach.id] !== null
+            ? achMax[ach.id]
+            : (ach.max || ach.bits?.length || null),
         };
       }
       setLegendaryAchievements(achMap);
@@ -2133,7 +2136,10 @@ export default function App() {
     if (!data?.itemMap) return;
     const LEGENDARY_ITEM_IDS = [19626, 19674, 19673, 19672, 19678, 19677, 19676, 70801, 75299, 71123, 75744, 71655, 71787, 73236, 73196, 76530, 70867, 19621, 19622, 19623, 19624, 19631, 19632, 19639, 19638, 19627, 19630, 19656, 19659, 19664, 19665, 19667, 19669, 19670, 19648, 19647, 19645, 29185, 29169, 29178, 29181, 29170, 29173, 29172, 29175, 29176, 29177, 29166, 29184, 29180, 29182, 29183, 29168, 88567, 88933, 73239, 86036, 74927, 76427, 70797, 74300, 77086, 79419, 79839, 72083, 90893, 89445, 85744, 71383, 72713, 76158, 78556, 79802, 79562, 81957, 86098, 87109, 90551, 89854, 81908, 81729, 81796, 81861, 71820, 46743, 46742, 82008, 70528, 71581, 73137, 71994, 73248, 70820, 20797, 46683, 81815, 82036, 79280, 80332, 81706, 81127, 79899, 79469, 91604, 91520, 91407, 91607, 91559, 91584, 91594, 91443, 91509, 91420, 91488, 91382, 19687, 19682, 19686, 19684,
     // Mystic Forge vendor items + unnamed flip market items
-    20796, 20799, 97983, 71581];
+    20796, 20799, 97983, 71581,
+    // The Legend / Bifrost precursor chain items (June 2026)
+    77190, 71932, 73748, 72261, 71677, 75535, 73431, 77139, 75316, 73517, 74094, 75752,
+    74378, 76891, 76027, 73809, 73875, 74301, 24572];
     const allDailyIds = [
       ...Object.values(MANUAL_DAILY_MAP).map(v => v.itemId),
       ...Object.values(DAILY_CRAFT_MAP).map(v => v.itemId),
