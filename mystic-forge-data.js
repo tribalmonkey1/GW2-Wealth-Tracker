@@ -1759,6 +1759,57 @@ export function getObsidianAcquisition(needed, wallet, priceMap) {
 }
 
 
+// ── Mystic Clover Recipes ─────────────────────────────────────────────────────
+// Source: wiki.guildwars2.com/wiki/Mystic_Clover
+//
+// Method 1 — Guaranteed (Miyani vendor, Trader's Forum / Memory of Old Lion's Arch):
+//   3 Spirit Shards + 3 Mystic Coins + 3 Obsidian Shards + 5 Glob of Ectoplasm
+//   → 1 Mystic Clover. Limit 10 per week. [wiki verified June 2026 — screenshot confirmed]
+//
+// Method 2 — Random Mystic Forge:
+//   10 Mystic Coins + 10 Obsidian Shards + 10 Glob of Ectoplasm + 10 Philosopher's Stones
+//   → Random outcome: 10× Mystic Clover OR 10× T6 materials. Expected value ≈ 1.33 clovers/attempt.
+//   (The forge has a 25% chance to give 10 clovers on a 5-clover recipe; wiki documents the
+//    common shorthand as ~1.33 average but exact probability varies.)
+
+export const MYSTIC_CLOVER_RECIPES = {
+  // Guaranteed: 1 clover per craft, 10/week cap
+  guaranteed: {
+    id: 'mystic_clover_guaranteed',
+    name: 'Mystic Clover (Guaranteed)',
+    outputId: 19675,       // Mystic Clover [API verified]
+    outputCount: 1,
+    weeklyLimit: 10,
+    spiritShardsPerCraft: 3,
+    inputs: [
+      // Spirit Shards: shown as currency cost, 0 gold
+      { itemId: null, name: 'Spirit Shard', count: 3, source: 'spirit_shard',
+        note: '3 Spirit Shards per clover (currency, not gold)', inputs: [] },
+      { itemId: F.MYSTIC_COIN,        name: 'Mystic Coin',        count: 3, source: 'tp', inputs: [] },
+      { itemId: F.OBSIDIAN_SHARD,     name: 'Obsidian Shard',     count: 3, source: 'karma',
+        note: '1,050 Karma each — or Volatile/Unbound Magic + 96c', inputs: [] },
+      { itemId: F.GLOB_OF_ECTOPLASM,  name: 'Glob of Ectoplasm',  count: 5, source: 'tp', inputs: [] },
+    ],
+  },
+  // Random forge: ~1.33 average clovers per attempt (no weekly cap)
+  random: {
+    id: 'mystic_clover_random',
+    name: 'Mystic Clover (Random Forge)',
+    outputId: 19675,
+    outputCount: 1.33,   // average output per attempt
+    outputIsAverage: true,
+    weeklyLimit: null,
+    inputs: [
+      { itemId: F.MYSTIC_COIN,         name: 'Mystic Coin',          count: 10, source: 'tp', inputs: [] },
+      { itemId: F.OBSIDIAN_SHARD,      name: 'Obsidian Shard',       count: 10, source: 'karma',
+        note: '1,050 Karma each — or Volatile/Unbound Magic + 96c', inputs: [] },
+      { itemId: F.GLOB_OF_ECTOPLASM,   name: 'Glob of Ectoplasm',    count: 10, source: 'tp', inputs: [] },
+      { itemId: F.PHILOSOPHER_STONE,   name: "Philosopher's Stone",  count: 10, source: 'spirit_shard',
+        note: '10 Philosopher\'s Stones = 1 Spirit Shard from Miyani', inputs: [] },
+    ],
+  },
+};
+
 // ── Miniature Promotion Recipes ────────────────────────────────────────────────
 // Miniature promotion: 4x lower-tier minis → 1x higher-tier mini (random output)
 // Source: wiki.guildwars2.com/wiki/Mystic_Forge/Miniatures

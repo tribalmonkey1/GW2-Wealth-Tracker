@@ -76,9 +76,12 @@ const VENDOR_PRICES = {
   36731: 16, 8576: 8, 12238: 150,
 };
 
-function buildTreeSync(itemId, count, resolvedRecipes, depth = 0) {
+// rootRecipe override — see App.jsx buildTreeSync for full rationale. Needed so
+// each card (one per recipe object) builds its own tree instead of always
+// resolving to whichever recipe last won the resolvedRecipes[outputId] collision.
+function buildTreeSync(itemId, count, resolvedRecipes, depth = 0, rootRecipe = null) {
   if (depth > 8) return { itemId, count, children: [], isLeaf: true };
-  const recipe = resolvedRecipes[itemId];
+  const recipe = (depth === 0 && rootRecipe) ? rootRecipe : resolvedRecipes[itemId];
   if (!recipe) return { itemId, count, children: [], isLeaf: true };
   const outputCount = recipe.output_item_count || 1;
   const runs = Math.ceil(count / outputCount);
@@ -184,13 +187,26 @@ function cheapestAcquire(itemId, count, resolvedRecipes, priceMap, itemMap, owne
 }
 
 function buildCraftItems(recipes, resolvedRecipes, itemMap, priceMap, ownedMap) {
+  // Defensive: collapse any recipes sharing the same GW2 recipe id before building
+  // cards. Mirrors the same guard in App.jsx's buildCraftItems — see that copy
+  // for the full rationale. Keeping both in sync matters since this worker copy
+  // is the one used for the bulk of live refreshes (computeCraftItems).
+  const seenRecipeIds = new Set();
+  const cleanRecipes = [];
+  for (const r of recipes) {
+    if (seenRecipeIds.has(r.id)) continue;
+    seenRecipeIds.add(r.id);
+    cleanRecipes.push(r);
+  }
+  recipes = cleanRecipes;
+
   const items = [];
   for (const recipe of recipes) {
     const outputId = recipe.output_item_id;
     const outputCount = recipe.output_item_count || 1;
     const outputPrice = priceMap[outputId];
     // Don't skip recipes with no TP price — show all recipes, 0 sell = untradeable/unlisted
-    const tree = buildTreeSync(outputId, 1, resolvedRecipes);
+    const tree = buildTreeSync(outputId, 1, resolvedRecipes, 0, recipe);
     const leaves = flatLeaves(tree, ownedMap);
     let canCraft = true;
     const missingMats = [], matDetails = [];
@@ -248,9 +264,15 @@ self.onmessage = function(e) {
       const craftItems = buildCraftItems(recipes, resolvedRecipes, itemMap, priceMap, ownedMap);
       const byDisc = {};
       const byDiscSeen = {};
-      craftItems.forEach(ci => (ci.disciplines || ['Unknown']).forEach(d => {
+      // getRecipeDisciplines: empty disciplines array is truthy so `|| ['Unknown']`
+      // never caught it — items with [] disciplines silently vanished from every
+      // tab. Falls back to 'Uncategorized' instead. Dedup key changed from
+      // ci.outputId to ci.recipeId so multiple valid recipes for the same output
+      // (different materials/costs) each get their own card instead of collapsing
+      // into one. Mirrors the same fix in App.jsx.
+      craftItems.forEach(ci => ((ci.disciplines && ci.disciplines.length > 0) ? ci.disciplines : ['Uncategorized']).forEach(d => {
         if (!byDisc[d]) { byDisc[d] = []; byDiscSeen[d] = new Set(); }
-        if (!byDiscSeen[d].has(ci.outputId)) { byDiscSeen[d].add(ci.outputId); byDisc[d].push(ci); }
+        if (!byDiscSeen[d].has(ci.recipeId)) { byDiscSeen[d].add(ci.recipeId); byDisc[d].push(ci); }
       }));
       self.postMessage({ type: 'craft_items_result', id, result: { craftItems, byDisc } });
     } catch(e) {

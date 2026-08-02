@@ -61,6 +61,7 @@ const ID = {
   GIFT_OF_THE_SANCTUARY:    19670,   // HotW tokens   — sub of Gift of Ice
   GIFT_OF_THE_NOBLEMAN:     19665,   // CoF tokens    — sub of Gift of Music
   GIFT_OF_THORNS:           19667,   // TA tokens     — sub of Gift of Nature
+  GIFT_OF_THE_FORGEMAN:     19666,   // SE tokens (500 Tales of Dungeon Delving) — sub of Eel Statue + Vial of Quicksilver [wiki verified June 2026]
 
   // Top-level weapon-specific gifts [wiki verified]
   GIFT_OF_TWILIGHT:         19648,
@@ -87,16 +88,16 @@ const ID = {
   // Unique sub-components used inside weapon gifts [wiki verified]
   VIAL_OF_LIQUID_FLAME:     19634,   // Chef-crafted; used by Incinerator + Rodgort
   // The following are account-bound collectibles with no TP listing:
-  GIFT_OF_ENTERTAINMENT:    null,    // used by The Moot + Quip
-  GIFT_OF_WEATHER:          null,    // used by Meteorlogicus
+  GIFT_OF_ENTERTAINMENT:    19635,   // used by The Moot + Quip [wiki verified June 2026]; Armorsmith 400 crafted via Recipe: Gift of Entertainment (9628 from Miyani)
+  GIFT_OF_WEATHER:          19637,   // used by Meteorlogicus — RESOLVED July 2026, previously null
   GIFT_OF_HISTORY:          null,    // used by The Flameseeker Prophecies
-  VIAL_OF_QUICKSILVER:      null,    // used by The Juggernaut
+  VIAL_OF_QUICKSILVER:      null,    // used by The Juggernaut — recipe uses Gift of the Forgeman [sub-ingredients TBD]
   WOLF_STATUE:              null,    // used by Howler
   GIFT_OF_STEALTH:          null,    // used by The Predator
   UNICORN_STATUE:           null,    // used by The Dreamer
   GIFT_OF_WATER:            null,    // used by Frenzy
   SHARK_STATUE:             null,    // used by Kamohoali'i Kotaki
-  EEL_STATUE:               null,    // used by Kraitkin
+  EEL_STATUE:               null,    // used by Kraitkin — recipe verified June 2026 (Gift of Forgeman + 250 Orichalcum + 250 Cured Hardened Leather + 250 Armored Scale)
 
   // Gen 2 mastery gifts [API scan]
   GIFT_OF_MAGUUMA_MASTERY:  73239,
@@ -126,6 +127,43 @@ const ID = {
   ETERNITY:                 88933,
   THE_BIFROST:              88567,
 
+  // Previously-null IDs — resolved June 2026
+  SPIRITWOOD_PLANK:         46736,   // Ascended, account-bound, TP tradeable
+  PILE_OF_BLOODSTONE_DUST:  46731,   // Ascended, account-bound, TP tradeable
+  MASTER_MAINTENANCE_OIL:   9461,    // Fine rarity, TP tradeable
+  // Sculptor's Tools: 74909 — Exotic, account-bound, purchased from Lord Joshua in Beetletun
+  // for 4,500 Karma. NOT on TP — left as collection source below.
+
+  // Bolt/Zap precursor chain IDs [wiki verified June 2026]
+  // Tier 1 — Zap Experiment (Bolt I: The Experimental Sword)
+  ZAP_EXPERIMENT:              74093,   // Tier 1 precursor weapon — salvage for Spirit
+  ESSENCE_OF_ARTISTRY:         75769,   // From Chest of Artistry (73912) — Bolt I achievement reward
+  EXPERIMENTAL_SWORD_BLADE:    76117,   // Crafted Weaponsmith 450
+  EXPERIMENTAL_SWORD_HILT:     73013,   // Crafted Weaponsmith 450
+  BOX_OF_RECIPES_ZAP_1:        71679,   // Box of Recipes: Zap (First Tier) — from Chest of Artistry
+  CHEST_OF_ARTISTRY:           73912,   // Chest of Artistry — Bolt I achievement reward
+  // Tier 2 — Perfected Sword (Bolt II: The Perfected Sword)
+  PERFECTED_SWORD_ZAP:         77118,   // Tier 2 precursor weapon — salvage for Spirit
+  EXPERTISE_IN_SWORD_CRAFTING: 73473,   // From Tricks and Tips for Advanced Sword Crafting — Bolt II reward
+  TRICKS_AND_TIPS_SWORD:       75891,   // Tricks and Tips for Advanced Sword Crafting — Bolt II achievement reward
+  SPIRIT_OF_ZAP_EXPERIMENT:    73841,   // Salvage Zap Experiment (74093)
+  // Jar of Luminesce Polish (75316) and Prismatic Lodestone (73517) shared with Bifrost — already defined above
+  // Tier 3 — Zap (Bolt III: Zap)
+  ESSENCE_OF_ENERGY:           76380,   // From Chest of Energy — Bolt III achievement reward
+  SPIRIT_OF_PERFECTED_SWORD:   76269,   // Salvage Perfected Sword (77118) [wiki verified June 2026]
+  CHEST_OF_ENERGY:             71585,   // Chest of Energy — Bolt III achievement reward
+  ENGRAVERS_TOOLS:             72724,   // Crafted Weaponsmith 500
+  ENERGY_SOURCE:               70735,   // Crafted Weaponsmith 500
+
+  // Materials used in Zap chain [wiki verified June 2026]
+  BLACK_DIAMOND:               76491,   // Rare gemstone — TP tradeable
+  PILE_OF_COARSE_SAND:         71641,   // Fine crafting material — TP tradeable
+  CHARGED_QUARTZ_CRYSTAL:      43772,   // Rare crafting material — daily craft, account-bound
+  DELDRIMOR_STEEL_INGOT:       46738,   // Ascended material — TP tradeable
+  ORICHALCUM_PLATED_DOWEL:     12988,   // Masterwork refined material — TP tradeable
+  ELONIAN_LEATHER_SQUARE:      46739,   // Ascended material — TP tradeable
+  THERMOCATALYTIC_REAGENT:     46747,   // Fine material — vendor 150c or TP
+
   // The Legend precursor chain [wiki verified June 2026]
   // Tier 1 (The Bifrost I: achievement 2530)
   ESSENCE_OF_ANCIENT_MYSTICISM: 77190,  // from Chest of Ancient Mysticism (achievement reward)
@@ -150,6 +188,50 @@ const ID = {
   CARVED_BEAM:               73875,   // crafted, recipe from Box of Recipes: The Legend (74301)
   BOX_OF_RECIPES_LEGEND_MAIN: 74301,  // Box of Recipes: The Legend — from Chest of Rainbows
 
+  // Chaos Gun precursor chain (Quip) — wiki verified June 2026
+  // Achievement IDs: Quip I: 2389 (16 bits), Quip II: 2498 (14 bits), Quip III: 2524 (36 bits)
+  // Tier 1 (Quip I: The Experimental Pistol, achievement 2389)
+  ESSENCE_OF_AUDACITY:          73332,  // from Chest of Audacity — Quip I reward; also Hobbs 10,003 karma after achievement
+  EXPERIMENTAL_PISTOL_BARREL:   70874,  // crafted, recipe 11569, Huntsman 450
+  EXPERIMENTAL_PISTOL_FRAME:    75330,  // crafted, recipe 10080, Huntsman 450
+  CHAOS_GUN_EXPERIMENT:         75846,  // crafted, recipe 10970, Huntsman 450 — salvage for Spirit
+  BOX_OF_RECIPES_CHAOS_GUN_1:   71499,  // Box of Recipes: Chaos Gun (First Tier) — from Chest of Audacity
+  // Tier 2 (Quip II: The Perfected Pistol, achievement 2498)
+  SPIRIT_OF_CHAOS_GUN_EXPERIMENT: 70763, // salvage Chaos Gun Experiment (75846)
+  EXPERTISE_IN_PISTOL_CRAFTING: 70850,  // from Tricks and Tips for Advanced Pistol Crafting — Quip II reward
+  PERFECTED_PISTOL:             73023,  // crafted, recipe 11397, Huntsman 450 — salvage for Spirit
+  BOX_OF_RECIPES_CHAOS_GUN_2:   72777,  // Box of Recipes: Chaos Gun (Second Tier) — from Tricks and Tips
+  // Tier 3 (Quip III: Chaos Gun, achievement 2524)
+  SPIRIT_OF_PERFECTED_PISTOL:   73396,  // salvage Perfected Pistol (73023)
+  ESSENCE_OF_MISCHIEF:          71163,  // from Chest of Mischief — Quip III reward; also Hobbs 1g14s32c after achievement
+  ORNATE_PISTOL_FRAME:          75429,  // crafted, recipe 11424, Huntsman 500
+  CONFETTI_BULLETS:             76094,  // crafted, recipe 11447, Huntsman 500
+  COLORED_PAPER:                73993,  // crafted (trophy), recipe 10389, Huntsman 400 — via Recipe: Confetti Pouch (70769)
+  BLACK_POWDER:                 75272,  // vendor only — Thegren Topjaw, Tela Range, Plains of Ashford, 1,500 Karma
+  BOX_OF_RECIPES_CHAOS_GUN_MAIN: 72923, // Box of Recipes: Chaos Gun — from Chest of Mischief
+
+  // Storm precursor chain (Meteorlogicus) — wiki verified July 2026
+  // Achievement IDs: Meteorlogicus I: 2441 (15 bits), Meteorlogicus II: 2391 (12 bits), Meteorlogicus III: 2449 (29 bits)
+  // Gift of Weather: 19637 (Armorsmith 400) — 1 Gift of Knowledge (19671) + 250 Orichalcum Ingot + 250 Hardened Leather Section + 100 Charged Lodestone
+  GIFT_OF_KNOWLEDGE:             19671, // 500 Tales of Dungeon Delving (Crucible of Eternity tokens) from dungeon vendors
+  // Tier 1 (Meteorlogicus I: The Experimental Scepter, achievement 2441)
+  ESSENCE_OF_METEOROLOGY:        75801, // from Chest of Meteorology — Meteorlogicus I reward
+  EXPERIMENTAL_SCEPTER_CORE:     70545, // crafted, recipe 10421, Artificer 450
+  EXPERIMENTAL_SCEPTER_ROD:      70977, // crafted, recipe 10697, Artificer 450
+  STORM_EXPERIMENT:              74655, // crafted, recipe 10527, Artificer 450 — salvage for Spirit
+  BOX_OF_RECIPES_STORM_1:        72843, // Box of Recipes: Storm (First Tier) — from Chest of Meteorology
+  // Tier 2 (Meteorlogicus II: The Perfected Scepter, achievement 2391)
+  SPIRIT_OF_STORM_EXPERIMENT:    73891, // salvage Storm Experiment (74655)
+  EXPERTISE_IN_SCEPTER_CRAFTING: 72995, // from Tricks and Tips for Advanced Scepter Crafting — Meteorlogicus II reward
+  PERFECTED_SCEPTER:             71886, // crafted, recipe 10756, Artificer 450 — salvage for Spirit
+  BOX_OF_RECIPES_STORM_2:        71170, // Box of Recipes: Storm (Second Tier) — from Tricks and Tips
+  // Tier 3 (Meteorlogicus III: Storm, achievement 2449)
+  SPIRIT_OF_PERFECTED_SCEPTER:   75336, // salvage Perfected Scepter (71886)
+  ESSENCE_OF_CONTROL:            72454, // from Chest of Control — Meteorlogicus III reward
+  GLOBE:                         70884, // crafted, recipe 10067, Artificer 500
+  SPINNING_MECHANISM:            76229, // crafted, recipe 11448, Artificer 500
+  BOX_OF_RECIPES_STORM_MAIN:     75923, // Box of Recipes: Storm — from Chest of Control
+
   // Gen 1 precursors [API scan + wiki verified]
   DUSK:                     29185,   // Twilight
   DAWN:                     29169,   // Sunrise
@@ -169,10 +251,131 @@ const ID = {
   THE_LOVER:                29178,   // The Dreamer
   TOOTH_OF_FROSTFANG:       29166,   // Frostfang
   VENOM:                    29183,   // Kraitkin
+
+  // ── Tooth of Frostfang precursor chain — wiki verified June 2026 ─────────
+  // Tier 1 (Frostfang I: The Experimental Axe — prereq "Revered Antiquarian", unlock "Frostfang Vol. 1", 15 bits)
+  CHEST_OF_DRAGONS:          73865,   // Frostfang I reward; also Hobbs 10,003 karma after achievement
+  ESSENCE_OF_DRAGONS:        73671,   // from Chest of Dragons
+  BOX_OF_RECIPES_FROSTFANG_1: 76732, // Box of Recipes: Tooth of Frostfang (First Tier)
+  TOOTH_OF_FROSTFANG_EXPERIMENT: 76795, // crafted, recipe 10542, Weaponsmith 450
+  EXPERIMENTAL_AXE_BLADE:    70868,   // crafted, recipe 11722, Weaponsmith 450
+  EXPERIMENTAL_AXE_HAFT:     70952,   // crafted, recipe 11627, Weaponsmith 450
+  // Legendary Inscription already defined: LEGENDARY_INSCRIPTION = 72261
+
+  // Tier 2 (Frostfang II: The Perfected Axe — prereq "Magister of Legends", unlock "Tooth of Frostfang Experiment", 12 bits)
+  TRICKS_AND_TIPS_AXE:       75415,   // Frostfang II reward; also Hobbs 1g14s32c after achievement
+  EXPERTISE_IN_AXE_CRAFTING: 76051,   // from Tricks and Tips for Advanced Axe Crafting
+  SPIRIT_OF_TOOTH_FROSTFANG_EXPERIMENT: 75534, // salvage Tooth of Frostfang Experiment
+  BOX_OF_RECIPES_FROSTFANG_2: 70679,  // Box of Recipes: Tooth of Frostfang (Second Tier)
+  PERFECTED_AXE:             71910,   // crafted, recipe 11273, Weaponsmith 450
+  SPIRIT_OF_PERFECTED_AXE:   71915,   // salvage Perfected Axe
+
+  // Tier 3 (Frostfang III: Tooth of Frostfang — prereq "Historian of the Armaments", unlock "Perfected Axe")
+  CHEST_OF_FREEZING:         72332,   // Frostfang III reward
+  ESSENCE_OF_FREEZING:       75818,   // from Chest of Freezing
+  BOX_OF_RECIPES_FROSTFANG_MAIN: 73126, // Box of Recipes: Tooth of Frostfang (teaches Dragon Mold, Freezing Core, Tooth of Frostfang)
+  FREEZING_CORE:             76342,   // crafted, recipe 10931, Weaponsmith 500
+  DRAGON_MOLD:               75619,   // crafted, recipe 11409, Weaponsmith 500
+
+  // Freezing Core sub-ingredients
+  SNOW_DIAMOND:              86627,   // Exotic festive material, TP tradeable (Wintersday vendor 1,000 Snowflakes)
+
+  // Dragon Mold sub-ingredients
+  LUMP_OF_BEESWAX:           71949,   // Account Bound, event vendor only (Fiona Hastings, Queensdale, 50c — "Defend the beehives" event, active only during Frostfang III collection)
+  BRICK_OF_CLAY:             66902,   // Masterwork, Account Bound, Dry Top karma/Geode vendors
+
+  // ── Venom precursor chain (Kraitkin) — wiki verified June 2026 ────────────
+  // Tier 1 (Kraitkin I: The Experimental Trident — prereq "Revered Antiquarian", unlock "Kraitkin Vol. 1")
+  CHEST_OF_TENTACLES:        75599,   // Kraitkin I reward; also Hobbs 10,003 karma after achievement
+  ESSENCE_OF_TENTACLES:      75043,   // from Chest of Tentacles
+  BOX_OF_RECIPES_VENOM_1:    73441,   // Box of Recipes: Venom (First Tier), from Chest of Tentacles
+  EXPERIMENTAL_TRIDENT_HEAD: 76017,   // crafted, recipe 10102, Artificer 450
+  EXPERIMENTAL_TRIDENT_SHAFT:74061,   // crafted, recipe 10916, Artificer 450
+  LEGENDARY_UNDERWATER_INSCRIPTION: 73440, // crafted, recipe 10963, shared component (Weaponsmith/Artificer/Huntsman 450)
+  VENOM_EXPERIMENT:          72629,   // crafted, recipe 11724, Artificer 450 — salvage for Spirit of the Venom Experiment
+
+  // Tier 2 (Kraitkin II: The Perfected Trident — prereq "Magister of Legends", unlock "Venom Experiment")
+  TRICKS_AND_TIPS_TRIDENT:   71788,   // Kraitkin II reward; also Hobbs 1g14s32c after achievement
+  EXPERTISE_IN_TRIDENT_CRAFTING: 70757, // from Tricks and Tips for Advanced Trident Crafting
+  SPIRIT_OF_VENOM_EXPERIMENT: 71720,  // salvage Venom Experiment
+  BOX_OF_RECIPES_VENOM_2:    74291,   // Box of Recipes: Venom (Second Tier), from Tricks and Tips
+  PERFECTED_TRIDENT:         74468,   // crafted, recipe 10586, Artificer 450 — Collection: Kraitkin III: Venom
+  SPIRIT_OF_PERFECTED_TRIDENT: 76376, // salvage Perfected Trident
+
+  // Tier 3 (Kraitkin III: Venom — achievement 2296, prereq "Historian of the Armaments", unlock "Perfected Trident")
+  CHEST_OF_THE_KRAIT:        74039,   // Kraitkin III reward
+  ESSENCE_OF_THE_KRAIT:      75215,   // from Chest of the Krait
+  BOX_OF_RECIPES_VENOM_MAIN: 75259,   // Box of Recipes: Venom, from Chest of the Krait — teaches Congealed Water, Snake Statue, Venom
+  SNAKE_STATUE:              72543,   // crafted, recipe 11347, Artificer 500
+  CONGEALED_WATER:           74433,   // crafted, recipe 11254, Artificer 500
+
+  // Snake Statue sub-ingredients — wiki verified June 2026
+  CORAL_TENTACLE:            24509,   // Masterwork Gemstone, TP tradeable
+  EMERALD_ORB:               24515,   // Rare Gemstone, TP tradeable
+  SHEET_OF_AMBRITE:          66650,   // Rare material, TP tradeable
+  // Jug of Water — Basic ingredient, vendor 10 for 80c (= 8c each) [wiki verified June 2026, API 12156]
+  // NOTE: VENDOR_PRICES in App.jsx previously had 12156 → "Pouch of Black Pigment" (wrong). Fixed June 2026.
+  // Pouch of Black Pigment is actually API 70426.
+  JUG_OF_WATER:              12156,   // vendor only, 8c each
   RAGE:                     29179,   // Frenzy       [wiki verified]
   CARCHARIAS:               29171,   // Kamohoali'i Kotaki [wiki verified]
   THE_ANOMALY:              null,    // HOPE precursor — [MISSING]
   ARIA:                     null,    // Kotaki precursor (old name, may be Carcharias)
+
+  // ── Spark precursor chain (Incinerator) — wiki verified June 2026 ─────────
+  INCINERATOR:               30687,  // Incinerator (legendary dagger itself)
+  // Tier 1 (Incinerator I: The Experimental Dagger — prereq "Revered Antiquarian", unlock "Incinerator Vol. 1")
+  CHEST_OF_INDUSTRY:         76613,  // Incinerator I reward; also Hobbs 10,003 karma after achievement
+  ESSENCE_OF_INDUSTRY:       74544,  // from Chest of Industry
+  BOX_OF_RECIPES_SPARK_1:    76927,  // Box of Recipes: Spark (First Tier), from Chest of Industry
+  EXPERIMENTAL_DAGGER_BLADE: 72017,  // crafted, recipe 11403, Weaponsmith 450
+  EXPERIMENTAL_DAGGER_HILT:  74031,  // crafted, recipe 11034, Weaponsmith 450
+  SPARK_EXPERIMENT:          72827,  // crafted, recipe 10563, Weaponsmith 450 — salvage for Spirit of the Spark Experiment
+
+  // Tier 2 (Incinerator II: The Perfected Dagger — prereq "Magister of Legends", unlock "Spark Experiment")
+  TRICKS_AND_TIPS_DAGGER:    71429,  // Incinerator II reward; also Hobbs 1g14s32c after achievement
+  EXPERTISE_IN_DAGGER_CRAFTING: 76460, // from Tricks and Tips for Advanced Dagger Crafting
+  SPIRIT_OF_SPARK_EXPERIMENT: 71203, // salvage Spark Experiment
+  BOX_OF_RECIPES_SPARK_2:    73353,  // Box of Recipes: Spark (Second Tier), from Tricks and Tips
+  PERFECTED_DAGGER:          77156,  // crafted, recipe 10503, Weaponsmith 450 — Collection: Incinerator III: Spark
+  SPIRIT_OF_PERFECTED_DAGGER: 75064, // salvage Perfected Dagger
+
+  // Tier 3 (Incinerator III: Spark — prereq "Historian of the Armaments", unlock "Perfected Dagger")
+  CHEST_OF_CHEMISTRY:        75957,  // Incinerator III reward
+  ESSENCE_OF_CHEMISTRY:      75504,  // from Chest of Chemistry
+  BOX_OF_RECIPES_SPARK_MAIN: 72368,  // Box of Recipes: Spark, from Chest of Chemistry — teaches Fuel Cannister, Regulator Nozzle, Spark
+  FUEL_CANNISTER:            75825,  // crafted, recipe 10734, Weaponsmith 500
+  REGULATOR_NOZZLE:          73736,  // crafted, recipe 11499, Weaponsmith 500
+  // Watchwork Mechanism — ingredient of Regulator Nozzle [wiki verified June 2026]
+  // Refined material (Tier 6), crafted from 250 Watchwork Sprocket (Recipe: Watchwork Mechanism, 12,600 Karma from Pact Supply Network Agent)
+  WATCHWORK_MECHANISM:       49782,
+
+  // ── Energizer precursor chain (The Moot) — wiki verified June 2026 ─────────
+  THE_MOOT:                  30692,  // The Moot (legendary mace itself)
+  BOX_O_FUN:                 20000,  // Box o' Fun — Gem Store consumable (ingredient in Gift of Entertainment)
+  // Tier 1 (Moot I: The Experimental Mace — prereq "Revered Antiquarian", unlock "The Moot Vol. 1")
+  CHEST_OF_THE_HUNT_MACE:    74731,  // Moot I reward; also Hobbs 10,003 karma after achievement
+  ESSENCE_OF_THE_HUNT_MACE:  72846,  // from Chest of the Hunt (mace version)
+  BOX_OF_RECIPES_ENERGIZER_1: 71493, // Box of Recipes: The Energizer (First Tier), from Chest of the Hunt
+  ENERGIZER_EXPERIMENT:      70610,  // crafted, recipe 11160, Weaponsmith 450 — salvage for Spirit
+  EXPERIMENTAL_MACE_HEAD:    72498,  // crafted, recipe 10428, Weaponsmith 450
+  EXPERIMENTAL_MACE_HAFT:    75952,  // crafted, recipe 10615, Weaponsmith 450
+  // Legendary Inscription already defined: LEGENDARY_INSCRIPTION = 72261
+
+  // Tier 2 (Moot II: The Perfected Mace — prereq "Magister of Legends", unlock "The Energizer Experiment")
+  TRICKS_AND_TIPS_MACE:      72028,  // Moot II reward; also Hobbs 1g14s32c after achievement
+  EXPERTISE_IN_MACE_CRAFTING: 77018, // from Tricks and Tips for Legendary Mace Crafting
+  SPIRIT_OF_ENERGIZER_EXPERIMENT: 71723, // salvage The Energizer Experiment
+  BOX_OF_RECIPES_ENERGIZER_2: 75704, // Box of Recipes: The Energizer (Second Tier), from Tricks and Tips
+  PERFECTED_MACE:            74020,  // crafted, recipe 11265, Weaponsmith 450 — salvage for Spirit
+  SPIRIT_OF_PERFECTED_MACE:  76735,  // salvage Perfected Mace
+
+  // Tier 3 (Moot III: The Energizer — prereq "Historian of the Armaments", unlock "Perfected Mace")
+  CHEST_OF_THE_CELEBRATION:  77116,  // Moot III reward
+  ESSENCE_OF_THE_CELEBRATION: 73375, // from Chest of the Celebration
+  BOX_OF_RECIPES_ENERGIZER_MAIN: 74984, // Box of Recipes: The Energizer, from Chest of Celebration — teaches Party Ball, Party Stick, The Energizer
+  PARTY_BALL:                73774,  // crafted, recipe 10029, Weaponsmith 500
+  PARTY_STICK:               71486,  // crafted, recipe 11541, Weaponsmith 500
 
   // T6 fine crafting materials [API verified]
   VICIOUS_CLAW:             24351,
@@ -237,7 +440,8 @@ const ID = {
 
   // Superior Sigils — used in weapon-specific gifts [wiki verified]
   SIGIL_OF_BLOOD:           91604,   // Twilight
-  SIGIL_OF_AIR:             91520,   // Sunrise, Bolt, Meteorlogicus
+  SIGIL_OF_AIR:             91520,   // Bolt, Meteorlogicus
+  SIGIL_OF_STRENGTH:        24548,   // Sunrise [wiki verified — screenshot June 2026]
   SIGIL_OF_FIRE:            91559,   // Incinerator, Rodgort
   SIGIL_OF_ICE:             24555,   // Frostfang
   SIGIL_OF_ENERGY:          24607,   // The Moot, The Minstrel
@@ -477,6 +681,25 @@ const VIAL_OF_LIQUID_FLAME = {
   ],
 };
 
+// Legendary Inscription [wiki verified June 2026 — ID 72261]
+// Shared across ALL Gen 1 precursor Tier 1 crafts (Zap, Chaos Gun, Dawn, etc.)
+// Recipe from Box of Recipes: [Weapon] (First Tier)
+// Crafted by Artificer/Huntsman/Weaponsmith 450
+const LEGENDARY_INSCRIPTION_COMPONENT = {
+  itemId: ID.LEGENDARY_INSCRIPTION,
+  name: 'Legendary Inscription',
+  count: 1,
+  source: 'forge',
+  accountBound: true,
+  note: 'Crafted (Artificer/Huntsman/Weaponsmith 450) — recipe from Box of Recipes (First Tier)',
+  inputs: [
+    tp(ID.GLOB_OF_ECTOPLASM,       'Glob of Ectoplasm',       10),
+    tp(ID.PILE_OF_CRYSTALLINE_DUST,'Pile of Crystalline Dust', 5),
+    tp(ID.ORICHALCUM_PLATED_DOWEL, 'Orichalcum Plated Dowel',  1),
+    tp(ID.ELONIAN_LEATHER_SQUARE,  'Elonian Leather Square',  10),
+  ],
+};
+
 // ── Top-level weapon-specific gifts [wiki verified] ────────────────────────────
 
 // Gift of Twilight [wiki verified]
@@ -487,12 +710,12 @@ const GIFT_OF_TWILIGHT = forge(ID.GIFT_OF_TWILIGHT, 'Gift of Twilight', 1, [
   tp(ID.SIGIL_OF_BLOOD,   'Superior Sigil of Blood',  1),
 ]);
 
-// Gift of Sunrise [wiki verified]
+// Gift of Sunrise [wiki verified — screenshot June 2026]
 const GIFT_OF_SUNRISE = forge(ID.GIFT_OF_SUNRISE, 'Gift of Sunrise', 1, [
   { ...GIFT_OF_METAL },
   { ...GIFT_OF_LIGHT },
-  tp(ID.ICY_RUNESTONE,   'Icy Runestone',          100),
-  tp(ID.SIGIL_OF_AIR,    'Superior Sigil of Air',   1),
+  tp(ID.ICY_RUNESTONE,      'Icy Runestone',              100),
+  tp(ID.SIGIL_OF_STRENGTH,  'Superior Sigil of Strength',   1),
 ]);
 
 // Gift of Bolt [wiki verified — ID 19655]
@@ -522,9 +745,20 @@ const GIFT_OF_INCINERATOR = forge(ID.GIFT_OF_INCINERATOR, 'Gift of Incinerator',
 // Gift of The Moot [wiki verified — ID 19650]
 const GIFT_OF_THE_MOOT = forge(ID.GIFT_OF_THE_MOOT, 'Gift of The Moot', 1, [
   { ...GIFT_OF_METAL },
+  // Gift of Entertainment [wiki verified June 2026 — ID 19635]
+  // Armorsmith 400 — recipe purchased from Miyani (10 Mystic Coins)
   { itemId: ID.GIFT_OF_ENTERTAINMENT, name: 'Gift of Entertainment', count: 1,
-    source: 'collection', accountBound: true,
-    note: 'Account-bound crafted item — obtained via The Moot collection chain', inputs: [] },
+    source: 'forge', accountBound: true,
+    note: 'Crafted (Armorsmith 400) — Recipe: Gift of Entertainment from Miyani for 10 Mystic Coins',
+    inputs: [
+      collection(ID.GIFT_OF_THE_NOBLEMAN, 'Gift of the Nobleman', 1,
+        'Purchase from Dungeon Merchant for 500 Tales of Dungeon Delving (Caudecus\'s Manor tokens)'),
+      tp(ID.ORICHALCUM_INGOT,  'Orichalcum Ingot',  250),
+      tp(ID.BOLT_OF_GOSSAMER,  'Bolt of Gossamer',  250),
+      { itemId: ID.BOX_O_FUN, name: "Box o' Fun", count: 5, source: 'tp',
+        note: 'Gem Store consumable (80 gems each) — also TP tradeable', inputs: [] },
+    ],
+  },
   tp(ID.ICY_RUNESTONE,    'Icy Runestone',            100),
   tp(ID.SIGIL_OF_ENERGY,  'Superior Sigil of Energy',  1),
 ]);
@@ -532,9 +766,19 @@ const GIFT_OF_THE_MOOT = forge(ID.GIFT_OF_THE_MOOT, 'Gift of The Moot', 1, [
 // Gift of Quip [wiki verified — ID 19651]
 const GIFT_OF_QUIP = forge(ID.GIFT_OF_QUIP, 'Gift of Quip', 1, [
   { ...GIFT_OF_WOOD },
+  // Gift of Entertainment [wiki verified June 2026 — ID 19635, shared with The Moot]
   { itemId: ID.GIFT_OF_ENTERTAINMENT, name: 'Gift of Entertainment', count: 1,
-    source: 'collection', accountBound: true,
-    note: 'Account-bound crafted item — obtained via Quip collection chain', inputs: [] },
+    source: 'forge', accountBound: true,
+    note: 'Crafted (Armorsmith 400) — Recipe: Gift of Entertainment from Miyani for 10 Mystic Coins',
+    inputs: [
+      collection(ID.GIFT_OF_THE_NOBLEMAN, 'Gift of the Nobleman', 1,
+        'Purchase from Dungeon Merchant for 500 Tales of Dungeon Delving (Caudecus\'s Manor tokens)'),
+      tp(ID.ORICHALCUM_INGOT,  'Orichalcum Ingot',  250),
+      tp(ID.BOLT_OF_GOSSAMER,  'Bolt of Gossamer',  250),
+      { itemId: ID.BOX_O_FUN, name: "Box o' Fun", count: 5, source: 'tp',
+        note: 'Gem Store consumable (80 gems each) — also TP tradeable', inputs: [] },
+    ],
+  },
   tp(ID.ICY_RUNESTONE,    'Icy Runestone',              100),
   tp(ID.SIGIL_OF_STAMINA, 'Superior Sigil of Stamina',   1),
 ]);
@@ -542,9 +786,18 @@ const GIFT_OF_QUIP = forge(ID.GIFT_OF_QUIP, 'Gift of Quip', 1, [
 // Gift of Meteorlogicus [wiki verified — ID 19652]
 const GIFT_OF_METEORLOGICUS = forge(ID.GIFT_OF_METEORLOGICUS, 'Gift of Meteorlogicus', 1, [
   { ...GIFT_OF_ENERGY },
-  { itemId: ID.GIFT_OF_WEATHER, name: 'Gift of Weather', count: 1,
-    source: 'collection', accountBound: true,
-    note: 'Account-bound crafted item — obtained via Meteorlogicus collection chain', inputs: [] },
+  {
+    itemId: ID.GIFT_OF_WEATHER, name: 'Gift of Weather', count: 1,
+    source: 'forge', accountBound: true,
+    note: 'Crafted (Armorsmith 400) — recipe purchased from Miyani or any Mystic Forge Attendant/Keeper',
+    inputs: [
+      { itemId: ID.GIFT_OF_KNOWLEDGE, name: 'Gift of Knowledge', count: 1, source: 'currency',
+        note: 'Purchased from dungeon vendors for 500 Tales of Dungeon Delving (Crucible of Eternity tokens)', inputs: [] },
+      tp(ID.ORICHALCUM_INGOT, 'Orichalcum Ingot', 250),
+      { itemId: null, name: 'Hardened Leather Section', count: 250, source: 'tp', inputs: [] },
+      tp(ID.CHARGED_LODESTONE, 'Charged Lodestone', 100),
+    ],
+  },
   tp(ID.ICY_RUNESTONE,   'Icy Runestone',          100),
   tp(ID.SIGIL_OF_AIR,    'Superior Sigil of Air',   1),
 ]);
@@ -654,9 +907,19 @@ const GIFT_OF_KOTAKI = forge(ID.GIFT_OF_KOTAKI, "Gift of Kamohoali'i Kotaki", 1,
 // Gift of Kraitkin [wiki verified — ID 19658]
 const GIFT_OF_KRAITKIN = forge(ID.GIFT_OF_KRAITKIN, 'Gift of Kraitkin', 1, [
   { ...GIFT_OF_ENERGY },
+  // Eel Statue — crafted via Legendary Component recipe (Tailor 400)
+  // Recipe verified June 2026: Gift of the Forgeman + 250 Orichalcum Ingots + 250 Cured Hardened Leather Squares + 250 Armored Scales
   { itemId: ID.EEL_STATUE, name: 'Eel Statue', count: 1,
-    source: 'collection', accountBound: true,
-    note: 'Account-bound crafted item — obtained via Kraitkin collection chain', inputs: [] },
+    source: 'forge', accountBound: true,
+    note: 'Crafted (Tailor 400) — recipe from Recipe: Eel Statue',
+    inputs: [
+      collection(ID.GIFT_OF_THE_FORGEMAN, 'Gift of the Forgeman', 1,
+        'Purchase from dungeon vendor for 500 Tales of Dungeon Delving (Sorrow\'s Embrace tokens)'),
+      tp(ID.ORICHALCUM_INGOT,           'Orichalcum Ingot',                  250),
+      tp(ID.CURED_HARDENED_LEATHER,     'Cured Hardened Leather Square',     250),
+      tp(ID.ARMORED_SCALE,              'Armored Scale',                     250),
+    ],
+  },
   tp(ID.ICY_RUNESTONE,   'Icy Runestone',          100),
   tp(ID.SIGIL_OF_VENOM,  'Superior Sigil of Venom', 1),
 ]);
@@ -769,17 +1032,50 @@ export const LEGENDARY_RECIPES = [
   },
 
   // ── Eternity (Greatsword) ─────────────────────────────────────────────────
+  // Mystic Forge: Twilight + Sunrise + Philosopher's Stone ×10 + Crystalline Dust ×5
+  // Twilight and Sunrise are full legendaries in their own right — their ingredient
+  // trees are embedded here so Eternity shows total cost to craft from scratch.
+  // [wiki verified June 2026 — full material list screenshot confirmed]
   {
     id: 'legendary_eternity',
     name: 'Eternity',
     itemId: ID.ETERNITY,
     rarity: 'Legendary', weaponType: 'Greatsword', generation: 1,
-    note: 'Combine Twilight + Sunrise in Mystic Forge',
+    note: 'Mystic Forge: Twilight + Sunrise + 10 Philosopher\'s Stones + 5 Crystalline Dust. Requires crafting both legendaries first.',
     inputs: [
-      tp(null,                        'Twilight',                   1),
-      tp(null,                        'Sunrise',                    1),
-      tp(ID.PILE_OF_CRYSTALLINE_DUST, 'Pile of Crystalline Dust',   5),
-      { itemId: 20796, name: "Philosopher's Stone", count: 10, source: 'currency',
+      // ── Twilight ────────────────────────────────────────────────────────────
+      {
+        itemId: null,
+        name: 'Twilight',
+        count: 1,
+        source: 'tp',
+        isPrecursor: false,
+        note: 'Legendary — craft from Dusk + Gift of Twilight + Gift of Fortune + Gift of Mastery, or buy from TP',
+        inputs: [
+          precursor(ID.DUSK, 'Dusk'),
+          { ...GIFT_OF_TWILIGHT },
+          { ...GIFT_OF_FORTUNE },
+          { ...GIFT_OF_MASTERY },
+        ],
+      },
+      // ── Sunrise ─────────────────────────────────────────────────────────────
+      {
+        itemId: null,
+        name: 'Sunrise',
+        count: 1,
+        source: 'tp',
+        isPrecursor: false,
+        note: 'Legendary — craft from Dawn + Gift of Sunrise + Gift of Fortune + Gift of Mastery, or buy from TP',
+        inputs: [
+          precursor(ID.DAWN, 'Dawn'),
+          { ...GIFT_OF_SUNRISE },
+          { ...GIFT_OF_FORTUNE },
+          { ...GIFT_OF_MASTERY },
+        ],
+      },
+      // ── Forge catalysts ─────────────────────────────────────────────────────
+      tp(ID.PILE_OF_CRYSTALLINE_DUST, 'Pile of Crystalline Dust', 5),
+      { itemId: 20796, name: "Philosopher's Stone", count: 10, source: 'spirit_shard',
         note: '10 for 1 Spirit Shard from Miyani', inputs: [] },
     ],
   },
@@ -788,10 +1084,189 @@ export const LEGENDARY_RECIPES = [
   {
     id: 'legendary_bolt',
     name: 'Bolt',
-    itemId: null,
+    itemId: 30699,
     rarity: 'Legendary', weaponType: 'Sword', generation: 1,
     inputs: [
-      precursor(ID.ZAP, 'Zap'),
+      // ── Zap precursor — 3-tier Legendary Crafting collection ──────────────
+      // Achievement chain: Bolt I (Experimental Sword) → Bolt II (Perfected Sword) → Bolt III (Zap)
+      {
+        itemId: ID.ZAP,
+        name: 'Zap',
+        count: 1,
+        source: 'collection',
+        accountBound: true,
+        achievementId: null,  // Bolt III: Zap — achievement ID TBD
+        note: 'Crafted once per account via Bolt III: Zap collection (Weaponsmith 500). Recipe from Box of Recipes: Zap.',
+        inputs: [
+          // ── Tier 3 ingredients (Bolt III: Zap) ──────────────────────────
+          // Essence of Energy — from Chest of Energy, Bolt III achievement reward
+          {
+            itemId: ID.ESSENCE_OF_ENERGY,
+            name: 'Essence of Energy',
+            count: 1,
+            source: 'collection',
+            accountBound: true,
+            note: 'From Chest of Energy — reward for completing Bolt III: Zap achievement. Also sold by Grandmaster Craftsman Hobbs after completion.',
+            inputs: [],
+          },
+          // Spirit of the Perfected Sword — salvage Perfected Sword
+          {
+            itemId: ID.SPIRIT_OF_PERFECTED_SWORD,
+            name: 'Spirit of the Perfected Sword',
+            count: 1,
+            source: 'collection',
+            accountBound: true,
+            note: 'Salvage Perfected Sword (ID 77118) with any salvage kit',
+            inputs: [
+              // ── Perfected Sword — Tier 2 (Bolt II: The Perfected Sword) ──
+              {
+                itemId: ID.PERFECTED_SWORD_ZAP,
+                name: 'Perfected Sword',
+                count: 1,
+                source: 'collection',
+                accountBound: true,
+                note: 'Crafted via Bolt II: The Perfected Sword collection (Weaponsmith 450). Recipe from Box of Recipes: Zap (Second Tier).',
+                inputs: [
+                  // Expertise in Sword Crafting — from Tricks and Tips book (Bolt II reward)
+                  {
+                    itemId: ID.EXPERTISE_IN_SWORD_CRAFTING,
+                    name: 'Expertise in Sword Crafting',
+                    count: 1,
+                    source: 'collection',
+                    accountBound: true,
+                    note: 'From Tricks and Tips for Advanced Sword Crafting (consumable) — reward for completing Bolt II: The Perfected Sword achievement',
+                    inputs: [],
+                  },
+                  // Spirit of the Zap Experiment — salvage Zap Experiment
+                  {
+                    itemId: ID.SPIRIT_OF_ZAP_EXPERIMENT,
+                    name: 'Spirit of the Zap Experiment',
+                    count: 1,
+                    source: 'collection',
+                    accountBound: true,
+                    note: 'Salvage Zap Experiment (ID 74093) with any salvage kit',
+                    inputs: [
+                      // ── Zap Experiment — Tier 1 (Bolt I: The Experimental Sword) ──
+                      {
+                        itemId: ID.ZAP_EXPERIMENT,
+                        name: 'Zap Experiment',
+                        count: 1,
+                        source: 'collection',
+                        accountBound: true,
+                        note: 'Crafted via Bolt I: The Experimental Sword collection (Weaponsmith 450). Recipe from Box of Recipes: Zap (First Tier).',
+                        inputs: [
+                          // Essence of Artistry — from Chest of Artistry (Bolt I reward)
+                          {
+                            itemId: ID.ESSENCE_OF_ARTISTRY,
+                            name: 'Essence of Artistry',
+                            count: 1,
+                            source: 'collection',
+                            accountBound: true,
+                            note: 'From Chest of Artistry — reward for completing Bolt I: The Experimental Sword achievement',
+                            inputs: [],
+                          },
+                          // Experimental Sword Blade — crafted Weaponsmith 450
+                          {
+                            itemId: ID.EXPERIMENTAL_SWORD_BLADE,
+                            name: 'Experimental Sword Blade',
+                            count: 1,
+                            source: 'forge',
+                            accountBound: true,
+                            note: 'Crafted (Weaponsmith 450) — recipe from Box of Recipes: Zap (First Tier)',
+                            inputs: [
+                              tp(ID.DELDRIMOR_STEEL_INGOT, 'Deldrimor Steel Ingot', 15),
+                              { itemId: null, name: 'Memory of Battle', count: 50, source: 'wvw', accountBound: false, note: 'WvW participation currency', inputs: [] },
+                              { itemId: null, name: 'Shard of Glory',   count: 50, source: 'currency', note: 'PvP participation currency', inputs: [] },
+                            ],
+                          },
+                          // Experimental Sword Hilt — crafted Weaponsmith 450
+                          {
+                            itemId: ID.EXPERIMENTAL_SWORD_HILT,
+                            name: 'Experimental Sword Hilt',
+                            count: 1,
+                            source: 'forge',
+                            accountBound: true,
+                            note: 'Crafted (Weaponsmith 450) — recipe from Box of Recipes: Zap (First Tier)',
+                            inputs: [
+                              tp(ID.DELDRIMOR_STEEL_INGOT, 'Deldrimor Steel Ingot', 15),
+                              { itemId: null, name: 'Memory of Battle', count: 50, source: 'wvw', accountBound: false, note: 'WvW participation currency', inputs: [] },
+                              { itemId: null, name: 'Shard of Glory',   count: 50, source: 'currency', note: 'PvP participation currency', inputs: [] },
+                            ],
+                          },
+                          // Legendary Inscription — shared component
+                          { ...LEGENDARY_INSCRIPTION_COMPONENT },
+                        ],
+                      },
+                    ],
+                  },
+                  // Jar of Luminesce Polish — shared with Bifrost Tier 2
+                  {
+                    itemId: ID.JAR_OF_LUMINESCE_POLISH,
+                    name: 'Jar of Luminesce Polish',
+                    count: 1,
+                    source: 'forge',
+                    accountBound: true,
+                    note: 'Crafted (Weaponsmith 400) — recipe from Box of Recipes: Zap (Second Tier)',
+                    inputs: [
+                      tp(ID.PILE_OF_BLOODSTONE_DUST,    'Pile of Bloodstone Dust',    250),
+                      { itemId: null, name: 'Amalgamated Gemstone',    count: 1,  source: 'tp', inputs: [] },
+                      tp(ID.THERMOCATALYTIC_REAGENT,    'Thermocatalytic Reagent',     10),
+                      tp(ID.MASTER_MAINTENANCE_OIL,     'Master Maintenance Oil',      10),
+                    ],
+                  },
+                  // Prismatic Lodestone — shared with Bifrost Tier 2
+                  {
+                    itemId: ID.PRISMATIC_LODESTONE,
+                    name: 'Prismatic Lodestone',
+                    count: 1,
+                    source: 'forge',
+                    accountBound: true,
+                    note: 'Crafted (Weaponsmith 400) — recipe from Box of Recipes: Zap (Second Tier). Combines 4 elemental lodestones.',
+                    inputs: [
+                      tp(ID.GLACIAL_LODESTONE,  'Glacial Lodestone',  1),
+                      tp(ID.MOLTEN_LODESTONE,   'Molten Lodestone',   1),
+                      tp(ID.ONYX_LODESTONE,     'Onyx Lodestone',     1),
+                      tp(ID.CHARGED_LODESTONE,  'Charged Lodestone',  1),
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+          // Engraver's Tools — crafted Weaponsmith 500
+          {
+            itemId: ID.ENGRAVERS_TOOLS,
+            name: "Engraver's Tools",
+            count: 1,
+            source: 'forge',
+            accountBound: true,
+            note: 'Crafted (Weaponsmith 500) — recipe from Box of Recipes: Zap',
+            inputs: [
+              tp(ID.MITHRIL_INGOT,            'Mithril Ingot',            100),
+              tp(ID.BLACK_DIAMOND,            'Black Diamond',              5),
+              tp(ID.PILE_OF_COARSE_SAND,      'Pile of Coarse Sand',       10),
+              tp(ID.THERMOCATALYTIC_REAGENT,  'Thermocatalytic Reagent',   10),
+            ],
+          },
+          // Energy Source — crafted Weaponsmith 500
+          {
+            itemId: ID.ENERGY_SOURCE,
+            name: 'Energy Source',
+            count: 1,
+            source: 'forge',
+            accountBound: true,
+            note: 'Crafted (Weaponsmith 500) — recipe from Box of Recipes: Zap',
+            inputs: [
+              { itemId: ID.CHARGED_QUARTZ_CRYSTAL, name: 'Charged Quartz Crystal', count: 10,
+                source: 'collection', accountBound: true,
+                note: 'Daily craft — 1/day from 25 Quartz Crystal at a Resonating Terrace', inputs: [] },
+              tp(ID.CHARGED_LODESTONE,         'Charged Lodestone',          1),
+              tp(ID.THERMOCATALYTIC_REAGENT,   'Thermocatalytic Reagent',   10),
+              tp(ID.PILE_OF_RADIANT_DUST,      'Pile of Radiant Dust',     100),
+            ],
+          },
+        ],
+      },
       { ...GIFT_OF_BOLT },
       { ...GIFT_OF_FORTUNE },
       { ...GIFT_OF_MASTERY },
@@ -802,10 +1277,184 @@ export const LEGENDARY_RECIPES = [
   {
     id: 'legendary_frostfang',
     name: 'Frostfang',
-    itemId: null,
+    itemId: 30684,
     rarity: 'Legendary', weaponType: 'Axe', generation: 1,
     inputs: [
-      precursor(ID.TOOTH_OF_FROSTFANG, 'Tooth of Frostfang'),
+      // ── Tooth of Frostfang precursor — 3-tier collection chain ────────────
+      {
+        itemId: ID.TOOTH_OF_FROSTFANG,
+        name: 'Tooth of Frostfang',
+        count: 1,
+        source: 'collection',
+        accountBound: true,
+        achievementId: 2393,  // Frostfang III: Tooth of Frostfang [wiki verified June 2026]
+        achievementBitCount: 34,
+        note: 'Crafted once per account via Frostfang III: Tooth of Frostfang collection (Weaponsmith 500). Recipe from Box of Recipes: Tooth of Frostfang.',
+        inputs: [
+          // ── Tier 3 (Frostfang III: Tooth of Frostfang) ───────────────────
+          {
+            itemId: ID.ESSENCE_OF_FREEZING,
+            name: 'Essence of Freezing',
+            count: 1,
+            source: 'collection',
+            accountBound: true,
+            note: 'From Chest of Freezing — reward for completing Frostfang III: Tooth of Frostfang achievement',
+            inputs: [],
+          },
+          // Spirit of the Perfected Axe — salvage Perfected Axe
+          {
+            itemId: ID.SPIRIT_OF_PERFECTED_AXE,
+            name: 'Spirit of the Perfected Axe',
+            count: 1,
+            source: 'collection',
+            accountBound: true,
+            note: 'Salvage Perfected Axe (ID 71910) with any salvage kit',
+            inputs: [
+              // ── Perfected Axe — Tier 2 (Frostfang II: The Perfected Axe) ─
+              {
+                itemId: ID.PERFECTED_AXE,
+                name: 'Perfected Axe',
+                count: 1,
+                source: 'collection',
+                accountBound: true,
+                achievementId: 2606,  // Frostfang II: The Perfected Axe [wiki verified June 2026]
+                achievementBitCount: 12,
+                note: 'Crafted via Frostfang II: The Perfected Axe collection (Weaponsmith 450). Recipe from Box of Recipes: Tooth of Frostfang (Second Tier).',
+                inputs: [
+                  {
+                    itemId: ID.EXPERTISE_IN_AXE_CRAFTING,
+                    name: 'Expertise in Axe Crafting',
+                    count: 1,
+                    source: 'collection',
+                    accountBound: true,
+                    note: 'From Tricks and Tips for Advanced Axe Crafting — reward for completing Frostfang II: The Perfected Axe achievement',
+                    inputs: [],
+                  },
+                  {
+                    itemId: ID.SPIRIT_OF_TOOTH_FROSTFANG_EXPERIMENT,
+                    name: 'Spirit of the Tooth of Frostfang Experiment',
+                    count: 1,
+                    source: 'collection',
+                    accountBound: true,
+                    note: 'Salvage Tooth of Frostfang Experiment (ID 76795) with any salvage kit',
+                    inputs: [
+                      // ── Tooth of Frostfang Experiment — Tier 1 ───────────
+                      {
+                        itemId: ID.TOOTH_OF_FROSTFANG_EXPERIMENT,
+                        name: 'Tooth of Frostfang Experiment',
+                        count: 1,
+                        source: 'collection',
+                        accountBound: true,
+                        achievementId: 2478,  // Frostfang I: The Experimental Axe [wiki verified June 2026]
+                        achievementBitCount: 15,
+                        note: 'Crafted via Frostfang I: The Experimental Axe collection (Weaponsmith 450). Recipe from Box of Recipes: Tooth of Frostfang (First Tier).',
+                        inputs: [
+                          {
+                            itemId: ID.ESSENCE_OF_DRAGONS,
+                            name: 'Essence of Dragons',
+                            count: 1,
+                            source: 'collection',
+                            accountBound: true,
+                            note: 'From Chest of Dragons — reward for completing Frostfang I: The Experimental Axe achievement',
+                            inputs: [],
+                          },
+                          {
+                            itemId: ID.EXPERIMENTAL_AXE_BLADE,
+                            name: 'Experimental Axe Blade',
+                            count: 1,
+                            source: 'forge',
+                            accountBound: true,
+                            note: 'Crafted (Weaponsmith 450) — recipe from Box of Recipes: Tooth of Frostfang (First Tier)',
+                            inputs: [
+                              tp(ID.DELDRIMOR_STEEL_INGOT, 'Deldrimor Steel Ingot', 15),
+                              { itemId: null, name: 'Memory of Battle', count: 50, source: 'wvw', accountBound: false, note: 'WvW participation currency', inputs: [] },
+                              { itemId: null, name: 'Shard of Glory',   count: 50, source: 'currency', note: 'PvP participation currency', inputs: [] },
+                            ],
+                          },
+                          {
+                            itemId: ID.EXPERIMENTAL_AXE_HAFT,
+                            name: 'Experimental Axe Haft',
+                            count: 1,
+                            source: 'forge',
+                            accountBound: true,
+                            note: 'Crafted (Weaponsmith 450) — recipe from Box of Recipes: Tooth of Frostfang (First Tier)',
+                            inputs: [
+                              tp(ID.SPIRITWOOD_PLANK, 'Spiritwood Plank', 10),
+                              { itemId: null, name: 'Memory of Battle', count: 50, source: 'wvw', accountBound: false, note: 'WvW participation currency', inputs: [] },
+                              { itemId: null, name: 'Shard of Glory',   count: 50, source: 'currency', note: 'PvP participation currency', inputs: [] },
+                            ],
+                          },
+                          { ...LEGENDARY_INSCRIPTION_COMPONENT },
+                        ],
+                      },
+                    ],
+                  },
+                  // Jar of Luminesce Polish — shared Tier 2 component
+                  {
+                    itemId: ID.JAR_OF_LUMINESCE_POLISH,
+                    name: 'Jar of Luminesce Polish',
+                    count: 1,
+                    source: 'forge',
+                    accountBound: true,
+                    note: 'Crafted (Artificer/Huntsman/Weaponsmith 400) — recipe from Box of Recipes: Tooth of Frostfang (Second Tier)',
+                    inputs: [
+                      tp(ID.PILE_OF_BLOODSTONE_DUST,  'Pile of Bloodstone Dust',  250),
+                      { itemId: null, name: 'Amalgamated Gemstone', count: 1, source: 'tp', inputs: [] },
+                      tp(ID.THERMOCATALYTIC_REAGENT,  'Thermocatalytic Reagent',   10),
+                      tp(ID.MASTER_MAINTENANCE_OIL,   'Master Maintenance Oil',    10),
+                    ],
+                  },
+                  // Prismatic Lodestone — shared Tier 2 component
+                  {
+                    itemId: ID.PRISMATIC_LODESTONE,
+                    name: 'Prismatic Lodestone',
+                    count: 1,
+                    source: 'forge',
+                    accountBound: true,
+                    note: 'Crafted (Artificer/Huntsman/Weaponsmith 400) — recipe from Box of Recipes: Tooth of Frostfang (Second Tier). Combines 4 elemental lodestones.',
+                    inputs: [
+                      tp(ID.GLACIAL_LODESTONE,  'Glacial Lodestone',  1),
+                      tp(ID.MOLTEN_LODESTONE,   'Molten Lodestone',   1),
+                      tp(ID.ONYX_LODESTONE,     'Onyx Lodestone',     1),
+                      tp(ID.CHARGED_LODESTONE,  'Charged Lodestone',  1),
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+          // Freezing Core — crafted Weaponsmith 500
+          {
+            itemId: ID.FREEZING_CORE,
+            name: 'Freezing Core',
+            count: 1,
+            source: 'forge',
+            accountBound: true,
+            note: 'Crafted (Weaponsmith 500) — recipe from Box of Recipes: Tooth of Frostfang',
+            inputs: [
+              tp(ID.GLACIAL_LODESTONE,        'Glacial Lodestone',        10),
+              tp(ID.ICY_RUNESTONE,             'Icy Runestone',            10),
+              tp(ID.SNOW_DIAMOND,              'Snow Diamond',              1),
+              tp(ID.PILE_OF_CRYSTALLINE_DUST,  'Pile of Crystalline Dust', 10),
+            ],
+          },
+          // Dragon Mold — crafted Weaponsmith 500
+          {
+            itemId: ID.DRAGON_MOLD,
+            name: 'Dragon Mold',
+            count: 1,
+            source: 'forge',
+            accountBound: true,
+            note: 'Crafted (Weaponsmith 500) — recipe from Box of Recipes: Tooth of Frostfang',
+            inputs: [
+              { itemId: ID.LUMP_OF_BEESWAX, name: 'Lump of Beeswax', count: 10, source: 'collection', accountBound: true, note: 'Event vendor — Fiona Hastings, Clayent Falls, Queensdale, 50c each. Requires "Defend the beehives from hungry bears" event. Only available while Frostfang III: Tooth of Frostfang collection is active.', inputs: [] },
+              tp(ID.ELDER_WOOD_PLANK,         'Elder Wood Plank',         50),
+              { itemId: ID.BRICK_OF_CLAY, name: 'Brick of Clay', count: 25, source: 'karma', note: 'Account Bound — Dry Top karma/Geode vendors', inputs: [] },
+              tp(ID.THERMOCATALYTIC_REAGENT,   'Thermocatalytic Reagent',  10),
+            ],
+          },
+        ],
+      },
       { ...GIFT_OF_FROSTFANG },
       { ...GIFT_OF_FORTUNE },
       { ...GIFT_OF_MASTERY },
@@ -816,10 +1465,192 @@ export const LEGENDARY_RECIPES = [
   {
     id: 'legendary_incinerator',
     name: 'Incinerator',
-    itemId: null,
+    itemId: ID.INCINERATOR,
     rarity: 'Legendary', weaponType: 'Dagger', generation: 1,
     inputs: [
-      precursor(ID.SPARK, 'Spark'),
+      // ── Spark precursor — 3-tier Legendary Crafting collection ────────────
+      // Achievement chain: Incinerator I (Experimental Dagger) → II (Perfected Dagger) → III (Spark)
+      {
+        itemId: ID.SPARK,
+        name: 'Spark',
+        count: 1,
+        source: 'collection',
+        accountBound: true,
+        achievementId: 2502,  // Incinerator III: Spark [wiki verified June 2026]
+        achievementBitCount: 24,
+        note: 'Crafted once per account via Incinerator III: Spark collection (Weaponsmith 500). Recipe from Box of Recipes: Spark.',
+        inputs: [
+          // ── Tier 3 ingredients (Incinerator III: Spark) ──────────────────
+          // Essence of Chemistry — from Chest of Chemistry, Incinerator III achievement reward
+          {
+            itemId: ID.ESSENCE_OF_CHEMISTRY,
+            name: 'Essence of Chemistry',
+            count: 1,
+            source: 'collection',
+            accountBound: true,
+            note: 'From Chest of Chemistry — reward for completing Incinerator III: Spark achievement',
+            inputs: [],
+          },
+          // Spirit of the Perfected Dagger — salvage Perfected Dagger
+          {
+            itemId: ID.SPIRIT_OF_PERFECTED_DAGGER,
+            name: 'Spirit of the Perfected Dagger',
+            count: 1,
+            source: 'collection',
+            accountBound: true,
+            note: 'Salvage Perfected Dagger (ID 77156) with any salvage kit',
+            inputs: [
+              // ── Perfected Dagger — Tier 2 (Incinerator II: The Perfected Dagger) ──
+              {
+                itemId: ID.PERFECTED_DAGGER,
+                name: 'Perfected Dagger',
+                count: 1,
+                source: 'collection',
+                accountBound: true,
+                achievementId: 2458,  // Incinerator II: The Perfected Dagger [wiki verified June 2026]
+                achievementBitCount: 15,
+                note: 'Crafted via Incinerator II: The Perfected Dagger collection (Weaponsmith 450). Recipe from Box of Recipes: Spark (Second Tier).',
+                inputs: [
+                  // Expertise in Dagger Crafting — from Tricks and Tips book (Incinerator II reward)
+                  {
+                    itemId: ID.EXPERTISE_IN_DAGGER_CRAFTING,
+                    name: 'Expertise in Dagger Crafting',
+                    count: 1,
+                    source: 'collection',
+                    accountBound: true,
+                    note: 'From Tricks and Tips for Advanced Dagger Crafting (consumable) — reward for completing Incinerator II: The Perfected Dagger achievement',
+                    inputs: [],
+                  },
+                  // Spirit of the Spark Experiment — salvage Spark Experiment
+                  {
+                    itemId: ID.SPIRIT_OF_SPARK_EXPERIMENT,
+                    name: 'Spirit of the Spark Experiment',
+                    count: 1,
+                    source: 'collection',
+                    accountBound: true,
+                    note: 'Salvage Spark Experiment (ID 72827) with any salvage kit',
+                    inputs: [
+                      // ── Spark Experiment — Tier 1 (Incinerator I: The Experimental Dagger) ──
+                      {
+                        itemId: ID.SPARK_EXPERIMENT,
+                        name: 'Spark Experiment',
+                        count: 1,
+                        source: 'collection',
+                        accountBound: true,
+                        achievementId: 2564,  // Incinerator I: The Experimental Dagger [wiki verified June 2026]
+                        achievementBitCount: 18,
+                        note: 'Crafted via Incinerator I: The Experimental Dagger collection (Weaponsmith 450). Recipe from Box of Recipes: Spark (First Tier).',
+                        inputs: [
+                          // Essence of Industry — from Chest of Industry (Incinerator I reward)
+                          {
+                            itemId: ID.ESSENCE_OF_INDUSTRY,
+                            name: 'Essence of Industry',
+                            count: 1,
+                            source: 'collection',
+                            accountBound: true,
+                            note: 'From Chest of Industry — reward for completing Incinerator I: The Experimental Dagger achievement',
+                            inputs: [],
+                          },
+                          // Experimental Dagger Blade — crafted Weaponsmith 450
+                          {
+                            itemId: ID.EXPERIMENTAL_DAGGER_BLADE,
+                            name: 'Experimental Dagger Blade',
+                            count: 1,
+                            source: 'forge',
+                            accountBound: true,
+                            note: 'Crafted (Weaponsmith 450) — recipe from Box of Recipes: Spark (First Tier)',
+                            inputs: [
+                              tp(ID.DELDRIMOR_STEEL_INGOT, 'Deldrimor Steel Ingot', 15),
+                              { itemId: null, name: 'Memory of Battle', count: 50, source: 'wvw', accountBound: false, note: 'WvW participation currency', inputs: [] },
+                              { itemId: null, name: 'Shard of Glory',   count: 50, source: 'currency', note: 'PvP participation currency', inputs: [] },
+                            ],
+                          },
+                          // Experimental Dagger Hilt — crafted Weaponsmith 450
+                          {
+                            itemId: ID.EXPERIMENTAL_DAGGER_HILT,
+                            name: 'Experimental Dagger Hilt',
+                            count: 1,
+                            source: 'forge',
+                            accountBound: true,
+                            note: 'Crafted (Weaponsmith 450) — recipe from Box of Recipes: Spark (First Tier)',
+                            inputs: [
+                              tp(ID.DELDRIMOR_STEEL_INGOT, 'Deldrimor Steel Ingot', 10),
+                              { itemId: null, name: 'Memory of Battle', count: 50, source: 'wvw', accountBound: false, note: 'WvW participation currency', inputs: [] },
+                              { itemId: null, name: 'Shard of Glory',   count: 50, source: 'currency', note: 'PvP participation currency', inputs: [] },
+                            ],
+                          },
+                          // Legendary Inscription — shared component
+                          { ...LEGENDARY_INSCRIPTION_COMPONENT },
+                        ],
+                      },
+                    ],
+                  },
+                  // Jar of Luminesce Polish — shared Tier 2 component
+                  {
+                    itemId: ID.JAR_OF_LUMINESCE_POLISH,
+                    name: 'Jar of Luminesce Polish',
+                    count: 1,
+                    source: 'forge',
+                    accountBound: true,
+                    note: 'Crafted (Artificer/Huntsman/Weaponsmith 400) — recipe from Box of Recipes: Spark (Second Tier)',
+                    inputs: [
+                      tp(ID.PILE_OF_BLOODSTONE_DUST,  'Pile of Bloodstone Dust',  250),
+                      { itemId: null, name: 'Amalgamated Gemstone', count: 1, source: 'tp', inputs: [] },
+                      tp(ID.THERMOCATALYTIC_REAGENT,  'Thermocatalytic Reagent',   10),
+                      tp(ID.MASTER_MAINTENANCE_OIL,   'Master Maintenance Oil',    10),
+                    ],
+                  },
+                  // Prismatic Lodestone — shared Tier 2 component
+                  {
+                    itemId: ID.PRISMATIC_LODESTONE,
+                    name: 'Prismatic Lodestone',
+                    count: 1,
+                    source: 'forge',
+                    accountBound: true,
+                    note: 'Crafted (Artificer/Huntsman/Weaponsmith 400) — recipe from Box of Recipes: Spark (Second Tier). Combines 4 elemental lodestones.',
+                    inputs: [
+                      tp(ID.GLACIAL_LODESTONE,  'Glacial Lodestone',  1),
+                      tp(ID.MOLTEN_LODESTONE,   'Molten Lodestone',   1),
+                      tp(ID.ONYX_LODESTONE,     'Onyx Lodestone',     1),
+                      tp(ID.CHARGED_LODESTONE,  'Charged Lodestone',  1),
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+          // Fuel Cannister — crafted Weaponsmith 500
+          {
+            itemId: ID.FUEL_CANNISTER,
+            name: 'Fuel Cannister',
+            count: 1,
+            source: 'forge',
+            accountBound: true,
+            note: 'Crafted (Weaponsmith 500) — recipe from Box of Recipes: Spark',
+            inputs: [
+              tp(ID.ORICHALCUM_INGOT,         'Orichalcum Ingot',          50),
+              tp(ID.PILE_OF_CRYSTALLINE_DUST, 'Pile of Crystalline Dust',   5),
+              tp(ID.DELDRIMOR_STEEL_INGOT,    'Deldrimor Steel Ingot',      1),
+              tp(ID.SHEET_OF_AMBRITE,         'Sheet of Ambrite',          10),
+            ],
+          },
+          // Regulator Nozzle — crafted Weaponsmith 500
+          {
+            itemId: ID.REGULATOR_NOZZLE,
+            name: 'Regulator Nozzle',
+            count: 1,
+            source: 'forge',
+            accountBound: true,
+            note: 'Crafted (Weaponsmith 500) — recipe from Box of Recipes: Spark. Watchwork Mechanism ID unconfirmed — no wiki screenshot provided yet.',
+            inputs: [
+              tp(ID.ORICHALCUM_INGOT,        'Orichalcum Ingot',         50),
+              { itemId: ID.WATCHWORK_MECHANISM, name: 'Watchwork Mechanism', count: 1, source: 'tp', inputs: [] },
+              tp(ID.THERMOCATALYTIC_REAGENT, 'Thermocatalytic Reagent',  10),
+              tp(ID.GLOB_OF_ECTOPLASM,       'Glob of Ectoplasm',         5),
+            ],
+          },
+        ],
+      },
       { ...GIFT_OF_INCINERATOR },
       { ...GIFT_OF_FORTUNE },
       { ...GIFT_OF_MASTERY },
@@ -830,10 +1661,186 @@ export const LEGENDARY_RECIPES = [
   {
     id: 'legendary_moot',
     name: 'The Moot',
-    itemId: null,
+    itemId: ID.THE_MOOT,
     rarity: 'Legendary', weaponType: 'Mace', generation: 1,
     inputs: [
-      precursor(ID.THE_ENERGIZER, 'The Energizer'),
+      // ── The Energizer precursor — 3-tier Legendary Crafting collection ────
+      // Achievement chain: Moot I (Experimental Mace) → Moot II (Perfected Mace) → Moot III (The Energizer)
+      {
+        itemId: ID.THE_ENERGIZER,
+        name: 'The Energizer',
+        count: 1,
+        source: 'collection',
+        accountBound: true,
+        achievementId: 2374,  // The Moot III: The Energizer [wiki verified June 2026]
+        achievementBitCount: 35,
+        note: 'Crafted once per account via The Moot III: The Energizer collection (Weaponsmith 500). Recipe from Box of Recipes: The Energizer.',
+        inputs: [
+          // ── Tier 3 ingredients (Moot III: The Energizer) ─────────────────
+          {
+            itemId: ID.ESSENCE_OF_THE_CELEBRATION,
+            name: 'Essence of the Celebration',
+            count: 1,
+            source: 'collection',
+            accountBound: true,
+            note: 'From Chest of the Celebration — reward for completing The Moot III: The Energizer achievement',
+            inputs: [],
+          },
+          // Spirit of the Perfected Mace — salvage Perfected Mace
+          {
+            itemId: ID.SPIRIT_OF_PERFECTED_MACE,
+            name: 'Spirit of the Perfected Mace',
+            count: 1,
+            source: 'collection',
+            accountBound: true,
+            note: 'Salvage Perfected Mace (ID 74020) with any salvage kit',
+            inputs: [
+              // ── Perfected Mace — Tier 2 (Moot II: The Perfected Mace) ────
+              {
+                itemId: ID.PERFECTED_MACE,
+                name: 'Perfected Mace',
+                count: 1,
+                source: 'collection',
+                accountBound: true,
+                achievementId: 2291,  // The Moot II: The Perfected Mace [wiki verified June 2026]
+                achievementBitCount: 14,
+                note: 'Crafted via The Moot II: The Perfected Mace collection (Weaponsmith 450). Recipe from Box of Recipes: The Energizer (Second Tier).',
+                inputs: [
+                  {
+                    itemId: ID.EXPERTISE_IN_MACE_CRAFTING,
+                    name: 'Expertise in Mace Crafting',
+                    count: 1,
+                    source: 'collection',
+                    accountBound: true,
+                    note: 'From Tricks and Tips for Legendary Mace Crafting — reward for completing The Moot II: The Perfected Mace achievement',
+                    inputs: [],
+                  },
+                  {
+                    itemId: ID.SPIRIT_OF_ENERGIZER_EXPERIMENT,
+                    name: 'Spirit of The Energizer Experiment',
+                    count: 1,
+                    source: 'collection',
+                    accountBound: true,
+                    note: 'Salvage The Energizer Experiment (ID 70610) with any salvage kit',
+                    inputs: [
+                      // ── The Energizer Experiment — Tier 1 (Moot I) ───────
+                      {
+                        itemId: ID.ENERGIZER_EXPERIMENT,
+                        name: 'The Energizer Experiment',
+                        count: 1,
+                        source: 'collection',
+                        accountBound: true,
+                        achievementId: 2177,  // The Moot I: The Experimental Mace [wiki verified June 2026]
+                        achievementBitCount: 14,
+                        note: 'Crafted via The Moot I: The Experimental Mace collection (Weaponsmith 450). Recipe from Box of Recipes: The Energizer (First Tier).',
+                        inputs: [
+                          {
+                            itemId: ID.ESSENCE_OF_THE_HUNT_MACE,
+                            name: 'Essence of the Hunt',
+                            count: 1,
+                            source: 'collection',
+                            accountBound: true,
+                            note: 'From Chest of the Hunt (mace) — reward for completing The Moot I: The Experimental Mace achievement',
+                            inputs: [],
+                          },
+                          {
+                            itemId: ID.EXPERIMENTAL_MACE_HEAD,
+                            name: 'Experimental Mace Head',
+                            count: 1,
+                            source: 'forge',
+                            accountBound: true,
+                            note: 'Crafted (Weaponsmith 450) — recipe from Box of Recipes: The Energizer (First Tier)',
+                            inputs: [
+                              tp(ID.DELDRIMOR_STEEL_INGOT, 'Deldrimor Steel Ingot', 15),
+                              { itemId: null, name: 'Memory of Battle', count: 50, source: 'wvw', accountBound: false, note: 'WvW participation currency', inputs: [] },
+                              { itemId: null, name: 'Shard of Glory', count: 50, source: 'currency', note: 'PvP participation currency', inputs: [] },
+                            ],
+                          },
+                          {
+                            itemId: ID.EXPERIMENTAL_MACE_HAFT,
+                            name: 'Experimental Mace Haft',
+                            count: 1,
+                            source: 'forge',
+                            accountBound: true,
+                            note: 'Crafted (Weaponsmith 450) — recipe from Box of Recipes: The Energizer (First Tier)',
+                            inputs: [
+                              tp(ID.SPIRITWOOD_PLANK, 'Spiritwood Plank', 10),
+                              { itemId: null, name: 'Memory of Battle', count: 50, source: 'wvw', accountBound: false, note: 'WvW participation currency', inputs: [] },
+                              { itemId: null, name: 'Shard of Glory', count: 50, source: 'currency', note: 'PvP participation currency', inputs: [] },
+                            ],
+                          },
+                          { ...LEGENDARY_INSCRIPTION_COMPONENT },
+                        ],
+                      },
+                    ],
+                  },
+                  // Jar of Luminesce Polish — shared Tier 2 component
+                  {
+                    itemId: ID.JAR_OF_LUMINESCE_POLISH,
+                    name: 'Jar of Luminesce Polish',
+                    count: 1,
+                    source: 'forge',
+                    accountBound: true,
+                    note: 'Crafted (Artificer/Huntsman/Weaponsmith 400) — recipe from Box of Recipes: The Energizer (Second Tier)',
+                    inputs: [
+                      tp(ID.PILE_OF_BLOODSTONE_DUST,  'Pile of Bloodstone Dust',  250),
+                      { itemId: null, name: 'Amalgamated Gemstone', count: 1, source: 'tp', inputs: [] },
+                      tp(ID.THERMOCATALYTIC_REAGENT,  'Thermocatalytic Reagent',   10),
+                      tp(ID.MASTER_MAINTENANCE_OIL,   'Master Maintenance Oil',    10),
+                    ],
+                  },
+                  // Prismatic Lodestone — shared Tier 2 component
+                  {
+                    itemId: ID.PRISMATIC_LODESTONE,
+                    name: 'Prismatic Lodestone',
+                    count: 1,
+                    source: 'forge',
+                    accountBound: true,
+                    note: 'Crafted (Artificer/Huntsman/Weaponsmith 400) — recipe from Box of Recipes: The Energizer (Second Tier). Combines 4 elemental lodestones.',
+                    inputs: [
+                      tp(ID.GLACIAL_LODESTONE,  'Glacial Lodestone',  1),
+                      tp(ID.MOLTEN_LODESTONE,   'Molten Lodestone',   1),
+                      tp(ID.ONYX_LODESTONE,     'Onyx Lodestone',     1),
+                      tp(ID.CHARGED_LODESTONE,  'Charged Lodestone',  1),
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+          // Party Ball — crafted Weaponsmith 500
+          {
+            itemId: ID.PARTY_BALL,
+            name: 'Party Ball',
+            count: 1,
+            source: 'forge',
+            accountBound: true,
+            note: 'Crafted (Weaponsmith 500) — recipe from Box of Recipes: The Energizer',
+            inputs: [
+              tp(ID.OPAL_ORB,                 'Opal Orb',                  10),
+              tp(ID.PILE_OF_COARSE_SAND,       'Pile of Coarse Sand',       100),
+              tp(ID.PILE_OF_CRYSTALLINE_DUST,  'Pile of Crystalline Dust',   50),
+              tp(ID.THERMOCATALYTIC_REAGENT,   'Thermocatalytic Reagent',    10),
+            ],
+          },
+          // Party Stick — crafted Weaponsmith 500
+          {
+            itemId: ID.PARTY_STICK,
+            name: 'Party Stick',
+            count: 1,
+            source: 'forge',
+            accountBound: true,
+            note: 'Crafted (Weaponsmith 500) — recipe from Box of Recipes: The Energizer. Sculptor\'s Tools: karma from Lord Joshua in Beetletun for 4,500 Karma.',
+            inputs: [
+              tp(ID.MITHRIL_INGOT,            'Mithril Ingot',            100),
+              tp(ID.ELDER_WOOD_PLANK,          'Elder Wood Plank',         250),
+              { itemId: 74909, name: "Sculptor's Tools", count: 1, source: 'karma',
+                note: 'Purchased from Lord Joshua in Beetletun for 4,500 Karma — account-bound, NOT on TP', inputs: [] },
+              tp(ID.PILE_OF_CRYSTALLINE_DUST,  'Pile of Crystalline Dust',  10),
+            ],
+          },
+        ],
+      },
       { ...GIFT_OF_THE_MOOT },
       { ...GIFT_OF_FORTUNE },
       { ...GIFT_OF_MASTERY },
@@ -847,7 +1854,204 @@ export const LEGENDARY_RECIPES = [
     itemId: null,
     rarity: 'Legendary', weaponType: 'Pistol', generation: 1,
     inputs: [
-      precursor(ID.CHAOS_GUN, 'Chaos Gun'),
+      // ── Chaos Gun precursor — 3-tier Legendary Crafting collection ────────
+      // Achievement chain: Quip I (Experimental Pistol) → II (Perfected Pistol) → III (Chaos Gun)
+      {
+        itemId: ID.CHAOS_GUN,
+        name: 'Chaos Gun',
+        count: 1,
+        source: 'collection',
+        accountBound: true,
+        achievementId: 2524,  // Quip III: Chaos Gun [wiki verified June 2026]
+        achievementBitCount: 36,
+        note: 'Crafted once per account via Quip III: Chaos Gun collection (Huntsman 500). Recipe from Box of Recipes: Chaos Gun.',
+        inputs: [
+          // ── Tier 3 ingredients (Quip III: Chaos Gun) ─────────────────────
+          {
+            itemId: ID.ESSENCE_OF_MISCHIEF,
+            name: 'Essence of Mischief',
+            count: 1,
+            source: 'collection',
+            accountBound: true,
+            note: 'From Chest of Mischief — reward for completing Quip III: Chaos Gun achievement',
+            inputs: [],
+          },
+          // Spirit of the Perfected Pistol — salvage Perfected Pistol
+          {
+            itemId: ID.SPIRIT_OF_PERFECTED_PISTOL,
+            name: 'Spirit of the Perfected Pistol',
+            count: 1,
+            source: 'collection',
+            accountBound: true,
+            note: 'Salvage Perfected Pistol (ID 73023) with any salvage kit',
+            inputs: [
+              // ── Perfected Pistol — Tier 2 (Quip II: The Perfected Pistol) ─
+              {
+                itemId: ID.PERFECTED_PISTOL,
+                name: 'Perfected Pistol',
+                count: 1,
+                source: 'collection',
+                accountBound: true,
+                achievementId: 2498,  // Quip II: The Perfected Pistol [wiki verified June 2026]
+                achievementBitCount: 14,
+                note: 'Crafted via Quip II: The Perfected Pistol collection (Huntsman 450). Recipe from Box of Recipes: Chaos Gun (Second Tier).',
+                inputs: [
+                  // Expertise in Pistol Crafting — from Tricks and Tips book (Quip II reward)
+                  {
+                    itemId: ID.EXPERTISE_IN_PISTOL_CRAFTING,
+                    name: 'Expertise in Pistol Crafting',
+                    count: 1,
+                    source: 'collection',
+                    accountBound: true,
+                    note: 'From Tricks and Tips for Advanced Pistol Crafting (consumable) — reward for completing Quip II: The Perfected Pistol achievement',
+                    inputs: [],
+                  },
+                  // Spirit of the Chaos Gun Experiment — salvage Chaos Gun Experiment
+                  {
+                    itemId: ID.SPIRIT_OF_CHAOS_GUN_EXPERIMENT,
+                    name: 'Spirit of the Chaos Gun Experiment',
+                    count: 1,
+                    source: 'collection',
+                    accountBound: true,
+                    note: 'Salvage Chaos Gun Experiment (ID 75846) with any salvage kit',
+                    inputs: [
+                      // ── Chaos Gun Experiment — Tier 1 (Quip I) ───────────
+                      {
+                        itemId: ID.CHAOS_GUN_EXPERIMENT,
+                        name: 'Chaos Gun Experiment',
+                        count: 1,
+                        source: 'collection',
+                        accountBound: true,
+                        achievementId: 2389,  // Quip I: The Experimental Pistol [wiki verified June 2026]
+                        achievementBitCount: 16,
+                        note: 'Crafted via Quip I: The Experimental Pistol collection (Huntsman 450). Recipe from Box of Recipes: Chaos Gun (First Tier).',
+                        inputs: [
+                          // Essence of Audacity — from Chest of Audacity (Quip I reward)
+                          {
+                            itemId: ID.ESSENCE_OF_AUDACITY,
+                            name: 'Essence of Audacity',
+                            count: 1,
+                            source: 'collection',
+                            accountBound: true,
+                            note: 'From Chest of Audacity — reward for completing Quip I: The Experimental Pistol achievement',
+                            inputs: [],
+                          },
+                          // Experimental Pistol Barrel — crafted Huntsman 450
+                          {
+                            itemId: ID.EXPERIMENTAL_PISTOL_BARREL,
+                            name: 'Experimental Pistol Barrel',
+                            count: 1,
+                            source: 'forge',
+                            accountBound: true,
+                            note: 'Crafted (Huntsman 450) — recipe from Box of Recipes: Chaos Gun (First Tier)',
+                            inputs: [
+                              tp(ID.DELDRIMOR_STEEL_INGOT, 'Deldrimor Steel Ingot', 15),
+                              { itemId: null, name: 'Memory of Battle', count: 50, source: 'wvw', accountBound: false, note: 'WvW participation currency', inputs: [] },
+                              { itemId: null, name: 'Shard of Glory',   count: 50, source: 'currency', note: 'PvP participation currency', inputs: [] },
+                            ],
+                          },
+                          // Experimental Pistol Frame — crafted Huntsman 450
+                          {
+                            itemId: ID.EXPERIMENTAL_PISTOL_FRAME,
+                            name: 'Experimental Pistol Frame',
+                            count: 1,
+                            source: 'forge',
+                            accountBound: true,
+                            note: 'Crafted (Huntsman 450) — recipe from Box of Recipes: Chaos Gun (First Tier)',
+                            inputs: [
+                              tp(ID.SPIRITWOOD_PLANK, 'Spiritwood Plank', 10),
+                              { itemId: null, name: 'Memory of Battle', count: 50, source: 'wvw', accountBound: false, note: 'WvW participation currency', inputs: [] },
+                              { itemId: null, name: 'Shard of Glory',   count: 50, source: 'currency', note: 'PvP participation currency', inputs: [] },
+                            ],
+                          },
+                          // Legendary Inscription — shared component
+                          { ...LEGENDARY_INSCRIPTION_COMPONENT },
+                        ],
+                      },
+                    ],
+                  },
+                  // Jar of Luminesce Polish — shared Tier 2 component
+                  {
+                    itemId: ID.JAR_OF_LUMINESCE_POLISH,
+                    name: 'Jar of Luminesce Polish',
+                    count: 1,
+                    source: 'forge',
+                    accountBound: true,
+                    note: 'Crafted (Artificer/Huntsman/Weaponsmith 400) — recipe from Box of Recipes: Chaos Gun (Second Tier)',
+                    inputs: [
+                      tp(ID.PILE_OF_BLOODSTONE_DUST,  'Pile of Bloodstone Dust',  250),
+                      { itemId: null, name: 'Amalgamated Gemstone', count: 1, source: 'tp', inputs: [] },
+                      tp(ID.THERMOCATALYTIC_REAGENT,  'Thermocatalytic Reagent',   10),
+                      tp(ID.MASTER_MAINTENANCE_OIL,   'Master Maintenance Oil',    10),
+                    ],
+                  },
+                  // Prismatic Lodestone — shared Tier 2 component
+                  {
+                    itemId: ID.PRISMATIC_LODESTONE,
+                    name: 'Prismatic Lodestone',
+                    count: 1,
+                    source: 'forge',
+                    accountBound: true,
+                    note: 'Crafted (Artificer/Huntsman/Weaponsmith 400) — recipe from Box of Recipes: Chaos Gun (Second Tier). Combines 4 elemental lodestones.',
+                    inputs: [
+                      tp(ID.GLACIAL_LODESTONE,  'Glacial Lodestone',  1),
+                      tp(ID.MOLTEN_LODESTONE,   'Molten Lodestone',   1),
+                      tp(ID.ONYX_LODESTONE,     'Onyx Lodestone',     1),
+                      tp(ID.CHARGED_LODESTONE,  'Charged Lodestone',  1),
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+          // Ornate Pistol Frame — crafted Huntsman 500
+          {
+            itemId: ID.ORNATE_PISTOL_FRAME,
+            name: 'Ornate Pistol Frame',
+            count: 1,
+            source: 'forge',
+            accountBound: true,
+            note: 'Crafted (Huntsman 500) — recipe from Box of Recipes: Chaos Gun. Sculptor\'s Tools: karma from Lord Joshua in Beetletun for 4,500 Karma.',
+            inputs: [
+              { itemId: 74909, name: "Sculptor's Tools", count: 1, source: 'karma',
+                note: 'Purchased from Lord Joshua in Beetletun for 4,500 Karma — account-bound, NOT on TP', inputs: [] },
+              tp(ID.ORICHALCUM_INGOT,      'Orichalcum Ingot',       10),
+              tp(ID.MITHRIL_INGOT,         'Mithril Ingot',          50),
+              tp(ID.DELDRIMOR_STEEL_INGOT, 'Deldrimor Steel Ingot',   1),
+            ],
+          },
+          // Confetti Bullets — crafted Huntsman 500
+          {
+            itemId: ID.CONFETTI_BULLETS,
+            name: 'Confetti Bullets',
+            count: 1,
+            source: 'forge',
+            accountBound: true,
+            note: 'Crafted (Huntsman 500) — recipe from Box of Recipes: Chaos Gun',
+            inputs: [
+              // Colored Paper — crafted (trophy), Huntsman 400, via Recipe: Confetti Pouch (bought from Hobbs for 5,005 Karma after Quip III achievement)
+              {
+                itemId: ID.COLORED_PAPER,
+                name: 'Colored Paper',
+                count: 10,
+                source: 'forge',
+                accountBound: true,
+                note: 'Crafted (Huntsman 400) — recipe unlocked via Recipe: Confetti Pouch (5,005 Karma from Hobbs, requires Quip III: Chaos Gun achievement)',
+                inputs: [
+                  { itemId: null, name: 'Sheet of Coarse Paper', count: 10, source: 'tp', inputs: [] },
+                  { itemId: null, name: 'Pouch of Red Pigment',    count: 15, source: 'tp', inputs: [] },
+                  { itemId: null, name: 'Pouch of Yellow Pigment', count: 15, source: 'tp', inputs: [] },
+                  { itemId: null, name: 'Pouch of Blue Pigment',   count: 15, source: 'tp', inputs: [] },
+                ],
+              },
+              tp(ID.MITHRIL_INGOT, 'Mithril Ingot', 50),
+              { itemId: ID.BLACK_POWDER, name: 'Black Powder', count: 1, source: 'karma',
+                note: 'Purchased from Thegren Topjaw (Tela Range, Plains of Ashford) for 1,500 Karma — only purchasable once the Confetti Bullets recipe box is unlocked', inputs: [] },
+              tp(24272, 'Pile of Glittering Dust', 50),
+            ],
+          },
+        ],
+      },
       { ...GIFT_OF_QUIP },
       { ...GIFT_OF_FORTUNE },
       { ...GIFT_OF_MASTERY },
@@ -858,10 +2062,193 @@ export const LEGENDARY_RECIPES = [
   {
     id: 'legendary_meteorlogicus',
     name: 'Meteorlogicus',
-    itemId: null,
+    itemId: 30695,
     rarity: 'Legendary', weaponType: 'Scepter', generation: 1,
     inputs: [
-      precursor(ID.STORM, 'Storm'),
+      // ── Storm precursor — 3-tier Legendary Crafting collection ────────────
+      // Achievement chain: Meteorlogicus I (Experimental Scepter) → II (Perfected Scepter) → III (Storm)
+      {
+        itemId: ID.STORM,
+        name: 'Storm',
+        count: 1,
+        source: 'collection',
+        accountBound: true,
+        achievementId: 2449,  // Meteorlogicus III: Storm [wiki verified July 2026]
+        achievementBitCount: 29,
+        note: 'Crafted once per account via Meteorlogicus III: Storm collection (Artificer 500). Recipe from Box of Recipes: Storm.',
+        inputs: [
+          // ── Tier 3 ingredients (Meteorlogicus III: Storm) ────────────────
+          {
+            itemId: ID.ESSENCE_OF_CONTROL,
+            name: 'Essence of Control',
+            count: 1,
+            source: 'collection',
+            accountBound: true,
+            note: 'From Chest of Control — reward for completing Meteorlogicus III: Storm achievement',
+            inputs: [],
+          },
+          // Spirit of the Perfected Scepter — salvage Perfected Scepter
+          {
+            itemId: ID.SPIRIT_OF_PERFECTED_SCEPTER,
+            name: 'Spirit of the Perfected Scepter',
+            count: 1,
+            source: 'collection',
+            accountBound: true,
+            note: 'Salvage Perfected Scepter (ID 71886) with any salvage kit',
+            inputs: [
+              // ── Perfected Scepter — Tier 2 (Meteorlogicus II: The Perfected Scepter) ─
+              {
+                itemId: ID.PERFECTED_SCEPTER,
+                name: 'Perfected Scepter',
+                count: 1,
+                source: 'collection',
+                accountBound: true,
+                achievementId: 2391,  // Meteorlogicus II: The Perfected Scepter [wiki verified July 2026]
+                achievementBitCount: 12,
+                note: 'Crafted via Meteorlogicus II: The Perfected Scepter collection (Artificer 450). Recipe from Box of Recipes: Storm (Second Tier).',
+                inputs: [
+                  // Expertise in Scepter Crafting — from Tricks and Tips book (Meteorlogicus II reward)
+                  {
+                    itemId: ID.EXPERTISE_IN_SCEPTER_CRAFTING,
+                    name: 'Expertise in Scepter Crafting',
+                    count: 1,
+                    source: 'collection',
+                    accountBound: true,
+                    note: 'From Tricks and Tips for Advanced Scepter Crafting (consumable) — reward for completing Meteorlogicus II: The Perfected Scepter achievement',
+                    inputs: [],
+                  },
+                  // Spirit of the Storm Experiment — salvage Storm Experiment
+                  {
+                    itemId: ID.SPIRIT_OF_STORM_EXPERIMENT,
+                    name: 'Spirit of the Storm Experiment',
+                    count: 1,
+                    source: 'collection',
+                    accountBound: true,
+                    note: 'Salvage Storm Experiment (ID 74655) with any salvage kit',
+                    inputs: [
+                      // ── Storm Experiment — Tier 1 (Meteorlogicus I) ──────
+                      {
+                        itemId: ID.STORM_EXPERIMENT,
+                        name: 'Storm Experiment',
+                        count: 1,
+                        source: 'collection',
+                        accountBound: true,
+                        achievementId: 2441,  // Meteorlogicus I: The Experimental Scepter [wiki verified July 2026]
+                        achievementBitCount: 15,
+                        note: 'Crafted via Meteorlogicus I: The Experimental Scepter collection (Artificer 450). Recipe from Box of Recipes: Storm (First Tier).',
+                        inputs: [
+                          // Essence of Meteorology — from Chest of Meteorology (Meteorlogicus I reward)
+                          {
+                            itemId: ID.ESSENCE_OF_METEOROLOGY,
+                            name: 'Essence of Meteorology',
+                            count: 1,
+                            source: 'collection',
+                            accountBound: true,
+                            note: 'From Chest of Meteorology — reward for completing Meteorlogicus I: The Experimental Scepter achievement',
+                            inputs: [],
+                          },
+                          // Experimental Scepter Core — crafted Artificer 450
+                          {
+                            itemId: ID.EXPERIMENTAL_SCEPTER_CORE,
+                            name: 'Experimental Scepter Core',
+                            count: 1,
+                            source: 'forge',
+                            accountBound: true,
+                            note: 'Crafted (Artificer 450) — recipe from Box of Recipes: Storm (First Tier)',
+                            inputs: [
+                              tp(ID.SPIRITWOOD_PLANK, 'Spiritwood Plank', 10),
+                              { itemId: null, name: 'Memory of Battle', count: 50, source: 'wvw', accountBound: false, note: 'WvW participation currency', inputs: [] },
+                              { itemId: null, name: 'Shard of Glory',   count: 50, source: 'currency', note: 'PvP participation currency', inputs: [] },
+                            ],
+                          },
+                          // Experimental Scepter Rod — crafted Artificer 450
+                          {
+                            itemId: ID.EXPERIMENTAL_SCEPTER_ROD,
+                            name: 'Experimental Scepter Rod',
+                            count: 1,
+                            source: 'forge',
+                            accountBound: true,
+                            note: 'Crafted (Artificer 450) — recipe from Box of Recipes: Storm (First Tier)',
+                            inputs: [
+                              tp(ID.SPIRITWOOD_PLANK, 'Spiritwood Plank', 15),
+                              { itemId: null, name: 'Memory of Battle', count: 50, source: 'wvw', accountBound: false, note: 'WvW participation currency', inputs: [] },
+                              { itemId: null, name: 'Shard of Glory',   count: 50, source: 'currency', note: 'PvP participation currency', inputs: [] },
+                            ],
+                          },
+                          // Legendary Inscription — shared component
+                          { ...LEGENDARY_INSCRIPTION_COMPONENT },
+                        ],
+                      },
+                    ],
+                  },
+                  // Jar of Luminesce Polish — shared Tier 2 component
+                  {
+                    itemId: ID.JAR_OF_LUMINESCE_POLISH,
+                    name: 'Jar of Luminesce Polish',
+                    count: 1,
+                    source: 'forge',
+                    accountBound: true,
+                    note: 'Crafted (Artificer/Huntsman/Weaponsmith 400) — recipe from Box of Recipes: Storm (Second Tier)',
+                    inputs: [
+                      tp(ID.PILE_OF_BLOODSTONE_DUST,  'Pile of Bloodstone Dust',  250),
+                      { itemId: null, name: 'Amalgamated Gemstone', count: 1, source: 'tp', inputs: [] },
+                      tp(ID.THERMOCATALYTIC_REAGENT,  'Thermocatalytic Reagent',   10),
+                      tp(ID.MASTER_MAINTENANCE_OIL,   'Master Maintenance Oil',    10),
+                    ],
+                  },
+                  // Prismatic Lodestone — shared Tier 2 component
+                  {
+                    itemId: ID.PRISMATIC_LODESTONE,
+                    name: 'Prismatic Lodestone',
+                    count: 1,
+                    source: 'forge',
+                    accountBound: true,
+                    note: 'Crafted (Artificer/Huntsman/Weaponsmith 400) — recipe from Box of Recipes: Storm (Second Tier). Combines 4 elemental lodestones.',
+                    inputs: [
+                      tp(ID.GLACIAL_LODESTONE,  'Glacial Lodestone',  1),
+                      tp(ID.MOLTEN_LODESTONE,   'Molten Lodestone',   1),
+                      tp(ID.ONYX_LODESTONE,     'Onyx Lodestone',     1),
+                      tp(ID.CHARGED_LODESTONE,  'Charged Lodestone',  1),
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+          // Globe — crafted Artificer 500
+          {
+            itemId: ID.GLOBE,
+            name: 'Globe',
+            count: 1,
+            source: 'forge',
+            accountBound: true,
+            note: 'Crafted (Artificer 500) — recipe from Box of Recipes: Storm',
+            inputs: [
+              { itemId: 66902, name: 'Brick of Clay', count: 25, source: 'karma',
+                note: 'Account Bound — Dry Top karma/Geode vendors', inputs: [] },
+              tp(ID.MOLTEN_LODESTONE, 'Molten Lodestone', 3),
+              { itemId: 12156, name: 'Jug of Water', count: 50, source: 'vendor',
+                note: 'Vendor only, 10 for 80c (8c each)', inputs: [] },
+              tp(ID.GLACIAL_LODESTONE, 'Glacial Lodestone', 5),
+            ],
+          },
+          // Spinning Mechanism — crafted Artificer 500
+          {
+            itemId: ID.SPINNING_MECHANISM,
+            name: 'Spinning Mechanism',
+            count: 1,
+            source: 'forge',
+            accountBound: true,
+            note: 'Crafted (Artificer 500) — recipe from Box of Recipes: Storm',
+            inputs: [
+              { itemId: ID.WATCHWORK_MECHANISM, name: 'Watchwork Mechanism', count: 1, source: 'tp', inputs: [] },
+              tp(ID.ELDER_WOOD_PLANK, 'Elder Wood Plank', 50),
+              tp(ID.MITHRIL_INGOT, 'Mithril Ingot', 50),
+              tp(ID.MASTER_MAINTENANCE_OIL, 'Master Maintenance Oil', 10),
+            ],
+          },
+        ],
+      },
       { ...GIFT_OF_METEORLOGICUS },
       { ...GIFT_OF_FORTUNE },
       { ...GIFT_OF_MASTERY },
@@ -1060,7 +2447,7 @@ export const LEGENDARY_RECIPES = [
                             accountBound: true,
                             note: 'Crafted (Artificer 450) — recipe from Box of Recipes: The Legend (First Tier)',
                             inputs: [
-                              { itemId: null, idName: 'Spiritwood Plank', name: 'Spiritwood Plank', count: 10, source: 'tp', inputs: [] },
+                              { itemId: ID.SPIRITWOOD_PLANK, name: 'Spiritwood Plank', count: 10, source: 'tp', inputs: [] },
                               { itemId: null, idName: 'Memory of Battle', name: 'Memory of Battle', count: 100, source: 'wvw', accountBound: false, note: 'WvW participation currency', inputs: [] },
                               { itemId: null, idName: 'Shard of Glory', name: 'Shard of Glory', count: 100, source: 'currency', note: 'PvP participation currency — buy from Miyani', inputs: [] },
                             ],
@@ -1074,7 +2461,7 @@ export const LEGENDARY_RECIPES = [
                             accountBound: true,
                             note: 'Crafted (Artificer 450) — recipe from Box of Recipes: The Legend (First Tier)',
                             inputs: [
-                              { itemId: null, idName: 'Spiritwood Plank', name: 'Spiritwood Plank', count: 25, source: 'tp', inputs: [] },
+                              { itemId: ID.SPIRITWOOD_PLANK, name: 'Spiritwood Plank', count: 25, source: 'tp', inputs: [] },
                               { itemId: null, idName: 'Memory of Battle', name: 'Memory of Battle', count: 100, source: 'wvw', accountBound: false, note: 'WvW participation currency', inputs: [] },
                               { itemId: null, idName: 'Shard of Glory', name: 'Shard of Glory', count: 100, source: 'currency', note: 'PvP participation currency — buy from Miyani', inputs: [] },
                             ],
@@ -1107,10 +2494,10 @@ export const LEGENDARY_RECIPES = [
                     accountBound: true,
                     note: 'Crafted (Artificer/Huntsman/Weaponsmith 400) — recipe from Box of Recipes: The Legend (Second Tier)',
                     inputs: [
-                      { itemId: null, idName: 'Pile of Bloodstone Dust', name: 'Pile of Bloodstone Dust', count: 250, source: 'tp', inputs: [] },
+                      { itemId: ID.PILE_OF_BLOODSTONE_DUST, name: 'Pile of Bloodstone Dust', count: 250, source: 'tp', inputs: [] },
                       { itemId: null, idName: 'Amalgamated Gemstone', name: 'Amalgamated Gemstone', count: 1, source: 'tp', inputs: [] },
                       { itemId: null, idName: 'Thermocatalytic Reagent', name: 'Thermocatalytic Reagent', count: 10, source: 'tp', inputs: [] },
-                      { itemId: null, idName: 'Master Maintenance Oil', name: 'Master Maintenance Oil', count: 10, source: 'tp', inputs: [] },
+                      { itemId: ID.MASTER_MAINTENANCE_OIL, name: 'Master Maintenance Oil', count: 10, source: 'tp', inputs: [] },
                     ],
                   },
                   // Prismatic Lodestone — crafted (recipe from Box of Recipes Second Tier)
@@ -1142,8 +2529,9 @@ export const LEGENDARY_RECIPES = [
             note: 'Crafted (Artificer 500) — recipe from Box of Recipes: The Legend (from Chest of Rainbows)',
             inputs: [
               tp(ID.GLOB_OF_ECTOPLASM,        'Glob of Ectoplasm',        1),
-              { itemId: null, idName: 'Spiritwood Plank',  name: 'Spiritwood Plank',  count: 1, source: 'tp', inputs: [] },
-              { itemId: null, idName: "Sculptor's Tools",  name: "Sculptor's Tools",  count: 1, source: 'tp', inputs: [] },
+              { itemId: ID.SPIRITWOOD_PLANK, name: 'Spiritwood Plank', count: 1, source: 'tp', inputs: [] },
+              { itemId: 74909, name: "Sculptor's Tools", count: 1, source: 'karma',
+                note: 'Purchased from Lord Joshua in Beetletun for 4,500 Karma — account-bound, NOT on TP', inputs: [] },
               tp(ID.PILE_OF_CRYSTALLINE_DUST, 'Pile of Crystalline Dust', 10),
             ],
           },
@@ -1158,8 +2546,9 @@ export const LEGENDARY_RECIPES = [
             inputs: [
               tp(ID.ELDER_WOOD_PLANK,   'Elder Wood Plank',   50),
               tp(ID.ANCIENT_WOOD_PLANK, 'Ancient Wood Plank', 50),
-              { itemId: null, idName: 'Spiritwood Plank', name: 'Spiritwood Plank', count: 1, source: 'tp', inputs: [] },
-              { itemId: null, idName: "Sculptor's Tools",  name: "Sculptor's Tools",  count: 1, source: 'tp', inputs: [] },
+              { itemId: ID.SPIRITWOOD_PLANK, name: 'Spiritwood Plank', count: 1, source: 'tp', inputs: [] },
+              { itemId: 74909, name: "Sculptor's Tools", count: 1, source: 'karma',
+                note: 'Purchased from Lord Joshua in Beetletun for 4,500 Karma — account-bound, NOT on TP', inputs: [] },
             ],
           },
         ],
@@ -1202,10 +2591,205 @@ export const LEGENDARY_RECIPES = [
   {
     id: 'legendary_kraitkin',
     name: 'Kraitkin',
-    itemId: null,
+    itemId: 30701,   // [wiki verified June 2026]
     rarity: 'Legendary', weaponType: 'Trident', generation: 1,
     inputs: [
-      precursor(ID.VENOM, 'Venom'),
+      // ── Venom precursor — 3-tier Legendary Crafting collection ───────────
+      // Achievement chain: Kraitkin I → Kraitkin II → Kraitkin III: Venom
+      // Tier 3 recipe (Artificer 500) confirmed: Essence of the Krait + Spirit of the Perfected Trident
+      //   + Snake Statue + Congealed Water [wiki verified June 2026]
+      // Sub-item IDs pending confirmation — modeled as stub collection for now
+      {
+        itemId: ID.VENOM,
+        name: 'Venom',
+        count: 1,
+        source: 'collection',
+        accountBound: true,
+        achievementId: 2296,  // Kraitkin III: Venom
+        note: 'Crafted once per account via Kraitkin III: Venom collection (Artificer 500). Recipe from Box of Recipes: Venom.',
+        inputs: [
+          // ── Tier 3 ingredients (Kraitkin III: Venom) ─────────────────────
+          // Essence of the Krait — from Chest of the Krait, Kraitkin III achievement reward
+          {
+            itemId: ID.ESSENCE_OF_THE_KRAIT,
+            name: 'Essence of the Krait',
+            count: 1,
+            source: 'collection',
+            accountBound: true,
+            note: 'From Chest of the Krait — reward for completing Kraitkin III: Venom achievement',
+            inputs: [],
+          },
+          // Spirit of the Perfected Trident — salvage Perfected Trident
+          {
+            itemId: ID.SPIRIT_OF_PERFECTED_TRIDENT,
+            name: 'Spirit of the Perfected Trident',
+            count: 1,
+            source: 'collection',
+            accountBound: true,
+            note: 'Salvage Perfected Trident (ID 74468) with any salvage kit',
+            inputs: [
+              // ── Perfected Trident — Tier 2 (Kraitkin II: The Perfected Trident) ──
+              {
+                itemId: ID.PERFECTED_TRIDENT,
+                name: 'Perfected Trident',
+                count: 1,
+                source: 'collection',
+                accountBound: true,
+                achievementId: 2522,  // Kraitkin II: The Perfected Trident
+                note: 'Crafted via Kraitkin II: The Perfected Trident collection (Artificer 450). Recipe from Box of Recipes: Venom (Second Tier).',
+                inputs: [
+                  // Expertise in Trident Crafting — from Tricks and Tips book (Kraitkin II reward)
+                  {
+                    itemId: ID.EXPERTISE_IN_TRIDENT_CRAFTING,
+                    name: 'Expertise in Trident Crafting',
+                    count: 1,
+                    source: 'collection',
+                    accountBound: true,
+                    note: 'From Tricks and Tips for Advanced Trident Crafting (consumable) — reward for completing Kraitkin II: The Perfected Trident achievement',
+                    inputs: [],
+                  },
+                  // Spirit of the Venom Experiment — salvage Venom Experiment
+                  {
+                    itemId: ID.SPIRIT_OF_VENOM_EXPERIMENT,
+                    name: 'Spirit of the Venom Experiment',
+                    count: 1,
+                    source: 'collection',
+                    accountBound: true,
+                    note: 'Salvage Venom Experiment (ID 72629) with any salvage kit',
+                    inputs: [
+                      // ── Venom Experiment — Tier 1 (Kraitkin I: The Experimental Trident) ──
+                      {
+                        itemId: ID.VENOM_EXPERIMENT,
+                        name: 'Venom Experiment',
+                        count: 1,
+                        source: 'collection',
+                        accountBound: true,
+                        achievementId: 2483,  // Kraitkin I: The Experimental Trident
+                        note: 'Crafted via Kraitkin I: The Experimental Trident collection (Artificer 450). Recipe from Box of Recipes: Venom (First Tier).',
+                        inputs: [
+                          // Essence of Tentacles — from Chest of Tentacles (Kraitkin I reward)
+                          {
+                            itemId: ID.ESSENCE_OF_TENTACLES,
+                            name: 'Essence of Tentacles',
+                            count: 1,
+                            source: 'collection',
+                            accountBound: true,
+                            note: 'From Chest of Tentacles — reward for completing Kraitkin I: The Experimental Trident achievement',
+                            inputs: [],
+                          },
+                          // Experimental Trident Head — crafted Artificer 450
+                          {
+                            itemId: ID.EXPERIMENTAL_TRIDENT_HEAD,
+                            name: 'Experimental Trident Head',
+                            count: 1,
+                            source: 'forge',
+                            accountBound: true,
+                            note: 'Crafted (Artificer 450) — recipe from Box of Recipes: Venom (First Tier)',
+                            inputs: [
+                              { itemId: null, name: 'Deldrimor Steel Ingot', count: 1, source: 'tp', inputs: [] },
+                              { itemId: null, name: 'Memory of Battle', count: 5, source: 'wvw', accountBound: false, note: 'WvW participation currency', inputs: [] },
+                              { itemId: null, name: 'Shard of Glory',   count: 5, source: 'currency', note: 'PvP participation currency', inputs: [] },
+                            ],
+                          },
+                          // Experimental Trident Shaft — crafted Artificer 450
+                          {
+                            itemId: ID.EXPERIMENTAL_TRIDENT_SHAFT,
+                            name: 'Experimental Trident Shaft',
+                            count: 1,
+                            source: 'forge',
+                            accountBound: true,
+                            note: 'Crafted (Artificer 450) — recipe from Box of Recipes: Venom (First Tier)',
+                            inputs: [
+                              { itemId: ID.SPIRITWOOD_PLANK, name: 'Spiritwood Plank', count: 1, source: 'tp', inputs: [] },
+                              { itemId: null, name: 'Memory of Battle', count: 5, source: 'wvw', accountBound: false, note: 'WvW participation currency', inputs: [] },
+                              { itemId: null, name: 'Shard of Glory',   count: 5, source: 'currency', note: 'PvP participation currency', inputs: [] },
+                            ],
+                          },
+                          // Legendary Underwater Inscription — shared component (Tier-1 box)
+                          {
+                            itemId: ID.LEGENDARY_UNDERWATER_INSCRIPTION,
+                            name: 'Legendary Underwater Inscription',
+                            count: 1,
+                            source: 'forge',
+                            accountBound: true,
+                            note: 'Crafted (Artificer/Huntsman/Weaponsmith 450) — recipe from Box of Recipes: Venom (First Tier) or other Tier-1 box',
+                            inputs: [
+                              tp(ID.ELONIAN_LEATHER_SQUARE,   'Elonian Leather Square',   1),
+                              tp(ID.ORICHALCUM_PLATED_DOWEL,  'Orichalcum Plated Dowel',  1),
+                              tp(ID.GLOB_OF_ECTOPLASM,         'Glob of Ectoplasm',        1),
+                              tp(ID.PILE_OF_CRYSTALLINE_DUST,  'Pile of Crystalline Dust', 5),
+                            ],
+                          },
+                        ],
+                      },
+                    ],
+                  },
+                  // Jar of Luminesce Polish — shared with Bolt/Bifrost Tier 2
+                  {
+                    itemId: ID.JAR_OF_LUMINESCE_POLISH,
+                    name: 'Jar of Luminesce Polish',
+                    count: 1,
+                    source: 'forge',
+                    accountBound: true,
+                    note: 'Crafted (Artificer/Huntsman/Weaponsmith 400) — recipe from Box of Recipes: Venom (Second Tier)',
+                    inputs: [
+                      tp(ID.PILE_OF_BLOODSTONE_DUST,    'Pile of Bloodstone Dust',    250),
+                      { itemId: null, name: 'Amalgamated Gemstone',    count: 1,  source: 'tp', inputs: [] },
+                      tp(ID.THERMOCATALYTIC_REAGENT,    'Thermocatalytic Reagent',     10),
+                      tp(ID.MASTER_MAINTENANCE_OIL,     'Master Maintenance Oil',      10),
+                    ],
+                  },
+                  // Prismatic Lodestone — shared with Bolt/Bifrost Tier 2
+                  {
+                    itemId: ID.PRISMATIC_LODESTONE,
+                    name: 'Prismatic Lodestone',
+                    count: 1,
+                    source: 'forge',
+                    accountBound: true,
+                    note: 'Crafted (Artificer/Huntsman/Weaponsmith 400) — recipe from Box of Recipes: Venom (Second Tier). Combines 4 elemental lodestones.',
+                    inputs: [
+                      tp(ID.GLACIAL_LODESTONE,  'Glacial Lodestone',  1),
+                      tp(ID.MOLTEN_LODESTONE,   'Molten Lodestone',   1),
+                      tp(ID.ONYX_LODESTONE,     'Onyx Lodestone',     1),
+                      tp(ID.CHARGED_LODESTONE,  'Charged Lodestone',  1),
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+          // Snake Statue — crafted Artificer 500
+          {
+            itemId: ID.SNAKE_STATUE,
+            name: 'Snake Statue',
+            count: 1,
+            source: 'forge',
+            accountBound: true,
+            note: 'Crafted (Artificer 500) — recipe from Box of Recipes: Venom',
+            inputs: [
+              tp(ID.MITHRIL_INGOT,    'Mithril Ingot',    10),
+              tp(ID.CORAL_TENTACLE,   'Coral Tentacle',    3),
+              tp(ID.EMERALD_ORB,      'Emerald Orb',       3),
+              tp(ID.SHEET_OF_AMBRITE, 'Sheet of Ambrite',  1),
+            ],
+          },
+          // Congealed Water — crafted Artificer 500
+          {
+            itemId: ID.CONGEALED_WATER,
+            name: 'Congealed Water',
+            count: 1,
+            source: 'forge',
+            accountBound: true,
+            note: 'Crafted (Artificer 500) — recipe from Box of Recipes: Venom. Jug of Water: vendor 10 for 80c (8c each).',
+            inputs: [
+              { itemId: ID.JUG_OF_WATER, name: 'Jug of Water', count: 10, source: 'vendor', note: 'Vendor 10 for 80c (8c each) — buy from any cooking vendor', inputs: [] },
+              tp(ID.GLOB_OF_ECTOPLASM,        'Glob of Ectoplasm',        1),
+              tp(ID.PILE_OF_CRYSTALLINE_DUST, 'Pile of Crystalline Dust', 5),
+              tp(ID.THERMOCATALYTIC_REAGENT,  'Thermocatalytic Reagent',  10),
+            ],
+          },
+        ],
+      },
       { ...GIFT_OF_KRAITKIN },
       { ...GIFT_OF_FORTUNE },
       { ...GIFT_OF_MASTERY },

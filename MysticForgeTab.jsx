@@ -5,6 +5,7 @@ import {
   EQUIPMENT_RECIPES_STANDARD,
   EQUIPMENT_RECIPES_TRINKETS,
   MINIATURE_PROMOTION_RECIPES,
+  MYSTIC_CLOVER_RECIPES,
   buildForgeItems,
   resolveForgeIds,
   FORGE_IDS,
@@ -612,6 +613,7 @@ export default function MysticForgeTab({ data, priceMap, ownedMap, velocitySumma
 
   const subTabs = [
     { key: "material",    label: "Material Promotion" },
+    { key: "mysticclover", label: "🍀 Mystic Clover" },
     { key: "equipment",   label: "Equipment" },
     { key: "miniatures",  label: "Miniatures" },
     { key: "legendary",   label: "⚜ Legendary Weapons" },
@@ -672,6 +674,274 @@ export default function MysticForgeTab({ data, priceMap, ownedMap, velocitySumma
           ))}
         </div>
       )}
+
+      {/* ── Mystic Clover ── */}
+      {subTab === "mysticclover" && (() => {
+        const cloverPrice = priceMap[19675];
+        const cloverSell  = cloverPrice?.sells?.unit_price || 0;
+        const cloverSellNet = Math.floor(cloverSell * 0.85);
+        const cloverBuy   = cloverPrice?.buys?.unit_price  || 0;
+        const cloverItem  = itemMap[19675];
+
+        // ── Guaranteed recipe cost calculation ──
+        const g = MYSTIC_CLOVER_RECIPES.guaranteed;
+        const coinSell   = priceMap[19976]?.sells?.unit_price || 0;
+        const ectoSell   = priceMap[19721]?.sells?.unit_price || 0;
+        // Obsidian Shard: use cheapest acquisition (volatile/unbound/karma/TP)
+        const obsidianSell = priceMap[19925]?.sells?.unit_price || 0;
+        const obsidianKarmaGold = 96; // 100 Volatile/Unbound Magic + 96c per shard
+        const obsidianCostPer = obsidianKarmaGold; // always use magic+gold path, cheaper than TP typically
+        const guaranteedGoldCost = (coinSell * 3) + (obsidianCostPer * 3) + (ectoSell * 5);
+        const guaranteedProfit   = cloverSellNet - guaranteedGoldCost;
+        // Weekly cap value
+        const weeklyCap = g.weeklyLimit; // 10
+        const weeklyGoldCost  = guaranteedGoldCost * weeklyCap;
+        const weeklyNetRevenue = cloverSellNet * weeklyCap;
+        const weeklyProfit    = guaranteedProfit * weeklyCap;
+
+        // ── Random recipe cost calculation ──
+        const r = MYSTIC_CLOVER_RECIPES.random;
+        // Philosopher's Stone: 10 for 1 Spirit Shard — treat as 0 gold (shard currency)
+        const randomGoldCost = (coinSell * 10) + (obsidianCostPer * 10) + (ectoSell * 10);
+        // Expected 1.33 clovers per attempt
+        const randomGoldPerClover = randomGoldCost / 1.33;
+        const randomProfitPerAttempt = (cloverSellNet * 1.33) - randomGoldCost;
+
+        return (
+          <div>
+            <div style={{ marginBottom: 16, fontSize: 13, color: "var(--text3)", fontStyle: "italic", lineHeight: 1.7 }}>
+              Mystic Clovers are required for every legendary — they're always the biggest cost bottleneck.
+              The guaranteed method is weekly-capped but costs Spirit Shards. The random forge has no cap.
+            </div>
+
+            {/* Clover price header */}
+            {cloverItem && (
+              <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 20px", background: "var(--bg3)", border: "1px solid var(--border2)", borderRadius: 6, marginBottom: 20 }}>
+                {cloverItem.icon
+                  ? <img src={cloverItem.icon} style={{ width: 40, height: 40, borderRadius: 4, border: "1px solid var(--border2)" }} alt="" />
+                  : <div style={{ width: 40, height: 40, background: "var(--bg4)", borderRadius: 4 }} />
+                }
+                <div>
+                  <div style={{ fontSize: 16, fontWeight: 600, color: "#9f4dff" }}>Mystic Clover</div>
+                  <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>Required for all legendary items · 77 per weapon typically</div>
+                </div>
+                <div style={{ marginLeft: "auto", display: "flex", gap: 24 }}>
+                  <div className="stat-cell" style={{ textAlign: "right" }}>
+                    <span className="stat-lbl">TP SELL (net)</span>
+                    <Gold v={cloverSellNet} size={16} />
+                    {cloverSell > 0 && <div style={{ fontSize: 11, color: "var(--text3)" }}><Gold v={cloverSell} size={11} /> before tax</div>}
+                  </div>
+                  <div className="stat-cell" style={{ textAlign: "right" }}>
+                    <span className="stat-lbl">BUY ORDER</span>
+                    <Gold v={cloverBuy} size={16} />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ── Guaranteed Method ── */}
+            <div className="ci" style={{ marginBottom: 12 }}>
+              <div style={{ padding: "16px 20px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+                  <div style={{ width: 36, height: 36, borderRadius: "50%", background: "rgba(60,160,60,0.15)", border: "2px solid var(--green2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>
+                    ✓
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 16, fontWeight: 600, color: "var(--green2)", marginBottom: 4 }}>
+                      Guaranteed Method — 1 clover per craft
+                    </div>
+                    <div style={{ fontSize: 12, color: "var(--text3)", lineHeight: 1.6 }}>
+                      Purchase from <strong style={{ color: "var(--text2)" }}>Miyani</strong> at Trader's Forum or Memory of Old Lion's Arch.
+                      Costs <strong style={{ color: "#7ab4d4" }}>3 Spirit Shards</strong> + gold ingredients per clover.
+                      <span style={{ marginLeft: 8, padding: "1px 8px", borderRadius: 3, background: "rgba(200,150,42,0.12)", border: "1px solid rgba(200,150,42,0.35)", color: "var(--gold2)", fontSize: 11, fontFamily: "Cinzel,serif", letterSpacing: 1 }}>
+                        LIMIT {weeklyCap}/WEEK
+                      </span>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 20, alignItems: "center", flexShrink: 0 }}>
+                    <div className="stat-cell" style={{ textAlign: "right" }}>
+                      <span className="stat-lbl">GOLD COST/CLOVER</span>
+                      {guaranteedGoldCost > 0
+                        ? <Gold v={guaranteedGoldCost} size={14} />
+                        : <span style={{ color: "var(--text3)", fontSize: 12 }}>no price data</span>}
+                    </div>
+                    <div className="stat-cell" style={{ textAlign: "right" }}>
+                      <span className="stat-lbl">SPIRIT SHARDS</span>
+                      <span style={{ fontSize: 14, color: "var(--blue2)", fontWeight: 600 }}>
+                        🔮 3 / clover
+                      </span>
+                    </div>
+                    <div className="stat-cell" style={{ textAlign: "right" }}>
+                      <span className="stat-lbl">VS BUYING ON TP</span>
+                      {cloverSell > 0 && guaranteedGoldCost > 0
+                        ? <span className={guaranteedGoldCost <= cloverSell ? "pp" : "pn"}>
+                            {guaranteedGoldCost <= cloverSell ? "✓ Cheaper to craft" : "Cheaper to buy"}
+                          </span>
+                        : <span style={{ color: "var(--text3)", fontSize: 12 }}>—</span>}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Ingredients */}
+                <div style={{ marginTop: 14, padding: "10px 14px", background: "var(--bg2)", borderRadius: 4, border: "1px solid var(--border)" }}>
+                  <div style={{ fontFamily: "Cinzel,serif", fontSize: 10, letterSpacing: 2, color: "var(--text3)", marginBottom: 8 }}>INGREDIENTS PER CLOVER</div>
+                  <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "flex-start" }}>
+                    {/* Spirit Shards */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 13 }}>
+                      <span style={{ fontSize: 16 }}>🔮</span>
+                      <span style={{ color: "var(--blue2)", fontWeight: 600 }}>3× Spirit Shard</span>
+                      <span style={{ fontSize: 11, color: "var(--text3)", background: "rgba(90,160,210,.12)", border: "1px solid rgba(90,160,210,.3)", padding: "1px 6px", borderRadius: 3 }}>currency</span>
+                    </div>
+                    {/* Mystic Coin */}
+                    {(() => { const item = itemMap[19976]; const price = priceMap[19976]?.sells?.unit_price || 0; return (
+                      <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 13 }}>
+                        {item?.icon && <img src={item.icon} style={{ width: 22, height: 22, borderRadius: 2, border: "1px solid var(--border2)" }} alt="" />}
+                        <span style={{ color: "var(--text2)" }}>3× Mystic Coin</span>
+                        {price > 0 && <Gold v={price * 3} size={12} />}
+                      </div>
+                    ); })()}
+                    {/* Obsidian Shard */}
+                    {(() => { const item = itemMap[19925]; return (
+                      <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 13 }}>
+                        {item?.icon && <img src={item.icon} style={{ width: 22, height: 22, borderRadius: 2, border: "1px solid var(--border2)" }} alt="" />}
+                        <span style={{ color: "var(--text2)" }}>3× Obsidian Shard</span>
+                        <span style={{ fontSize: 11, color: "#9855c8", background: "rgba(152,85,200,.12)", border: "1px solid rgba(152,85,200,.3)", padding: "1px 6px", borderRadius: 3 }}>
+                          🔮 Karma / Magic
+                        </span>
+                        <span style={{ fontSize: 11, color: "var(--text3)" }}>({obsidianCostPer * 3}c)</span>
+                      </div>
+                    ); })()}
+                    {/* Glob of Ectoplasm */}
+                    {(() => { const item = itemMap[19721]; const price = priceMap[19721]?.sells?.unit_price || 0; return (
+                      <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 13 }}>
+                        {item?.icon && <img src={item.icon} style={{ width: 22, height: 22, borderRadius: 2, border: "1px solid var(--border2)" }} alt="" />}
+                        <span style={{ color: "var(--text2)" }}>5× Glob of Ectoplasm</span>
+                        {price > 0 && <Gold v={price * 5} size={12} />}
+                      </div>
+                    ); })()}
+                  </div>
+                </div>
+
+                {/* Weekly summary */}
+                <div style={{ marginTop: 12, padding: "10px 14px", background: "rgba(60,160,60,0.05)", border: "1px solid rgba(60,160,60,0.2)", borderRadius: 4, display: "flex", gap: 32, flexWrap: "wrap" }}>
+                  <div style={{ fontFamily: "Cinzel,serif", fontSize: 10, letterSpacing: 1, color: "var(--green)", width: "100%", marginBottom: 4 }}>
+                    WEEKLY CAP SUMMARY — {weeklyCap} CLOVERS / WEEK
+                  </div>
+                  <div className="stat-cell">
+                    <span className="stat-lbl">TOTAL GOLD COST</span>
+                    {weeklyGoldCost > 0 ? <Gold v={weeklyGoldCost} size={14} /> : <span style={{ color: "var(--text3)" }}>—</span>}
+                  </div>
+                  <div className="stat-cell">
+                    <span className="stat-lbl">TOTAL SPIRIT SHARDS</span>
+                    <span style={{ fontSize: 14, color: "var(--blue2)", fontWeight: 600 }}>🔮 {weeklyCap * 3}</span>
+                  </div>
+                  <div className="stat-cell">
+                    <span className="stat-lbl">SELL VALUE (net)</span>
+                    {weeklyNetRevenue > 0 ? <Gold v={weeklyNetRevenue} size={14} /> : <span style={{ color: "var(--text3)" }}>—</span>}
+                  </div>
+                  <div className="stat-cell">
+                    <span className="stat-lbl">GOLD PROFIT</span>
+                    {weeklyProfit !== 0 && weeklyGoldCost > 0
+                      ? <span className={weeklyProfit >= 0 ? "pp" : "pn"}>{weeklyProfit >= 0 ? "+" : ""}<Gold v={weeklyProfit} size={14} /></span>
+                      : <span style={{ color: "var(--text3)" }}>—</span>}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* ── Random Forge Method ── */}
+            <div className="ci" style={{ marginBottom: 12 }}>
+              <div style={{ padding: "16px 20px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+                  <div style={{ width: 36, height: 36, borderRadius: "50%", background: "rgba(200,150,42,0.12)", border: "2px solid var(--gold2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>
+                    🎲
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 16, fontWeight: 600, color: "var(--gold2)", marginBottom: 4 }}>
+                      Random Mystic Forge — ~1.33 clovers / attempt
+                    </div>
+                    <div style={{ fontSize: 12, color: "var(--text3)", lineHeight: 1.6 }}>
+                      No weekly cap. Output is random — each attempt yields either <strong style={{ color: "#9f4dff" }}>10 Mystic Clovers</strong> or
+                      {" "}<strong style={{ color: "var(--red)" }}>10 T6 fine materials</strong> (roughly 1-in-3 gives clovers).
+                      Expected average: 1.33 clovers per attempt.
+                      Costs <strong style={{ color: "#7ab4d4" }}>1 Spirit Shard</strong> (via 10 Philosopher's Stones) per attempt.
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 20, alignItems: "center", flexShrink: 0 }}>
+                    <div className="stat-cell" style={{ textAlign: "right" }}>
+                      <span className="stat-lbl">GOLD COST/ATTEMPT</span>
+                      {randomGoldCost > 0
+                        ? <Gold v={randomGoldCost} size={14} />
+                        : <span style={{ color: "var(--text3)", fontSize: 12 }}>no price data</span>}
+                    </div>
+                    <div className="stat-cell" style={{ textAlign: "right" }}>
+                      <span className="stat-lbl">GOLD/CLOVER (avg)</span>
+                      {randomGoldPerClover > 0
+                        ? <Gold v={Math.round(randomGoldPerClover)} size={14} />
+                        : <span style={{ color: "var(--text3)", fontSize: 12 }}>—</span>}
+                    </div>
+                    <div className="stat-cell" style={{ textAlign: "right" }}>
+                      <span className="stat-lbl">VS GUARANTEED</span>
+                      {guaranteedGoldCost > 0 && randomGoldPerClover > 0
+                        ? <span className={randomGoldPerClover <= guaranteedGoldCost ? "pp" : "pn"}>
+                            {randomGoldPerClover <= guaranteedGoldCost ? "✓ Cheaper avg" : `+${Math.round(randomGoldPerClover - guaranteedGoldCost)}c/clover`}
+                          </span>
+                        : <span style={{ color: "var(--text3)", fontSize: 12 }}>—</span>}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Ingredients */}
+                <div style={{ marginTop: 14, padding: "10px 14px", background: "var(--bg2)", borderRadius: 4, border: "1px solid var(--border)" }}>
+                  <div style={{ fontFamily: "Cinzel,serif", fontSize: 10, letterSpacing: 2, color: "var(--text3)", marginBottom: 8 }}>INGREDIENTS PER ATTEMPT</div>
+                  <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "flex-start" }}>
+                    {(() => { const item = itemMap[19976]; const price = priceMap[19976]?.sells?.unit_price || 0; return (
+                      <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 13 }}>
+                        {item?.icon && <img src={item.icon} style={{ width: 22, height: 22, borderRadius: 2, border: "1px solid var(--border2)" }} alt="" />}
+                        <span style={{ color: "var(--text2)" }}>10× Mystic Coin</span>
+                        {price > 0 && <Gold v={price * 10} size={12} />}
+                      </div>
+                    ); })()}
+                    {(() => { const item = itemMap[19925]; return (
+                      <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 13 }}>
+                        {item?.icon && <img src={item.icon} style={{ width: 22, height: 22, borderRadius: 2, border: "1px solid var(--border2)" }} alt="" />}
+                        <span style={{ color: "var(--text2)" }}>10× Obsidian Shard</span>
+                        <span style={{ fontSize: 11, color: "#9855c8", background: "rgba(152,85,200,.12)", border: "1px solid rgba(152,85,200,.3)", padding: "1px 6px", borderRadius: 3 }}>🔮 Karma</span>
+                        <span style={{ fontSize: 11, color: "var(--text3)" }}>({obsidianCostPer * 10}c)</span>
+                      </div>
+                    ); })()}
+                    {(() => { const item = itemMap[19721]; const price = priceMap[19721]?.sells?.unit_price || 0; return (
+                      <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 13 }}>
+                        {item?.icon && <img src={item.icon} style={{ width: 22, height: 22, borderRadius: 2, border: "1px solid var(--border2)" }} alt="" />}
+                        <span style={{ color: "var(--text2)" }}>10× Glob of Ectoplasm</span>
+                        {price > 0 && <Gold v={price * 10} size={12} />}
+                      </div>
+                    ); })()}
+                    <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 13 }}>
+                      <span style={{ fontSize: 16 }}>🔮</span>
+                      <span style={{ color: "var(--text2)" }}>10× Philosopher's Stone</span>
+                      <span style={{ fontSize: 11, color: "var(--blue2)", background: "rgba(90,160,210,.12)", border: "1px solid rgba(90,160,210,.3)", padding: "1px 6px", borderRadius: 3 }}>1 Spirit Shard</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ marginTop: 12, padding: "8px 12px", background: "rgba(200,150,42,.06)", borderRadius: 4, border: "1px solid rgba(200,150,42,.2)", fontSize: 12, color: "var(--text3)" }}>
+                  ⚠ Output is <strong style={{ color: "var(--gold2)" }}>random</strong>. Each attempt: ~33% chance of 10 Mystic Clovers, ~67% chance of 10 T6 materials.
+                  The 1.33 average is over many attempts — short runs can be very unlucky.
+                  Use the guaranteed method weekly first, then random forge for the remainder.
+                </div>
+              </div>
+            </div>
+
+            {/* Guidance footer */}
+            <div style={{ marginTop: 8, padding: "12px 16px", background: "var(--bg3)", border: "1px solid var(--border)", borderRadius: 5, fontSize: 13, color: "var(--text3)", lineHeight: 1.7 }}>
+              <strong style={{ color: "var(--gold2)", fontFamily: "Cinzel,serif", fontSize: 11, letterSpacing: 1 }}>CLOVER STRATEGY</strong><br />
+              1. Do the <span style={{ color: "var(--green2)" }}>guaranteed method</span> every week (10/week cap). At 3 Spirit Shards each, 77 clovers costs 231 Spirit Shards over ~8 weeks.<br />
+              2. Use the <span style={{ color: "var(--gold2)" }}>random forge</span> to top up without a cap — best when Spirit Shards are plentiful or you're in a hurry.
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── Miniatures ── */}
       {subTab === "miniatures" && (

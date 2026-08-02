@@ -38,18 +38,19 @@ const VENDOR_PRICES = {
   19915: { name: "Minor Rune of Holding",            price: 252 },
   19916: { name: "Major Rune of Holding",            price: 500 },
   19917: { name: "Superior Rune of Holding",         price: 1000_00 }, // 10g
-  // Milling Basin (Chef)
-  12157: { name: "Milling Basin",                    price: 8   },
   // Glass (Artificer/Chef)
   19985: { name: "Lump of Glass",                    price: 8  },
-  // Dye pigments (Chef)
-  12156: { name: "Pouch of Black Pigment",           price: 8   },
+  // Jug of Water — vendor 10 for 80c = 8c each [wiki verified June 2026, API 12156]
+  // NOTE: 12156 is Jug of Water, NOT Pouch of Black Pigment (fixed June 2026)
+  12156: { name: "Jug of Water",                     price: 8   },
+  // Dye pigments (Chef) [API verified June 2026]
+  70426: { name: "Pouch of Black Pigment",           price: 8   },
   12151: { name: "Pouch of Red Pigment",             price: 8   },
   12152: { name: "Pouch of Orange Pigment",          price: 8   },
   12153: { name: "Pouch of Yellow Pigment",          price: 8   },
   12154: { name: "Pouch of Green Pigment",           price: 8   },
   12155: { name: "Pouch of Blue Pigment",            price: 8   },
-  12157: { name: "Pouch of Purple Pigment",          price: 8   },
+  77112: { name: "Pouch of Purple Pigment",          price: 8   },
   12158: { name: "Pouch of White Pigment",           price: 8   },
   12159: { name: "Pouch of Brown Pigment",           price: 8   },
   // Flax seeds (Chef)
@@ -60,7 +61,7 @@ const VENDOR_PRICES = {
   12238: { name: "Thermocatalytic Reagent (old)",    price: 150 },
 };
 
-const DISCIPLINES = ["Armorsmith","Leatherworker","Tailor","Weaponsmith","Huntsman","Chef","Artificer","Jeweler","Scribe"];
+const DISCIPLINES = ["Armorsmith","Leatherworker","Tailor","Weaponsmith","Huntsman","Chef","Artificer","Jeweler","Scribe","Homesteader"];
 
 // /v2/account/dailycrafting API - returns exactly these strings when an item has been crafted today.
 // Source: https://api.guildwars2.com/v2/dailycrafting (lists all valid IDs)
@@ -142,6 +143,35 @@ function normalizeDailyKey(s) {
 }
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
+// Returns a craft item's disciplines, falling back to "Uncategorized" when the
+// GW2 API returns an empty disciplines array (happens for some refinement-type
+// recipes, e.g. Piece of Dragon Jade). Previously `(ci.disciplines || ["Unknown"])`
+// only caught null/undefined — an empty array [] is truthy and passed through,
+// so .forEach ran zero times and the item silently never appeared under any tab.
+const getRecipeDisciplines = (ci) =>
+  (ci.disciplines && ci.disciplines.length > 0) ? ci.disciplines : ["Uncategorized"];
+
+// Deduplicates a recipe array by GW2 recipe API id. None of the three places that
+// build/load `allRecipes` (initial full-load merge, cache read, refreshRecipes'
+// incremental merge) ever checked for this, so if a duplicate ever got written
+// into the persisted cache (e.g. a race between two refresh cycles), it would
+// silently accumulate forever, since the cache is reused as-is on every launch.
+// Symptom: the same output item shows up as several identical-looking cards
+// (e.g. Karka Toughness Station showing 6 cards where only 3 real recipe
+// variants exist), with the count doubling/tripling depending on how many
+// times the duplication occurred historically.
+function dedupeRecipesById(recipes) {
+  const deduped = Array.from(new Map(recipes.map(r => [r.id, r])).values());
+  // Diagnostic: every known call site (fullLoad, refreshRecipes, rescanAutoUnlockedRecipes)
+  // is expected to be a no-op here in normal operation. If this ever actually removes
+  // something, the stack trace pinpoints which refresh path is reintroducing duplicate
+  // recipe ids into the live `recipes` array — check the console if duplicates return.
+  if (deduped.length !== recipes.length) {
+    console.warn(`[dedupeRecipesById] removed ${recipes.length - deduped.length} duplicate(s) — call stack:`, new Error().stack);
+  }
+  return deduped;
+}
+
 const chunk = (arr, size) =>
 Array.from({ length: Math.ceil(arr.length / size) }, (_, i) => arr.slice(i * size, i * size + size));
 
@@ -359,9 +389,18 @@ function TrendBadge({ trend }) {
 // storage.js exports manualDailySet — already aliased above.
 
 // ── Recipe Tree ───────────────────────────────────────────────────────────────
-function buildTreeSync(itemId, count, resolvedRecipes, depth = 0) {
+// `rootRecipe`, when provided, is used for the depth-0 node instead of looking
+// up resolvedRecipes[itemId]. This matters because resolvedRecipes is keyed by
+// output_item_id only — when an item has multiple valid recipes (e.g. Karka
+// Toughness Station has 3 different material combinations), resolvedRecipes[id]
+// can only ever hold one of them (last one written wins). Without rootRecipe,
+// every card for that output — regardless of which recipe object it represents —
+// would render the same ingredient tree. Deeper recursion still uses
+// resolvedRecipes[itemId] for sub-ingredients, which is an acceptable
+// simplification since the card being displayed is what needs to be correct.
+function buildTreeSync(itemId, count, resolvedRecipes, depth = 0, rootRecipe = null) {
   if (depth > 8) return { itemId, count, children: [], isLeaf: true };
-  const recipe = resolvedRecipes[itemId];
+  const recipe = (depth === 0 && rootRecipe) ? rootRecipe : resolvedRecipes[itemId];
   if (!recipe) return { itemId, count, children: [], isLeaf: true };
   const outputCount = recipe.output_item_count || 1;
   const runs = Math.ceil(count / outputCount);
@@ -516,6 +555,19 @@ function checkFulfillment(itemId, needed, resolvedRecipes, ownedMap, depth = 0) 
 const TRACKED_RARITIES = new Set(["Rare", "Exotic", "Ascended", "Legendary"]);
 
 function buildCraftItems(recipes, resolvedRecipes, itemMap, priceMap, ownedMap) {
+  // Defensive: collapse any recipes sharing the same GW2 recipe id before building
+  // cards. Something upstream (a refresh path, a race between cache writes, etc.)
+  // can reintroduce duplicate ids into the recipes array during a live session —
+  // this guarantees exactly one card per recipe id no matter the cause upstream.
+  const seenRecipeIds = new Set();
+  const cleanRecipes = [];
+  for (const r of recipes) {
+    if (seenRecipeIds.has(r.id)) continue;
+    seenRecipeIds.add(r.id);
+    cleanRecipes.push(r);
+  }
+  recipes = cleanRecipes;
+
   const items = [];
   for (const recipe of recipes) {
     const outputId = recipe.output_item_id;
@@ -524,7 +576,7 @@ function buildCraftItems(recipes, resolvedRecipes, itemMap, priceMap, ownedMap) 
     // Don't skip recipes with no TP price — show them with 0 sell price so user
     // can see all recipes. Account-bound/untradeable outputs will show negative profit.
 
-    const tree = buildTreeSync(outputId, 1, resolvedRecipes);
+    const tree = buildTreeSync(outputId, 1, resolvedRecipes, 0, recipe);
     const leaves = flatLeaves(tree, ownedMap);
 
     let canCraft = true;
@@ -1307,7 +1359,11 @@ export default function App() {
 
       const hasCachedEverything = cachedRecipes && cachedItems && cachedPrices;
       if (hasCachedEverything) {
-        const cachedAllRecipes = cachedRecipes.value;
+        const cachedAllRecipes = dedupeRecipesById(cachedRecipes.value);
+        if (cachedAllRecipes.length !== cachedRecipes.value.length) {
+          console.log(`[Cache] Removed ${cachedRecipes.value.length - cachedAllRecipes.length} duplicate recipe(s) from cache — self-healing persisted copy`);
+          cacheSet("allRecipes", cachedAllRecipes);
+        }
         const cachedItemMap = cachedItems.value;
         const cachedPriceMap = cachedPrices.value;
         const cachedOwnedMap = cachedOwnedMapEntry?.value || {};
@@ -1424,7 +1480,7 @@ export default function App() {
         const hasTimegated = cachedRecipes.value?.some(r => (r.flags||[]).some(f => f.toLowerCase() === "timegated"));
         console.log(`[Cache] Fast path: ${cachedRecipes.value?.length} recipes, has Timegated flag: ${hasTimegated}, sample flags:`, sampleFlags);
         prog(15, `Using cached recipes & items from ${cacheAgeMin < 60 ? cacheAgeMin + "m" : Math.round(cacheAgeMin/60) + "h"} ago...`);
-        allRecipes = cachedRecipes.value;
+        allRecipes = dedupeRecipesById(cachedRecipes.value);
         itemMap = cachedItems.value;
         // Refresh discipline levels from current character data (catches level-ups)
         disciplineLevels = {};
@@ -1483,7 +1539,7 @@ export default function App() {
           if ((r.flags || []).includes("LearnedFromItem")) return false;
           return r.disciplines.some(d => (disciplineLevels[d] || 0) >= (r.min_rating || 0));
         });
-        allRecipes = [...knownRecipes, ...autoUnlocked];
+        allRecipes = dedupeRecipesById([...knownRecipes, ...autoUnlocked]);
         resolvedRecipes = {};
         allRecipes.forEach(r => { resolvedRecipes[r.output_item_id] = r; });
 
@@ -1547,9 +1603,9 @@ export default function App() {
 
       const byDisc = {};
       const byDiscSeen = {};
-      craftItems.forEach(ci => (ci.disciplines || ["Unknown"]).forEach(d => {
+      craftItems.forEach(ci => getRecipeDisciplines(ci).forEach(d => {
         if (!byDisc[d]) { byDisc[d] = []; byDiscSeen[d] = new Set(); }
-        if (!byDiscSeen[d].has(ci.outputId)) { byDiscSeen[d].add(ci.outputId); byDisc[d].push(ci); }
+        if (!byDiscSeen[d].has(ci.recipeId)) { byDiscSeen[d].add(ci.recipeId); byDisc[d].push(ci); }
       }));
 
       const materialRows = materials.map(m => {
@@ -1662,13 +1718,13 @@ export default function App() {
       apiFetch(`${BASE}/account/wallet`),
       apiFetch(`${BASE}/account/materials`),
       apiFetch(`${BASE}/account/dailycrafting`).catch(() => []),
-      apiFetch(`${BASE}/account/achievements?ids=3489,3522,2530,2500,2187`).catch(() => []),
+      apiFetch(`${BASE}/account/achievements?ids=3489,3522,2530,2500,2187,2483,2522,2296,2478,2606,2393,2564,2458,2502,2177,2291,2374,2389,2498,2524,2441,2391,2449`).catch(() => []),
       apiFetch(`${BASE}/commerce/transactions/current/sells`).catch(() => null),
       fetchSoldHistory().catch(() => []),
     ]);
     // Process legendary achievement progress (Aurora II: Empowering = 3489, Aurora: Awakening = 3522)
     if (Array.isArray(rawAchievements)) {
-      const achMax = { 3489: 21, 3522: 7, 2530: null, 2500: null, 2187: null }; // null = use API bits count
+      const achMax = { 3489: 21, 3522: 7, 2530: null, 2500: null, 2187: null, 2483: 7, 2522: 9, 2296: null, 2478: 15, 2606: 12, 2393: 34, 2564: 18, 2458: 15, 2502: 24, 2177: 14, 2291: 14, 2374: 35, 2389: 16, 2498: 14, 2524: 36, 2441: 15, 2391: 12, 2449: 29 }; // null = use API bits count
       const achMap = {};
       for (const ach of rawAchievements) {
         achMap[ach.id] = {
@@ -1716,10 +1772,15 @@ export default function App() {
     });
     const partialTotalMat = partialMatRows.reduce((s, r) => s + r.totalValue, 0);
     const partialCraftItems = buildCraftItems(allRecipes, resolvedRecipes, itemMap, freshPrices, partialOwnedMap);
+    // Dedup by recipeId — every other byDisc builder in this file already does this
+    // (fullLoad, refreshRecipes, rescanAutoUnlockedRecipes, the worker); this one was
+    // missing the guard, which let duplicate recipe ids pile up across refreshes
+    // instead of collapsing to one card each.
     const partialByDisc = {};
-    partialCraftItems.forEach(ci => (ci.disciplines || []).forEach(d => {
-      if (!partialByDisc[d]) partialByDisc[d] = [];
-      partialByDisc[d].push(ci);
+    const partialByDiscSeen = {};
+    partialCraftItems.forEach(ci => getRecipeDisciplines(ci).forEach(d => {
+      if (!partialByDisc[d]) { partialByDisc[d] = []; partialByDiscSeen[d] = new Set(); }
+      if (!partialByDiscSeen[d].has(ci.recipeId)) { partialByDiscSeen[d].add(ci.recipeId); partialByDisc[d].push(ci); }
     }));
 
     // Show partial data immediately — gold, mat storage prices, crafting profits
@@ -1808,10 +1869,12 @@ export default function App() {
       });
       const fullTotalMat = fullMatRows.reduce((s, r) => s + r.totalValue, 0);
       const fullCraftItems = buildCraftItems(allRecipes, resolvedRecipes, itemMap, freshPrices, fullOwnedMap);
+      // Same recipeId dedup guard as wave 2 above — see that comment for rationale.
       const fullByDisc = {};
-      fullCraftItems.forEach(ci => (ci.disciplines || []).forEach(d => {
-        if (!fullByDisc[d]) fullByDisc[d] = [];
-        fullByDisc[d].push(ci);
+      const fullByDiscSeen = {};
+      fullCraftItems.forEach(ci => getRecipeDisciplines(ci).forEach(d => {
+        if (!fullByDisc[d]) { fullByDisc[d] = []; fullByDiscSeen[d] = new Set(); }
+        if (!fullByDiscSeen[d].has(ci.recipeId)) { fullByDiscSeen[d].add(ci.recipeId); fullByDisc[d].push(ci); }
       }));
       const charInventoryByChar = extractCharacterItemsByChar(characters_startup);
       const charDisciplines = extractCharacterDisciplines(characters_startup);
@@ -2047,6 +2110,72 @@ export default function App() {
   }, []); // no deps — uses refs
 
   // ── Recipe refresh ──────────────────────────────────────────────────────────
+  // Some GW2 recipes (e.g. Piece of Dragon Jade, source: "Automatic") never need to be
+  // "learned" — they're usable the moment any qualifying discipline hits the required
+  // rating. These never appear in /account/recipes, so refreshRecipes' diff-based
+  // approach can never discover them. The only place that ever scanned for them was
+  // the one-time no-cache initial load. Once recipes are cached (i.e. every launch
+  // after the very first), that scan never runs again — if a discipline crosses the
+  // qualifying threshold afterward, the recipe is permanently invisible with no
+  // self-healing path. This is a manual, user-triggered re-scan (Settings button)
+  // rather than something run automatically on a timer, since it requires fetching
+  // and checking the full public recipe list — expensive to do silently every few hours.
+  const [rescanningRecipes, setRescanningRecipes] = useState(false);
+  const rescanAutoUnlockedRecipes = useCallback(async () => {
+    if (!cacheRef.current.itemMap || rescanningRecipes) return;
+    setRescanningRecipes(true);
+    try {
+      const { itemMap, priceMap, ownedMap, resolvedRecipes, recipes, disciplineLevels, knownRecipeIds } = cacheRef.current;
+      const existingIds = new Set(recipes.map(r => r.id));
+      const knownSet = new Set(knownRecipeIds || []);
+      const allRecipeIds = await publicFetch(`${BASE}/recipes`);
+      const candidateIds = allRecipeIds.filter(id => !existingIds.has(id) && !knownSet.has(id));
+      const candidateDetails = [];
+      for (const ch of chunk(candidateIds, 200)) {
+        try {
+          const batch = await publicFetch(`${BASE}/recipes?ids=${ch.join(",")}`);
+          candidateDetails.push(...(Array.isArray(batch) ? batch : []));
+        } catch {}
+      }
+      const newlyEligible = candidateDetails.filter(r => {
+        if (!r.disciplines?.length) return false;
+        if ((r.flags || []).includes("LearnedFromItem")) return false;
+        return r.disciplines.some(d => (disciplineLevels[d] || 0) >= (r.min_rating || 0));
+      });
+      if (newlyEligible.length === 0) {
+        setToast("✦ Rescan complete — no new auto-unlocked recipes found");
+        setTimeout(() => setToast(null), 5000);
+        return;
+      }
+      const allRecipes = dedupeRecipesById([...recipes, ...newlyEligible]);
+      newlyEligible.forEach(r => { resolvedRecipes[r.output_item_id] = r; });
+      const newItemIds = [...new Set([...newlyEligible.map(r => r.output_item_id), ...newlyEligible.flatMap(r => r.ingredients.map(i => i.item_id))])].filter(id => !itemMap[id]);
+      if (newItemIds.length) {
+        const ni = await fetchIds("/items", newItemIds);
+        ni.forEach(i => { itemMap[i.id] = i; });
+        const np = await fetchPrices(filterTradeable(newItemIds, itemMap));
+        Object.assign(priceMap, np);
+      }
+      cacheRef.current = { ...cacheRef.current, itemMap, priceMap, resolvedRecipes, recipes: allRecipes, ownedMap };
+      cacheSet("allRecipes", allRecipes);
+      const craftItems = buildCraftItems(allRecipes, resolvedRecipes, itemMap, priceMap, ownedMap);
+      const byDisc = {};
+      const _byDiscSeen = {};
+      craftItems.forEach(ci => getRecipeDisciplines(ci).forEach(d => {
+        if (!byDisc[d]) { byDisc[d] = []; _byDiscSeen[d] = new Set(); }
+        if (!_byDiscSeen[d].has(ci.recipeId)) { _byDiscSeen[d].add(ci.recipeId); byDisc[d].push(ci); }
+      }));
+      setData(prev => ({ ...prev, craftItems, byDisc, itemMap, priceMap }));
+      setToast(`✦ ${newlyEligible.length} new auto-unlocked recipe${newlyEligible.length > 1 ? "s" : ""} found!`);
+      setTimeout(() => setToast(null), 5000);
+    } catch (e) {
+      setToast(`✕ Rescan failed: ${e.message}`);
+      setTimeout(() => setToast(null), 5000);
+    } finally {
+      setRescanningRecipes(false);
+    }
+  }, [rescanningRecipes]);
+
   const refreshRecipes = useCallback(async () => {
     if (!cacheRef.current.itemMap) return;
     try {
@@ -2059,7 +2188,7 @@ export default function App() {
       cacheSet("lastRecipeRefresh", recipeNow);
       if (!added.length) return;
       const newRecipes = await fetchIds("/recipes", added);
-      const allRecipes = [...recipes, ...newRecipes];
+      const allRecipes = dedupeRecipesById([...recipes, ...newRecipes]);
       newRecipes.forEach(r => { resolvedRecipes[r.output_item_id] = r; });
       const newItemIds = [...new Set([...newRecipes.map(r => r.output_item_id), ...newRecipes.flatMap(r => r.ingredients.map(i => i.item_id))])].filter(id => !itemMap[id]);
       if (newItemIds.length) {
@@ -2073,9 +2202,9 @@ export default function App() {
       const craftItems = buildCraftItems(allRecipes, resolvedRecipes, itemMap, priceMap, ownedMap);
       const byDisc = {};
       const _byDiscSeen = {};
-      craftItems.forEach(ci => (ci.disciplines || ["Unknown"]).forEach(d => {
+      craftItems.forEach(ci => getRecipeDisciplines(ci).forEach(d => {
         if (!byDisc[d]) { byDisc[d] = []; _byDiscSeen[d] = new Set(); }
-        if (!_byDiscSeen[d].has(ci.outputId)) { _byDiscSeen[d].add(ci.outputId); byDisc[d].push(ci); }
+        if (!_byDiscSeen[d].has(ci.recipeId)) { _byDiscSeen[d].add(ci.recipeId); byDisc[d].push(ci); }
       }));
       setData(prev => ({ ...prev, craftItems, byDisc, itemMap, priceMap }));
       setToast(`✦ ${added.length} new recipe${added.length > 1 ? "s" : ""} discovered!`);
@@ -2139,7 +2268,82 @@ export default function App() {
     20796, 20799, 97983, 71581,
     // The Legend / Bifrost precursor chain items (June 2026)
     77190, 71932, 73748, 72261, 71677, 75535, 73431, 77139, 75316, 73517, 74094, 75752,
-    74378, 76891, 76027, 73809, 73875, 74301, 24572];
+    74378, 76891, 76027, 73809, 73875, 74301, 24572,
+    // Resolved null IDs (June 2026): Spiritwood Plank, Pile of Bloodstone Dust, Master Maintenance Oil, Sculptor's Tools
+    46736, 46731, 9461, 74909,
+    // Sigil of Strength (Sunrise) — corrected from Sigil of Air
+    24548,
+    // Bolt/Zap precursor chain (June 2026)
+    74093, 75769, 76117, 73013, 71679, 73912,  // Tier 1: Zap Experiment + components
+    77118, 73473, 75891, 73841, 76269,          // Tier 2: Perfected Sword + components
+    76380, 71585, 72724, 70735,                 // Tier 3: Zap components
+    // Materials used in Zap chain
+    76491, 71641, 43772, 46738, 12988, 46739, 46747,
+    // Kraitkin/Venom (June 2026)
+    30701,   // Kraitkin item ID
+    19666,
+    // Bolt item ID (missed when Zap chain was added)
+    30699,
+    // Venom precursor chain (Kraitkin) — wiki verified June 2026
+    // Tier 1: Kraitkin I: The Experimental Trident
+    75599, 75043, 73441, 76017, 74061, 73440, 72629,
+    // Tier 2: Kraitkin II: The Perfected Trident
+    71788, 70757, 71720, 74291, 74468, 76376,
+    // Tier 3: Kraitkin III: Venom
+    74039, 75215, 75259, 72543, 74433,
+    // Frostfang precursor chain (Tooth of Frostfang) — wiki verified June 2026
+    // Tier 1: Frostfang I: The Experimental Axe
+    73865, 73671, 76732, 76795, 70868, 70952,
+    // Tier 2: Frostfang II: The Perfected Axe
+    75415, 76051, 75534, 70679, 71910, 71915,
+    // Tier 3: Frostfang III: Tooth of Frostfang
+    72332, 75818, 73126, 76342, 75619,
+    // Sub-ingredients: Snow Diamond, Lump of Beeswax, Brick of Clay
+    86627, 71949, 66902,
+    // Frostfang legendary item
+    30684,
+    // Spark precursor chain (Incinerator) — wiki verified June 2026
+    // Tier 1: Incinerator I: The Experimental Dagger
+    76613, 74544, 76927, 72017, 74031, 72827,
+    // Tier 2: Incinerator II: The Perfected Dagger
+    71429, 76460, 71203, 73353, 77156, 75064,
+    // Tier 3: Incinerator III: Spark
+    75957, 75504, 72368, 75825, 73736,
+    // Watchwork Mechanism (Regulator Nozzle ingredient)
+    49782,
+    // Incinerator legendary item
+    30687,
+    // Energizer precursor chain (The Moot) — wiki verified June 2026
+    // Tier 1: Moot I: The Experimental Mace
+    74731, 72846, 71493, 70610, 72498, 75952,
+    // Tier 2: Moot II: The Perfected Mace
+    72028, 77018, 71723, 75704, 74020, 76735,
+    // Tier 3: Moot III: The Energizer
+    77116, 73375, 74984, 73774, 71486,
+    // Gift of Entertainment ingredients
+    20000,   // Box o' Fun
+    // The Moot legendary item
+    30692,
+    // Chaos Gun precursor chain (Quip) — wiki verified June 2026
+    // Tier 1: Chaos Gun Experiment + components
+    73332, 70874, 75330, 75846,
+    // Tier 2: Perfected Pistol + components
+    70763, 70850, 73023,
+    // Tier 3: Chaos Gun + components
+    73396, 71163, 75429, 76094, 73993, 75272,
+    // Chaos Gun (precursor) item ID
+    29174,
+    // Storm precursor chain (Meteorlogicus) — wiki verified July 2026
+    // Gift of Weather + Gift of Knowledge
+    19637, 19671,
+    // Tier 1: Storm Experiment + components
+    75801, 70545, 70977, 74655,
+    // Tier 2: Perfected Scepter + components
+    73891, 72995, 71886,
+    // Tier 3: Storm + components
+    75336, 72454, 70884, 76229,
+    // Storm (precursor) item ID + Meteorlogicus legendary item ID
+    29176, 30695];
     const allDailyIds = [
       ...Object.values(MANUAL_DAILY_MAP).map(v => v.itemId),
       ...Object.values(DAILY_CRAFT_MAP).map(v => v.itemId),
@@ -2414,13 +2618,16 @@ export default function App() {
   const RecommendedTab = useMemo(() => {
     if (!data) return null;
 
-    // Gather all craft items across every discipline, deduplicated by outputId
+    // Gather all craft items across every discipline (including any non-standard
+    // discipline bucket, e.g. "Uncategorized"), deduplicated by recipeId — NOT
+    // outputId, since some items have multiple valid recipes (different materials/
+    // costs) that must each show up as their own entry, not collapse into one.
     const seen = new Set();
     const allItems = [];
-    for (const disc of DISCIPLINES) {
+    for (const disc of Object.keys(data.byDisc)) {
       for (const ci of (data.byDisc[disc] || [])) {
-        if (!seen.has(ci.outputId)) {
-          seen.add(ci.outputId);
+        if (!seen.has(ci.recipeId)) {
+          seen.add(ci.recipeId);
           allItems.push(ci);
         }
       }
@@ -2614,7 +2821,7 @@ export default function App() {
           const totalListed = listings.reduce((s, l) => s + l.quantity, 0);
 
           return (
-            <div key={ci.outputId} className="ci" style={{ marginBottom: 6 }}>
+            <div key={ci.recipeId} className="ci" style={{ marginBottom: 6 }}>
             <div className="ci-hdr" onClick={() => ci.recipeId && setExpanded(e => ({ ...e, [ci.recipeId]: !e[ci.recipeId] }))}>
             {/* Rank badge */}
             <span style={{ fontFamily: "Cinzel,serif", fontSize: 12, color: rank < 3 ? "var(--gold2)" : "var(--text3)", width: 28, textAlign: "center", flexShrink: 0 }}>
@@ -2624,7 +2831,7 @@ export default function App() {
             <span className={`ci-name rar-${ci.rarity}`}>{ci.name}</span>
             {/* Disciplines */}
             <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-            {(ci.disciplines || []).map(d => (
+            {getRecipeDisciplines(ci).map(d => (
               <span key={d} style={{ fontSize: 10, fontFamily: "Cinzel,serif", letterSpacing: 1, padding: "2px 7px", borderRadius: 3, background: "rgba(200,150,42,0.1)", border: "1px solid rgba(200,150,42,0.3)", color: "var(--gold2)" }}>{d}</span>
             ))}
             </div>
@@ -2716,7 +2923,17 @@ export default function App() {
             {isOpen && !ci.isMaterial && (
               <div style={{ padding: "10px 16px", borderTop: "1px solid var(--border)", background: "var(--bg2)", fontSize: 13, color: "var(--text3)" }}>
               Click this item in <strong style={{ color: "var(--gold2)" }}>Crafting Profits</strong> for full ingredient breakdown.
-              <button onClick={() => { setActiveTab("crafting"); setActiveDisc(ci.disciplines?.[0]); setSearchCraft(ci.name); }}
+              <button onClick={() => {
+                setActiveTab("crafting");
+                setActiveDisc(ci.disciplines?.[0]);
+                setSearchCraft(ci.name);
+                // Auto-expand this specific recipe card — a name search alone isn't
+                // enough when several recipes share the same output name (e.g. Mystic
+                // Curio's 7 material variants), since clicking any of them would
+                // otherwise land on the same generic filtered list with no obvious
+                // indication of which card corresponds to the one just clicked.
+                setExpanded(e => ({ ...e, [ci.recipeId]: true }));
+              }}
               style={{ marginLeft: 12, fontSize: 12, color: "var(--gold2)", background: "transparent", border: "1px solid var(--border)", borderRadius: 3, padding: "2px 10px", cursor: "pointer", fontFamily: "Cinzel,serif" }}>
               Open in Crafting Profits ↗
               </button>
@@ -2737,7 +2954,12 @@ export default function App() {
 
   const CraftingTab = useMemo(() => {
     if (!data) return null;
-    const discs = DISCIPLINES.filter(d => data.byDisc[d]?.length > 0);
+    // Known professions first, then any non-standard bucket (e.g. "Uncategorized" —
+    // items whose GW2 API disciplines array came back empty) so nothing is ever
+    // silently hidden just because it doesn't match a known profession name.
+    const knownDiscs = DISCIPLINES.filter(d => data.byDisc[d]?.length > 0);
+    const extraDiscs = Object.keys(data.byDisc).filter(d => !DISCIPLINES.includes(d) && data.byDisc[d]?.length > 0);
+    const discs = [...knownDiscs, ...extraDiscs];
     const disc = activeDisc || discs[0];
 
     // Build forge recipe map for cross-tab integration
@@ -2883,6 +3105,21 @@ export default function App() {
       return b.profitNet - a.profitNet;
     });
 
+    // When an item has more than one valid recipe (different materials/costs —
+    // e.g. Karka Toughness Station has 3), label each card "Method X of Y" so
+    // they're distinguishable instead of looking like duplicate entries.
+    const outputCounts = {};
+    sorted.forEach(ci => { outputCounts[ci.outputId] = (outputCounts[ci.outputId] || 0) + 1; });
+    const outputSeenIdx = {};
+    const variantLabel = {};
+    sorted.forEach(ci => {
+      const total = outputCounts[ci.outputId];
+      if (total > 1) {
+        outputSeenIdx[ci.outputId] = (outputSeenIdx[ci.outputId] || 0) + 1;
+        variantLabel[ci.recipeId] = `Method ${outputSeenIdx[ci.outputId]} of ${total}`;
+      }
+    });
+
     return (
       <div>
       {(() => {
@@ -2943,6 +3180,11 @@ export default function App() {
             <div className="ci-hdr" onClick={() => setExpanded(e => ({ ...e, [ci.recipeId]: !e[ci.recipeId] }))}>
             {ci.icon ? <img className="iico" src={ci.icon} alt="" /> : <div className="iico-ph" />}
             <span className={`ci-name rar-${ci.rarity}`}>{ci.name}</span>
+            {variantLabel[ci.recipeId] && (
+              <span title="This item has multiple valid recipes with different materials/costs" style={{ fontSize: 10, fontFamily: "Cinzel,serif", letterSpacing: 1, padding: "2px 8px", borderRadius: 3, background: "rgba(159,77,255,.12)", border: "1px solid rgba(159,77,255,.4)", color: "#9f4dff", flexShrink: 0 }}>
+              ⚗ {variantLabel[ci.recipeId]}
+              </span>
+            )}
             {ci.outputCount > 1 && <span style={{ color: "var(--text3)", fontSize: 13 }}>×{ci.outputCount}</span>}
             {ci.canCraft ? <span className="bhave">✓ Can Craft</span> : <span className="bmiss">✗ Missing</span>}
             {DAILY_CRAFT_IDS.has(ci.outputId) && (
@@ -3471,6 +3713,16 @@ export default function App() {
       style={{ flex: 1 }} />
       <span style={{ width: 40, color: "var(--gold2)", fontFamily: "monospace", fontSize: 13 }}>{settingsAlertThreshold}%</span>
       </div>
+      </div>
+      <div style={{ fontSize: 12, color: "var(--text2)", marginTop: 8, paddingTop: 14, borderTop: "1px solid var(--border)" }}>
+      <strong style={{ color: "var(--gold1)" }}>Rescan Auto-Unlocked Recipes</strong>
+      <div style={{ fontSize: 11, color: "var(--text3)", marginBottom: 8, lineHeight: 1.6 }}>
+      A small number of recipes (e.g. Piece of Dragon Jade) never need to be "learned" — they become usable the moment a discipline hits the required rating. These never show up in the normal recipe refresh, so if you've leveled a discipline since your very first launch, run this to catch anything newly available. Can take a minute or two — it scans every recipe in the game.
+      </div>
+      <button onClick={rescanAutoUnlockedRecipes} disabled={rescanningRecipes}
+      style={{ fontSize: 11, color: "var(--gold2)", background: "transparent", border: "1px solid var(--border)", borderRadius: 3, padding: "5px 14px", cursor: rescanningRecipes ? "not-allowed" : "pointer", fontFamily: "Cinzel,serif", letterSpacing: 1, opacity: rescanningRecipes ? 0.5 : 1 }}>
+      {rescanningRecipes ? "⏳ Scanning all recipes..." : "🔍 Rescan Auto-Unlocked Recipes"}
+      </button>
       </div>
       <div style={{ display: "flex", gap: 10 }}>
       <button onClick={async () => {

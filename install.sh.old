@@ -1085,17 +1085,6 @@ if [ -f "$SCRIPT_DIR/main.jsx" ] && [ ! -f "$INSTALL_DIR/src/main.jsx" ]; then
   cp "$SCRIPT_DIR/main.jsx" "$INSTALL_DIR/src/main.jsx"
 fi
 
-# vite.config.js — Step 4 above always writes a default (no dev proxy) via heredoc
-# on every fresh install / --dev run. If a hand-edited version (e.g. with the
-# /gw2api proxy for dev-mode CORS bypass) exists next to install.sh, prefer it
-# so it isn't silently overwritten every time this script runs.
-if [ -f "$SCRIPT_DIR/vite.config.js" ]; then
-  cp "$SCRIPT_DIR/vite.config.js" "$INSTALL_DIR/vite.config.js"
-  echo "  ✓ vite.config.js copied (custom version, e.g. dev proxy preserved)"
-else
-  echo "  ⚠ vite.config.js not found next to install.sh — using default (no dev proxy)"
-fi
-
 # ── Step 7: npm install ───────────────────────────────────────────────────────
 if [ "$UPDATE_ONLY" = false ]; then
   echo "► Running npm install..."
