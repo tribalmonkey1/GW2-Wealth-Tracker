@@ -1,6 +1,6 @@
 {
   "productName": "GW2 Wealth Tracker",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "identifier": "com.gw2.analyzer",
   "build": {
     "beforeDevCommand": "npm run dev",
