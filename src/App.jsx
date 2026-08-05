@@ -367,6 +367,7 @@ import {
   pruneOldData as pruneOldSnapshots,
   getDbStats, importFromBrowser, exportAllData,
 } from "./storage.js";
+import { getCurrentVersion, checkForUpdate, getChangelog } from "./updater.js";
 
 function TrendBadge({ trend }) {
   if (!trend) return null;
@@ -1311,7 +1312,7 @@ export default function App() {
   const [apiKey, setApiKey] = useState("");
   const [settingsApiKey, setSettingsApiKey] = useState("");
   const [settingsMarketDbPath, setSettingsMarketDbPath] = useState("");
-  const [settingsNasSsh, setSettingsNasSsh] = useState("derrick@192.168.1.212");
+  const [settingsNasSsh, setSettingsNasSsh] = useState("");
   const [settingsMsg, setSettingsMsg] = useState(null);
   const [alertThreshold, setAlertThreshold] = useState(85); // % of 7-day high to trigger price alert
   const [settingsAlertThreshold, setSettingsAlertThreshold] = useState(85);
@@ -2256,6 +2257,55 @@ export default function App() {
     }, 1000);
     return () => clearInterval(t);
   }, [lastRecipe]);
+
+  // ── Update check + changelog ─────────────────────────────────────────────────
+  const [appVersion, setAppVersion] = useState(null);
+  const [updateInfo, setUpdateInfo] = useState(null);
+  const [updateChecking, setUpdateChecking] = useState(false);
+  const [updateInstalling, setUpdateInstalling] = useState(false);
+  const [updateError, setUpdateError] = useState(null);
+  const [showChangelog, setShowChangelog] = useState(false);
+  const [changelog, setChangelog] = useState([]);
+  const [changelogLoading, setChangelogLoading] = useState(false);
+
+  useEffect(() => {
+    getCurrentVersion().then(setAppVersion);
+    checkForUpdate().then(setUpdateInfo).catch(() => {}); // silent — no toast if it fails or none found
+  }, []);
+
+  const handleCheckForUpdates = async () => {
+    setUpdateChecking(true); setUpdateError(null);
+    try {
+      const info = await checkForUpdate();
+      setUpdateInfo(info);
+      if (!info) setToast("✓ You're up to date");
+    } catch (e) {
+      setUpdateError(String(e));
+    } finally {
+      setUpdateChecking(false);
+    }
+  };
+
+  const handleInstallUpdate = async () => {
+    if (!updateInfo) return;
+    setUpdateInstalling(true); setUpdateError(null);
+    try {
+      await updateInfo.install(); // downloads, verifies signature, relaunches — app exits here on success
+    } catch (e) {
+      setUpdateError(String(e));
+      setUpdateInstalling(false);
+    }
+  };
+
+  const handleOpenChangelog = async () => {
+    setShowChangelog(v => !v);
+    if (!showChangelog && changelog.length === 0) {
+      setChangelogLoading(true);
+      try { setChangelog(await getChangelog()); }
+      catch (e) { setToast(`✕ Changelog failed: ${e.message}`); }
+      finally { setChangelogLoading(false); }
+    }
+  };
 
   // ── History ─────────────────────────────────────────────────────────────────
   // Tick every 60s to refresh open charts with new collector data
@@ -3606,6 +3656,17 @@ export default function App() {
     <h1>⚜ GW2 Wealth Tracker ⚜</h1>
     <p>Account Ledger & Crafting Profit Calculator</p>
     <div style={{ marginTop: 8, fontSize: 11, color: "var(--text3)", fontFamily: "Cinzel,serif", letterSpacing: 1, display: "flex", gap: 10, justifyContent: "center", alignItems: "center", flexWrap: "wrap" }}>
+    {appVersion && (
+      <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        v{appVersion}
+        {updateInfo && (
+          <span onClick={() => setShowSettings(true)} title={`v${updateInfo.version} available`}
+            style={{ cursor: "pointer", color: "var(--gold2)", background: "rgba(200,150,42,.15)", border: "1px solid rgba(200,150,42,.4)", borderRadius: 3, padding: "1px 7px" }}>
+            ⬆ Update available
+          </span>
+        )}
+      </span>
+    )}
     {dbStats && (
       <span title={dbStats.db_path}>💾 {Number(dbStats.size_mb).toFixed(2)}MB · {(dbStats.price_history_count || 0).toLocaleString()} price · {(dbStats.velocity_count || 0).toLocaleString()} velocity snapshots</span>
     )}
@@ -3724,6 +3785,52 @@ export default function App() {
       {rescanningRecipes ? "⏳ Scanning all recipes..." : "🔍 Rescan Auto-Unlocked Recipes"}
       </button>
       </div>
+
+      <div style={{ fontSize: 12, color: "var(--text2)", marginTop: 8, paddingTop: 14, borderTop: "1px solid var(--border)" }}>
+        <strong style={{ color: "var(--gold1)" }}>Updates & Changelog</strong>
+        <div style={{ fontSize: 11, color: "var(--text3)", marginBottom: 8, lineHeight: 1.6 }}>
+          Current version: <span style={{ color: "var(--gold2)", fontFamily: "monospace" }}>{appVersion || "…"}</span>
+        </div>
+
+        {updateError && <div style={{ fontSize: 11, color: "var(--red2,#e05555)", marginBottom: 8 }}>{updateError}</div>}
+
+        {updateInfo ? (
+          <div style={{ background: "rgba(200,150,42,0.08)", border: "1px solid rgba(200,150,42,0.3)", borderRadius: 4, padding: "10px 14px", marginBottom: 10 }}>
+            <div style={{ fontSize: 13, color: "var(--gold2)", fontWeight: 600, marginBottom: 4 }}>Update available: v{updateInfo.version}</div>
+            {updateInfo.body && <div style={{ fontSize: 12, color: "var(--text2)", whiteSpace: "pre-wrap", marginBottom: 8, maxHeight: 140, overflowY: "auto" }}>{updateInfo.body}</div>}
+            <button onClick={handleInstallUpdate} disabled={updateInstalling}
+              style={{ fontSize: 11, color: "#fff", background: "var(--gold3,#7a5c1e)", border: "none", borderRadius: 3, padding: "5px 14px", cursor: updateInstalling ? "not-allowed" : "pointer", fontFamily: "Cinzel,serif", letterSpacing: 1, opacity: updateInstalling ? 0.6 : 1 }}>
+              {updateInstalling ? "⏳ Downloading & installing..." : "⬇ Download & Restart to Update"}
+            </button>
+          </div>
+        ) : (
+          <button onClick={handleCheckForUpdates} disabled={updateChecking}
+            style={{ fontSize: 11, color: "var(--gold2)", background: "transparent", border: "1px solid var(--border)", borderRadius: 3, padding: "5px 14px", cursor: updateChecking ? "not-allowed" : "pointer", fontFamily: "Cinzel,serif", letterSpacing: 1, opacity: updateChecking ? 0.6 : 1, marginBottom: 10 }}>
+            {updateChecking ? "⏳ Checking..." : "🔍 Check for Updates"}
+          </button>
+        )}
+
+        <div>
+          <button onClick={handleOpenChangelog}
+            style={{ fontSize: 11, color: "var(--text2)", background: "transparent", border: "1px solid var(--border)", borderRadius: 3, padding: "5px 14px", cursor: "pointer", fontFamily: "Cinzel,serif", letterSpacing: 1 }}>
+            {showChangelog ? "▲ Hide Changelog" : "📜 View Changelog"}
+          </button>
+          {showChangelog && (
+            <div style={{ marginTop: 10, maxHeight: 260, overflowY: "auto", background: "var(--bg3)", border: "1px solid var(--border)", borderRadius: 4, padding: "10px 14px" }}>
+              {changelogLoading && <div style={{ fontSize: 12, color: "var(--text3)" }}>Loading...</div>}
+              {!changelogLoading && changelog.length === 0 && <div style={{ fontSize: 12, color: "var(--text3)" }}>No releases found.</div>}
+              {changelog.map(r => (
+                <div key={r.tag} style={{ marginBottom: 12, paddingBottom: 12, borderBottom: "1px solid var(--border)" }}>
+                  <div style={{ fontSize: 13, color: "var(--gold2)", fontWeight: 600 }}>{r.name}</div>
+                  <div style={{ fontSize: 10, color: "var(--text3)", marginBottom: 4 }}>{new Date(r.date).toLocaleDateString()}</div>
+                  <div style={{ fontSize: 12, color: "var(--text2)", whiteSpace: "pre-wrap" }}>{r.body || "—"}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
       <div style={{ display: "flex", gap: 10 }}>
       <button onClick={async () => {
         setSettingsMsg(null);
