@@ -1663,6 +1663,7 @@ export function buildForgeItems(recipes, itemMap, priceMap, ownedMap, spiritShar
     const outSellNet = Math.floor(outSell * recipe.outputCount * 0.85);
 
     let totalInputCost = 0;
+    let matSellValue = 0; // gross TP sell value of the raw ingredients, before tax
     let hasUnresolved = false;
     const inputDetails = [];
 
@@ -1675,6 +1676,12 @@ export function buildForgeItems(recipes, itemMap, priceMap, ownedMap, spiritShar
       );
       totalInputCost += cost;
       const tpSell = priceMap[inp.itemId]?.sells?.unit_price || 0;
+      // Spirit-shard-sourced ingredients (Philosopher's Stone, Mystic Crystal) aren't
+      // something you'd otherwise sell on the TP — they're a currency conversion, not
+      // gold. Treat their value as 0 rather than counting their TP sell price.
+      if (source !== 'spirit_shard') {
+        matSellValue += tpSell * inp.count;
+      }
       inputDetails.push({
         ...inp,
         owned,
@@ -1685,14 +1692,18 @@ export function buildForgeItems(recipes, itemMap, priceMap, ownedMap, spiritShar
       });
     }
 
+    const matSellNet = Math.floor(matSellValue * 0.85);
     const profitNet = outSellNet - totalInputCost;
-    const craftAdvantage = profitNet; // simplified — no mat sell value for forge
+    // Craft advantage: how much better crafting is than simply selling the raw
+    // ingredients on the TP instead of promoting them. NOT the same as net profit.
+    const craftAdvantage = profitNet - matSellNet;
 
     items.push({
       ...recipe,
       outSell,
       outSellNet,
       totalInputCost,
+      matSellNet,
       profitNet,
       craftAdvantage,
       inputDetails,

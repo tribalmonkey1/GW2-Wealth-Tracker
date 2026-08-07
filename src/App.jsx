@@ -1024,15 +1024,48 @@ function PriceChart({ itemId, itemName }) {
   ];
 
   const [noData, setNoData] = useState(false);
+  const [loading, setLoading] = useState(true);
+  // Guards against out-of-order responses: if the user clicks between 1H/24H/3D/7D/30D
+  // quickly, several loadHistory() calls can be in flight at once (a 30D query can take
+  // far longer than a 1H query). Without this guard, whichever request happens to resolve
+  // LAST wins — even if it was for a period the user already clicked away from — which is
+  // exactly the "sometimes shows data, sometimes doesn't" behavior. Only the response that
+  // matches the most recently issued request is allowed to update state.
+  const requestSeqRef = useRef(0);
+  // Per-item+period cache so re-clicking a period you've already viewed this session is
+  // instant instead of re-running a potentially 30+ second query every time.
+  const historyCacheRef = useRef(new Map());
+
   useEffect(() => {
     if (!itemId) return;
-    setNoData(false);
     const p = PERIODS.find(p => p.key === period);
     const sinceTs = Date.now() - p.ms;
+    const cacheKey = `${itemId}:${period}`;
+    const mySeq = ++requestSeqRef.current;
+
+    const cached = historyCacheRef.current.get(cacheKey);
+    if (cached) {
+      // Show what we already have instantly; still refetch in the background below
+      // so newly-collected snapshots eventually show up without a manual reopen.
+      setD(cached);
+      setNoData(cached.length === 0);
+      setLoading(false);
+    } else {
+      setLoading(true);
+      setNoData(false);
+    }
+
     loadHistory(itemId, sinceTs).then(rows => {
+      if (mySeq !== requestSeqRef.current) return; // superseded by a newer request — ignore
+      historyCacheRef.current.set(cacheKey, rows);
       setD(rows);
-      if (rows.length === 0) setNoData(true); // don't retry empty results
-    }).catch(() => { setD([]); setNoData(true); });
+      setNoData(rows.length === 0);
+      setLoading(false);
+    }).catch(() => {
+      if (mySeq !== requestSeqRef.current) return;
+      if (!cached) { setD([]); setNoData(true); }
+      setLoading(false);
+    });
   }, [itemId, period]);
 
   const fmtDate = (ts) => {
@@ -1074,9 +1107,11 @@ function PriceChart({ itemId, itemName }) {
     </div>
     </div>
     <div className="hist-empty">
-      {noData
-        ? "No price history collected for this item — only Rare/Exotic/Ascended/Legendary items are tracked."
-        : "No data for this period yet."}
+      {loading
+        ? "Loading price history…"
+        : noData
+          ? "No price history collected for this item — only Rare/Exotic/Ascended/Legendary items are tracked."
+          : "No data for this period yet."}
     </div>
     </div>
   );
@@ -2937,6 +2972,12 @@ export default function App() {
             <span className={ci.profitNet >= 0 ? "pp" : "pn"}>{ci.profitNet >= 0 ? "+" : ""}<Gold v={ci.profitNet} size={13} /></span>
             <TrendBadge trend={trendSummary[ci.outputId]} />
             </div>
+            {ci.craftAdvantage != null && (
+              <div className="stat-cell" style={{ minWidth: 0 }} title="Net profit minus what you'd get selling the raw materials instead of crafting">
+              <span className="stat-lbl">CRAFT ADV.</span>
+              <span className={ci.craftAdvantage >= 0 ? "pp" : "pn"}>{ci.craftAdvantage >= 0 ? "+" : ""}<Gold v={ci.craftAdvantage} size={13} /></span>
+              </div>
+            )}
             {ci.sellFillsPerHr != null && (
               <div className="stat-cell" style={{ minWidth: 0 }} title="Buyers paying ask price — sell listings purchased/hr (upper bound). High sell rate + few listings = less competition, your listing clears fast.">
               <span className="stat-lbl" style={{ color: !ci.buyDominates ? "var(--green2)" : "var(--text3)" }}>BUYING HIGH</span>
@@ -3303,6 +3344,13 @@ export default function App() {
             <span className={ci.profitNet >= 0 ? "pp" : "pn"} style={{ fontSize: 15 }}>{ci.profitNet >= 0 ? "+" : ""}<Gold v={ci.profitNet} size={15} /></span>
             <TrendBadge trend={trendSummary[ci.outputId]} />
             </div>
+            {ci.craftAdvantage != null && (
+              <div className="ci-stat" style={{ borderLeft: "1px solid var(--border)", paddingLeft: 16 }}
+              title="Net profit minus what you'd get selling the raw materials instead of crafting">
+              <span className="ci-stat-lbl">CRAFT ADV.</span>
+              <span className={ci.craftAdvantage >= 0 ? "pp" : "pn"} style={{ fontSize: 15 }}>{ci.craftAdvantage >= 0 ? "+" : ""}<Gold v={ci.craftAdvantage} size={15} /></span>
+              </div>
+            )}
             {ci.sellFillsPerHr != null && (
               <div className="ci-stat" style={{ borderLeft: "1px solid var(--border)", paddingLeft: 16 }}
               title="Buyers paying ask price per hour. High fills + few listings = low undercutting competition.">
