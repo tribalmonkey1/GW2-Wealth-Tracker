@@ -1,12 +1,51 @@
 name: Release
-
 on:
   push:
     tags:
       - 'v*'
 
+# If the same tag gets pushed again while a previous run for it is still in
+# flight (e.g. you delete+re-push a tag to redo a release), cancel the old
+# run instead of letting two runs race each other.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  release:
+  # Creates the draft release ONCE, on its own, before either platform starts
+  # building. This is the fix for the duplicate-draft bug: previously both
+  # matrix jobs below called tauri-action independently, and each one tried
+  # to find-or-create a release for the tag at roughly the same time. Running
+  # in parallel, both checks could see "no release yet" and both would create
+  # one — a known race in tauri-action itself (see upstream issue #914,
+  # "Duplicate Releases Sometimes Created"). Having exactly one job create
+  # the release, and having the build jobs upload into it via releaseId
+  # instead of tagName-based lookup, removes the race entirely.
+  create-release:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    outputs:
+      release_id: ${{ steps.create-release.outputs.result }}
+    steps:
+      - name: Create draft release
+        id: create-release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data } = await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: '${{ github.ref_name }}',
+              name: 'GW2 Wealth Tracker ${{ github.ref_name }}',
+              body: 'Auto-update will pick this up. Edit these release notes before publishing — they show up in-app as the changelog.',
+              draft: true,
+              prerelease: false
+            })
+            return data.id
+
+  build-and-upload:
+    needs: create-release
     permissions:
       contents: write
     strategy:
@@ -18,38 +57,34 @@ jobs:
           - platform: 'windows-latest'
             args: '--bundles nsis'
     runs-on: ${{ matrix.platform }}
-
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
-
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
-
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
-
       - name: Install Linux build dependencies
         if: matrix.platform == 'ubuntu-22.04'
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
-
       - name: Install npm dependencies
         run: npm install
-
-      - name: Build and publish release
+      - name: Build and upload to release
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
+          releaseId: ${{ needs.create-release.outputs.release_id }}
+          # tagName is still needed even though releaseId identifies the release —
+          # without it, latest.json's download URLs fall back to
+          # releases/latest/download/<bundle> instead of this tag's assets.
           tagName: ${{ github.ref_name }}
-          releaseName: 'GW2 Wealth Tracker ${{ github.ref_name }}'
-          releaseBody: 'Auto-update will pick this up. Edit these release notes before publishing — they show up in-app as the changelog.'
           releaseDraft: true
           prerelease: false
           includeUpdaterJson: true
