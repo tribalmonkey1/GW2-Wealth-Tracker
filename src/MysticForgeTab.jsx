@@ -59,6 +59,37 @@ const Gold = ({ v, size = 14 }) => {
   );
 };
 
+// ── Receipt-style hover stat ────────────────────────────────────────────────
+// Mirrors the ReceiptStat component in App.jsx — renders a stat with a
+// vertical receipt breakdown shown on hover (desktop only). Kept as a local
+// copy since MysticForgeTab.jsx has no shared UI module with App.jsx.
+function ReceiptStat({ label, value, lines, size = 14 }) {
+  const positive = value >= 0;
+  return (
+    <div className="ci-stat tt-wrap">
+      <span className="ci-stat-lbl">{label}</span>
+      <span className={positive ? "pp" : "pn"} style={{ fontSize: size }}>
+        {positive ? "+" : ""}<Gold v={value} size={size} />
+      </span>
+      <div className="tt" style={{ minWidth: 260, textAlign: "left" }}>
+        {lines.map((l, i) => (
+          <div key={i} style={{
+            display: "flex", justifyContent: "space-between", gap: 20,
+            padding: l.isTotal ? "6px 0 0" : "3px 0",
+            marginTop: l.isTotal ? 6 : 0,
+            borderTop: l.isTotal ? "1px solid var(--border2)" : "none",
+          }}>
+            <span style={{ fontSize: 13, fontWeight: l.isTotal ? 600 : 400, color: l.isTotal ? "var(--text1)" : "var(--text3)" }}>{l.label}</span>
+            <span style={{ fontSize: 13, fontWeight: l.isTotal ? 600 : 400, color: l.isTotal ? (l.value >= 0 ? "var(--green2)" : "var(--red2)") : "var(--text2)" }}>
+              <Gold v={l.value} size={13} />
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function CurrencyBar({ wallet }) {
   const items = [
     { label: "Spirit Shards", value: wallet.spirit_shards, color: "var(--blue2)" },
@@ -164,8 +195,6 @@ function MiniChainNode({ recipe, depth = 0, forgeRecipeMap, itemMap, priceMap, o
 function ForgeRecipeCard({ item, itemMap, priceMap, ownedMap, spiritShards, trendSummary, velocitySummary, forgeRecipeMap }) {
   const [open, setOpen] = useState(false);
 
-  const vel = velocitySummary[item.outputId];
-  const sellFills = vel?.observations >= 5 ? vel.sellFillsPerHr : null;
   const trend = trendSummary[item.outputId];
 
   return (
@@ -188,49 +217,51 @@ function ForgeRecipeCard({ item, itemMap, priceMap, ownedMap, spiritShards, tren
           <span style={{ fontSize: 10, color: "var(--gold)", background: "rgba(200,150,42,.1)", border: "1px solid rgba(200,150,42,.3)", borderRadius: 3, padding: "1px 6px" }}>⚠ Some IDs pending</span>
         )}
         <div className="ci-stats">
-          <div className="ci-stat">
-            <span className="ci-stat-lbl">CRAFT ADVANTAGE</span>
-            <span className={item.craftAdvantage >= 0 ? "pp" : "pn"} style={{ fontSize: 14 }}>
-              {item.craftAdvantage >= 0 ? "+" : ""}<Gold v={item.craftAdvantage} size={14} />
-            </span>
-            {trend && <span style={{ fontSize: 10, color: trend.pct > 0 ? "var(--green2)" : "var(--red2)" }}>{trend.pct > 0 ? "▲" : "▼"} {Math.abs(trend.pct).toFixed(1)}%</span>}
-          </div>
-          <div className="ci-stat" style={{ borderLeft: "1px solid var(--border)", paddingLeft: 12 }}>
-            <span className="ci-stat-lbl">NET PROFIT</span>
-            <span className={item.profitNet >= 0 ? "pp" : "pn"} style={{ fontSize: 14 }}>
-              {item.profitNet >= 0 ? "+" : ""}<Gold v={item.profitNet} size={14} />
-            </span>
-          </div>
-          {sellFills != null && (
-            <div className="ci-stat" style={{ borderLeft: "1px solid var(--border)", paddingLeft: 12 }}>
-              <span className="ci-stat-lbl">BUYING HIGH</span>
-              <span style={{ fontSize: 13, color: sellFills >= 2 ? "var(--green2)" : sellFills === 0 ? "var(--red)" : "var(--gold2)" }}>
-                {sellFills.toFixed(1)}/hr
-              </span>
-            </div>
-          )}
+          {(() => {
+            const sellPrice = item.outSell * item.outputCount;
+            const taxAmt = sellPrice - item.outSellNet;
+            return (
+              <>
+              <div className="ci-stat">
+                <span className="ci-stat-lbl">SELL PRICE</span>
+                <span style={{ fontSize: 14 }}><Gold v={sellPrice} size={14} /></span>
+                {item.outputIsAverage && <span style={{ fontSize: 9, color: "var(--text3)", fontStyle: "italic" }}>avg</span>}
+              </div>
+              <div style={{ borderLeft: "1px solid var(--border)", paddingLeft: 12 }}>
+                <ReceiptStat
+                  label="NET PROFIT"
+                  value={item.profitNet}
+                  size={14}
+                  lines={[
+                    { label: "Sell Price", value: sellPrice },
+                    { label: "− 15% TP Tax", value: -taxAmt },
+                    { label: "− Must-Buy Mats", value: -item.totalInputCost },
+                    { label: "Net Profit", value: item.profitNet, isTotal: true },
+                  ]}
+                />
+              </div>
+              <div style={{ borderLeft: "1px solid var(--border)", paddingLeft: 12 }}>
+                <ReceiptStat
+                  label="CRAFT ADVANTAGE"
+                  value={item.craftAdvantage}
+                  size={14}
+                  lines={[
+                    { label: "Net Profit", value: item.profitNet },
+                    { label: "− Owned Mats Cost", value: -(item.matSellNet || 0) },
+                    { label: "Craft Advantage", value: item.craftAdvantage, isTotal: true },
+                  ]}
+                />
+                {trend && <span style={{ fontSize: 10, color: trend.pct > 0 ? "var(--green2)" : "var(--red2)" }}>{trend.pct > 0 ? "▲" : "▼"} {Math.abs(trend.pct).toFixed(1)}%</span>}
+              </div>
+              </>
+            );
+          })()}
         </div>
         <span style={{ color: "var(--text3)", fontSize: 13, flexShrink: 0 }}>{open ? "▲" : "▼"}</span>
       </div>
 
       {open && (
         <div className="ci-body">
-          {/* Stats row */}
-          <div className="stat-row">
-            {[
-              ["SELL PRICE (avg)", <Gold v={item.outSell * item.outputCount} />],
-              ["AFTER 15% TAX", <Gold v={item.outSellNet} />],
-              ["INPUT COST", <Gold v={item.totalInputCost} />],
-              ["NET PROFIT", <span className={item.profitNet >= 0 ? "pp" : "pn"}>{item.profitNet >= 0 ? "+" : ""}<Gold v={item.profitNet} /></span>],
-              ["CRAFT ADVANTAGE", <span className={item.craftAdvantage >= 0 ? "pp" : "pn"}>{item.craftAdvantage >= 0 ? "+" : ""}<Gold v={item.craftAdvantage} /></span>],
-            ].map(([lbl, val]) => (
-              <div key={lbl} className="stat-cell">
-                <span className="stat-lbl">{lbl}</span>
-                <span>{val}</span>
-              </div>
-            ))}
-          </div>
-
           {/* Ingredient list */}
           <div style={{ marginTop: 8 }}>
             <div style={{ fontFamily: "Cinzel,serif", fontSize: 10, letterSpacing: 2, color: "var(--text3)", padding: "6px 10px", borderBottom: "1px solid var(--border)" }}>

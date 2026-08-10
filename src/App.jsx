@@ -8,6 +8,7 @@ import { buildForgeRecipeMap } from "./mystic-forge-data.js";
 const BASE = "https://api.guildwars2.com/v2";
 const PRICE_REFRESH_MS = 60_000;
 const RECIPE_REFRESH_MS = 4 * 60 * 60_000;
+const UPDATE_CHECK_MS = 4 * 60 * 60_000; // 4h — GitHub Releases doesn't need aggressive polling
 const SIX_MONTHS_MS = 6 * 30 * 24 * 60 * 60 * 1000;
 const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
@@ -192,6 +193,38 @@ const Gold = ({ v, size = 14 }) => {
     </span>
   );
 };
+
+// ── Receipt-style hover stat ────────────────────────────────────────────────
+// Renders a single stat (e.g. Net Profit, Craft Advantage) that shows a
+// vertical receipt breakdown on hover. `lines` is an ordered array of
+// { label, value, isTotal? } — always rendered in full, including 0c lines.
+// Desktop-only (hover), reuses the existing .tt-wrap/.tt tooltip CSS.
+function ReceiptStat({ label, value, lines, size = 15, wrapClass = "ci-stat", lblClass = "ci-stat-lbl" }) {
+  const positive = value >= 0;
+  return (
+    <div className={`${wrapClass} tt-wrap`}>
+      <span className={lblClass}>{label}</span>
+      <span className={positive ? "pp" : "pn"} style={{ fontSize: size }}>
+        {positive ? "+" : ""}<Gold v={value} size={size} />
+      </span>
+      <div className="tt" style={{ minWidth: 260, textAlign: "left" }}>
+        {lines.map((l, i) => (
+          <div key={i} style={{
+            display: "flex", justifyContent: "space-between", gap: 20,
+            padding: l.isTotal ? "6px 0 0" : "3px 0",
+            marginTop: l.isTotal ? 6 : 0,
+            borderTop: l.isTotal ? "1px solid var(--border2)" : "none",
+          }}>
+            <span style={{ fontSize: 13, fontWeight: l.isTotal ? 600 : 400, color: l.isTotal ? "var(--text1)" : "var(--text3)" }}>{l.label}</span>
+            <span style={{ fontSize: 13, fontWeight: l.isTotal ? 600 : 400, color: l.isTotal ? (l.value >= 0 ? "var(--green2)" : "var(--red2)") : "var(--text2)" }}>
+              <Gold v={l.value} size={13} />
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 // Fetch up to 30 days of sold history by paging through the API (50 per page)
 async function fetchSoldHistory() {
@@ -2305,7 +2338,14 @@ export default function App() {
 
   useEffect(() => {
     getCurrentVersion().then(setAppVersion);
-    checkForUpdate().then(setUpdateInfo).catch(() => {}); // silent — no toast if it fails or none found
+
+    const runUpdateCheck = () => {
+      checkForUpdate().then(setUpdateInfo).catch(() => {}); // silent — no toast if it fails or none found
+    };
+
+    runUpdateCheck(); // initial check on launch, same as before
+    const updateInterval = setInterval(runUpdateCheck, UPDATE_CHECK_MS);
+    return () => clearInterval(updateInterval);
   }, []);
 
   const handleCheckForUpdates = async () => {
@@ -2967,37 +3007,46 @@ export default function App() {
 
             {/* Key metrics inline */}
             <div style={{ display: "flex", gap: 14, alignItems: "center", marginLeft: "auto" }}>
-            <div className="stat-cell" style={{ minWidth: 0 }}>
-            <span className="stat-lbl">NET PROFIT</span>
-            <span className={ci.profitNet >= 0 ? "pp" : "pn"}>{ci.profitNet >= 0 ? "+" : ""}<Gold v={ci.profitNet} size={13} /></span>
-            <TrendBadge trend={trendSummary[ci.outputId]} />
-            </div>
-            {ci.craftAdvantage != null && (
-              <div className="stat-cell" style={{ minWidth: 0 }} title="Net profit minus what you'd get selling the raw materials instead of crafting">
-              <span className="stat-lbl">CRAFT ADV.</span>
-              <span className={ci.craftAdvantage >= 0 ? "pp" : "pn"}>{ci.craftAdvantage >= 0 ? "+" : ""}<Gold v={ci.craftAdvantage} size={13} /></span>
-              </div>
-            )}
-            {ci.sellFillsPerHr != null && (
-              <div className="stat-cell" style={{ minWidth: 0 }} title="Buyers paying ask price — sell listings purchased/hr (upper bound). High sell rate + few listings = less competition, your listing clears fast.">
-              <span className="stat-lbl" style={{ color: !ci.buyDominates ? "var(--green2)" : "var(--text3)" }}>BUYING HIGH</span>
-              <span style={{ color: ci.sellFillsPerHr >= 2 ? "var(--green2)" : ci.sellFillsPerHr === 0 ? "var(--red)" : "var(--gold2)", fontSize: 13 }}>
-              {ci.sellFillsPerHr.toFixed(1)}/hr
-              </span>
-              </div>
-            )}
-            {ci.buyFillsPerHr != null && (
-              <div className="stat-cell" style={{ minWidth: 0 }} title={ci.buyDominates ? "⚠ Market moves at floor price — more sellers hitting bids than buyers paying ask. Selling low may be more reliable." : "Sellers fulfilling buy orders/hr (lower bound)"}>
-              <span className="stat-lbl" style={{ color: ci.buyDominates ? "var(--gold2)" : "var(--text3)" }}>SELLING LOW</span>
-              <span style={{ color: ci.buyDominates ? "var(--gold2)" : "var(--text3)", fontSize: 13 }}>
-              {ci.buyFillsPerHr.toFixed(1)}/hr{ci.buyDominates ? " ★" : ""}
-              </span>
-              </div>
-            )}
-            <div className="stat-cell" style={{ minWidth: 0 }} title={`Market activity signal · ${ci.priceSignalLabel || "no data yet"}`}>
-            <span className="stat-lbl">WILL IT SELL?</span>
-            <span style={{ fontSize: 12, color: ci.sellSignalColor || "var(--text3)" }}>{ci.sellSignalLabel || "⬜ no data"}</span>
-            </div>
+            {(() => {
+              const sellPrice = ci.outSell * (ci.outputCount || 1);
+              const afterTax = Math.floor(sellPrice * 0.85);
+              const taxAmt = sellPrice - afterTax;
+              return (
+                <>
+                <div className="stat-cell" style={{ minWidth: 0 }}>
+                <span className="stat-lbl">SELL PRICE</span>
+                <span><Gold v={sellPrice} size={13} /></span>
+                </div>
+                <ReceiptStat
+                label="NET PROFIT"
+                value={ci.profitNet}
+                size={13}
+                wrapClass="stat-cell"
+                lblClass="stat-lbl"
+                lines={[
+                  { label: "Sell Price", value: sellPrice },
+                  { label: "− 15% TP Tax", value: -taxAmt },
+                  { label: "− Must-Buy Mats", value: -(ci.totalMustBuyCostSell || 0) },
+                  { label: "Net Profit", value: ci.profitNet, isTotal: true },
+                ]}
+                />
+                {ci.craftAdvantage != null && (
+                  <ReceiptStat
+                  label="CRAFT ADVANTAGE"
+                  value={ci.craftAdvantage}
+                  size={13}
+                  wrapClass="stat-cell"
+                  lblClass="stat-lbl"
+                  lines={[
+                    { label: "Net Profit", value: ci.profitNet },
+                    { label: "− Owned Mats Cost", value: -(ci.matSellNet || 0) },
+                    { label: "Craft Advantage", value: ci.craftAdvantage, isTotal: true },
+                  ]}
+                  />
+                )}
+                </>
+              );
+            })()}
             <button className={`cbtn${craftingChartItem === ci.outputId ? " on" : ""}`}
             onClick={e => { e.stopPropagation(); setCraftingChartItem(craftingChartItem === ci.outputId ? null : ci.outputId); }}>
             📈 Chart
@@ -3339,43 +3388,46 @@ export default function App() {
               );
             })()}
             <div className="ci-stats">
-            <div className="ci-stat">
-            <span className="ci-stat-lbl">NET PROFIT</span>
-            <span className={ci.profitNet >= 0 ? "pp" : "pn"} style={{ fontSize: 15 }}>{ci.profitNet >= 0 ? "+" : ""}<Gold v={ci.profitNet} size={15} /></span>
-            <TrendBadge trend={trendSummary[ci.outputId]} />
-            </div>
-            {ci.craftAdvantage != null && (
-              <div className="ci-stat" style={{ borderLeft: "1px solid var(--border)", paddingLeft: 16 }}
-              title="Net profit minus what you'd get selling the raw materials instead of crafting">
-              <span className="ci-stat-lbl">CRAFT ADV.</span>
-              <span className={ci.craftAdvantage >= 0 ? "pp" : "pn"} style={{ fontSize: 15 }}>{ci.craftAdvantage >= 0 ? "+" : ""}<Gold v={ci.craftAdvantage} size={15} /></span>
-              </div>
-            )}
-            {ci.sellFillsPerHr != null && (
-              <div className="ci-stat" style={{ borderLeft: "1px solid var(--border)", paddingLeft: 16 }}
-              title="Buyers paying ask price per hour. High fills + few listings = low undercutting competition.">
-              <span className="ci-stat-lbl" style={{ color: !ci.buyDominates ? "var(--green2)" : "var(--text3)" }}>BUYING HIGH</span>
-              <span style={{ color: ci.sellFillsPerHr >= 2 ? "var(--green2)" : ci.sellFillsPerHr === 0 ? "var(--red)" : "var(--gold2)", fontSize: 14 }}>
-              {ci.sellFillsPerHr.toFixed(1)}/hr
-              </span>
-              </div>
-            )}
-            {ci.buyFillsPerHr != null && (
-              <div className="ci-stat" style={{ paddingLeft: 16 }}
-              title={ci.buyDominates ? "⚠ Market moves at floor price — selling low may be more reliable here." : "Sellers fulfilling buy orders/hr (lower bound)"}>
-              <span className="ci-stat-lbl" style={{ color: ci.buyDominates ? "var(--gold2)" : "var(--text3)" }}>SELLING LOW</span>
-              <span style={{ color: ci.buyDominates ? "var(--gold2)" : "var(--text3)", fontSize: 14 }}>
-              {ci.buyFillsPerHr.toFixed(1)}/hr{ci.buyDominates ? " ★" : ""}
-              </span>
-              </div>
-            )}
-            {ci.sellSignalLabel && (
-              <div className="ci-stat" style={{ borderLeft: "1px solid var(--border)", paddingLeft: 16 }}
-              title={`${ci.priceSignalLabel || "no data"} · ${velocitySummary[ci.outputId]?.observations || 0} snapshot pairs`}>
-              <span className="ci-stat-lbl">WILL IT SELL?</span>
-              <span style={{ fontSize: 12, color: ci.sellSignalColor || "var(--text3)" }}>{ci.sellSignalLabel}</span>
-              </div>
-            )}
+            {(() => {
+              const sellPrice = ci.outSell * ci.outputCount;
+              const afterTax = Math.floor(sellPrice * 0.85);
+              const taxAmt = sellPrice - afterTax;
+              return (
+                <>
+                <div className="ci-stat">
+                <span className="ci-stat-lbl">SELL PRICE</span>
+                <span style={{ fontSize: 15 }}><Gold v={sellPrice} size={15} /></span>
+                </div>
+                <div style={{ borderLeft: "1px solid var(--border)", paddingLeft: 16 }}>
+                <ReceiptStat
+                label="NET PROFIT"
+                value={ci.profitNet}
+                size={15}
+                lines={[
+                  { label: "Sell Price", value: sellPrice },
+                  { label: "− 15% TP Tax", value: -taxAmt },
+                  { label: "− Must-Buy Mats", value: -ci.totalMustBuyCostSell },
+                  { label: "Net Profit", value: ci.profitNet, isTotal: true },
+                ]}
+                />
+                </div>
+                {ci.craftAdvantage != null && (
+                  <div style={{ borderLeft: "1px solid var(--border)", paddingLeft: 16 }}>
+                  <ReceiptStat
+                  label="CRAFT ADVANTAGE"
+                  value={ci.craftAdvantage}
+                  size={15}
+                  lines={[
+                    { label: "Net Profit", value: ci.profitNet },
+                    { label: "− Owned Mats Cost", value: -(ci.matSellNet || 0) },
+                    { label: "Craft Advantage", value: ci.craftAdvantage, isTotal: true },
+                  ]}
+                  />
+                  </div>
+                )}
+                </>
+              );
+            })()}
             <button className={`cbtn${craftingChartItem === ci.outputId ? " on" : ""}`}
             onClick={e => { e.stopPropagation(); setCraftingChartItem(craftingChartItem === ci.outputId ? null : ci.outputId); }}>
             📈 Chart
@@ -3392,24 +3444,6 @@ export default function App() {
 
             {isOpen && (
               <div className="ci-body">
-              {/* Summary row */}
-              <div className="stat-row">
-              {[
-                ["SELL PRICE", <Gold v={ci.outSell * ci.outputCount} />, "var(--gold2)"],
-                        ["AFTER 15% TAX", <Gold v={Math.floor(ci.outSell * ci.outputCount * 0.85)} />, "var(--gold)"],
-                        ["MUST BUY COST", <Gold v={ci.totalMustBuyCostSell} />, "var(--red)"],
-                        ["GROSS PROFIT", <span className={ci.profitGross >= 0 ? "pp" : "pn"}>{ci.profitGross >= 0 ? "+" : ""}<Gold v={ci.profitGross} /></span>, null],
-                        ["NET PROFIT", <span className={ci.profitNet >= 0 ? "pp" : "pn"}>{ci.profitNet >= 0 ? "+" : ""}<Gold v={ci.profitNet} /></span>, null],
-                        ["SELL MATS (net)", <Gold v={ci.matSellNet} />, "var(--gold)"],
-                        ["CRAFT ADVANTAGE", <span className={ci.craftAdvantage >= 0 ? "pp" : "pn"}>{ci.craftAdvantage >= 0 ? "+" : ""}<Gold v={ci.craftAdvantage} /></span>, null],
-              ].map(([lbl, val, col]) => (
-                <div key={lbl} className="stat-cell">
-                <span className="stat-lbl">{lbl}</span>
-                <span style={col ? { color: col } : {}}>{val}</span>
-                </div>
-              ))}
-              </div>
-
               {/* Ingredient tree — shows intermediary crafts with sub-ingredients indented */}
               <div className="r-tree">
               <div className="r-hdr">
