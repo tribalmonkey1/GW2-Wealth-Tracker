@@ -1662,8 +1662,8 @@ export function buildForgeItems(recipes, itemMap, priceMap, ownedMap, spiritShar
     const outSell = outPrice.sells?.unit_price || 0;
     const outSellNet = Math.floor(outSell * recipe.outputCount * 0.85);
 
-    let totalInputCost = 0;
-    let matSellValue = 0; // gross TP sell value of the raw ingredients, before tax
+    let totalInputCost = 0;       // cost of materials NOT owned — must buy or must craft
+    let ownedMatSellValue = 0;    // gross TP sell value of materials you already OWN, before tax
     let hasUnresolved = false;
     const inputDetails = [];
 
@@ -1674,13 +1674,22 @@ export function buildForgeItems(recipes, itemMap, priceMap, ownedMap, spiritShar
         inp.itemId, inp.count, inp.name, priceMap, ownedMap, null,
         spiritShards, forgeRecipeMap, new Set([recipe.outputId])
       );
+      // getIngredientEffectiveCost already zeroes cost once owned >= needed (and
+      // substitutes a cheaper forge-craft path when one exists), so this is already
+      // "cost of what you'd have to buy or craft" — i.e. must-buy cost.
       totalInputCost += cost;
       const tpSell = priceMap[inp.itemId]?.sells?.unit_price || 0;
       // Spirit-shard-sourced ingredients (Philosopher's Stone, Mystic Crystal) aren't
       // something you'd otherwise sell on the TP — they're a currency conversion, not
       // gold. Treat their value as 0 rather than counting their TP sell price.
       if (source !== 'spirit_shard') {
-        matSellValue += tpSell * inp.count;
+        // Craft advantage compares against the value of materials you ALREADY OWN
+        // (the opportunity cost of using them here instead of selling them on the
+        // TP) — not the sell value of the full ingredient list. Only the owned
+        // portion counts; anything you still need to buy belongs in totalInputCost
+        // above, not here.
+        const ownedPortion = Math.min(owned, inp.count);
+        ownedMatSellValue += tpSell * ownedPortion;
       }
       inputDetails.push({
         ...inp,
@@ -1692,10 +1701,11 @@ export function buildForgeItems(recipes, itemMap, priceMap, ownedMap, spiritShar
       });
     }
 
-    const matSellNet = Math.floor(matSellValue * 0.85);
+    const matSellNet = Math.floor(ownedMatSellValue * 0.85);
     const profitNet = outSellNet - totalInputCost;
-    // Craft advantage: how much better crafting is than simply selling the raw
-    // ingredients on the TP instead of promoting them. NOT the same as net profit.
+    // Craft advantage: net profit minus the value of materials you already own —
+    // i.e. what crafting nets you beyond simply selling your owned mats instead.
+    // Matches the same owned-vs-must-buy split the Crafting Profits tab uses.
     const craftAdvantage = profitNet - matSellNet;
 
     items.push({
