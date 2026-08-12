@@ -150,7 +150,7 @@ function getWorker() {
         const cb = _workerCallbacks[id];
         if (!cb) return;
         delete _workerCallbacks[id];
-        if (type === 'market_summary_result' || type === 'craft_items_result' || type === 'parse_cache_bulk_result' || type === 'process_startup_cache_result') cb.resolve(result);
+        if (type === 'market_summary_result' || type === 'craft_items_result' || type === 'parse_cache_bulk_result' || type === 'process_startup_cache_result' || type === 'locked_craft_items_result') cb.resolve(result);
         else cb.reject(new Error(error));
       };
         _worker.onerror = (e) => {
@@ -382,6 +382,23 @@ export function computeCraftItems(recipes, resolvedRecipes, itemMap, priceMap, o
       type: 'compute_craft_items',
       id,
       payload: { recipes, resolvedRecipes, itemMap, priceMap, ownedMap }
+    });
+  });
+}
+
+// Run buildCraftItems against the full-catalog "locked" (not-learned) recipe list,
+// off the main thread — powers the Unlearned Recipes tab. Same worker/message pattern
+// as computeCraftItems above.
+export function computeLockedCraftItems(lockedRecipes, resolvedRecipes, itemMap, priceMap, ownedMap) {
+  const worker = getWorker();
+  if (!worker) return Promise.resolve(null); // fallback: caller handles null
+  return new Promise((resolve, reject) => {
+    const id = ++_workerMsgId;
+    _workerCallbacks[id] = { resolve, reject };
+    worker.postMessage({
+      type: 'compute_locked_craft_items',
+      id,
+      payload: { lockedRecipes, resolvedRecipes, itemMap, priceMap, ownedMap }
     });
   });
 }

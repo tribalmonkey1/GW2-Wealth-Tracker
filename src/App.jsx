@@ -9,6 +9,7 @@ const BASE = "https://api.guildwars2.com/v2";
 const PRICE_REFRESH_MS = 60_000;
 const RECIPE_REFRESH_MS = 4 * 60 * 60_000;
 const UPDATE_CHECK_MS = 4 * 60 * 60_000; // 4h — GitHub Releases doesn't need aggressive polling
+const UNLEARNED_REFRESH_MS = 7 * 24 * 60 * 60_000; // weekly — full-catalog recipe ID diff for Unlearned Recipes tab
 const SIX_MONTHS_MS = 6 * 30 * 24 * 60 * 60 * 1000;
 const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
@@ -392,7 +393,7 @@ function buildDailyCraftedSet(dailyNames, itemMap) {
 // ── Storage: Tauri SQLite backend (replaces IndexedDB) ───────────────────────
 import {
   cacheSet, cacheGet,
-  saveSnapshot, loadHistory, computeCraftItems, cacheGetBulk, processStartupCache, getPriceAlertData,
+  saveSnapshot, loadHistory, computeCraftItems, computeLockedCraftItems, cacheGetBulk, processStartupCache, getPriceAlertData,
   saveVelocitySnapshot, loadMarketSummary,
   flipPendingAdd, flipPendingGetAll, flipPendingDelete,
   flipHistoryAdd, flipHistoryGetAll, flipHistoryDelete,
@@ -1367,6 +1368,11 @@ export default function App() {
   const [showRecDaily, setShowRecDaily] = useState(true);
   const [showRecDailyOutputs, setShowRecDailyOutputs] = useState(true);
   const [showRecMissing, setShowRecMissing] = useState(false);
+  // ── Unlearned Recipes tab state ──
+  const [lockedCraftItems, setLockedCraftItems] = useState([]); // computed craft items for recipes NOT known/learned
+  const [unlearnedRecipeCount, setUnlearnedRecipeCount] = useState(0); // size of the cached locked-recipe catalog
+  const [unlearnedLoading, setUnlearnedLoading] = useState(false);
+  const [hideZeroProfitUnlearned, setHideZeroProfitUnlearned] = useState(true); // mirrors showRecMissing's "hide the long tail" role
   const [sortMat, setSortMat] = useState({ k: "totalValue", d: -1 });
   const [searchMat, setSearchMat] = useState("");
   const [searchCraft, setSearchCraft] = useState("");
@@ -2211,6 +2217,30 @@ export default function App() {
         if ((r.flags || []).includes("LearnedFromItem")) return false;
         return r.disciplines.some(d => (disciplineLevels[d] || 0) >= (r.min_rating || 0));
       });
+
+      // Opportunistic seed for the Unlearned Recipes tab: this scan already fetched full
+      // details for essentially every non-owned recipe — everything that DIDN'T qualify
+      // as newly-eligible above is exactly the "locked" set that tab wants, so merge it
+      // into that cache instead of discarding it (per project design — avoids a second,
+      // separately-expensive full-catalog fetch just for that tab).
+      (async () => {
+        try {
+          const newlyEligibleIds = new Set(newlyEligible.map(r => r.id));
+          const stillLocked = candidateDetails.filter(r => !newlyEligibleIds.has(r.id));
+          const [idsEntry, detailsEntry] = await cacheGetBulk(["allGameRecipeIds", "allGameRecipes"]);
+          const mergedIds = [...new Set([...(idsEntry?.value || []), ...allRecipeIds])];
+          const mergedDetails = dedupeRecipesById([...(detailsEntry?.value || []), ...stillLocked])
+            .filter(r => !newlyEligibleIds.has(r.id));
+          cacheRef.current.lockedRecipes = mergedDetails;
+          await Promise.all([
+            cacheSet("allGameRecipeIds", mergedIds),
+            cacheSet("allGameRecipes", mergedDetails),
+          ]);
+          setUnlearnedRecipeCount(mergedDetails.length);
+          computeAndSetLockedCraftItems(mergedDetails);
+        } catch (e) { console.warn("[UnlearnedRecipes] seed from rescan failed:", e.message); }
+      })();
+
       if (newlyEligible.length === 0) {
         setToast("✦ Rescan complete — no new auto-unlocked recipes found");
         setTimeout(() => setToast(null), 5000);
@@ -2281,6 +2311,96 @@ export default function App() {
     } catch {}
   }, []);
 
+  // ── Unlearned Recipes tab ────────────────────────────────────────────────────
+  // Ranks every recipe you DON'T currently know (recipe not in /account/recipes and
+  // not auto-unlocked) by the same craftAdvantage × sellFillsPerHr formula as ⭐
+  // Recommended, so you can see what would be worth learning/farming. "Recipe known"
+  // and "materials owned" are independent axes here — buildCraftItems' canCraft still
+  // reflects materials only, so the UI badges recipe-lock state separately.
+  const computeAndSetLockedCraftItems = useCallback(async (lockedRecipesArr) => {
+    const { itemMap, priceMap, ownedMap, resolvedRecipes } = cacheRef.current;
+    if (!itemMap || !priceMap || !ownedMap || !lockedRecipesArr?.length) { setLockedCraftItems([]); return; }
+    // Merge a locked-recipe output→recipe map into the resolved set so ingredient trees
+    // can walk through OTHER locked recipes too, not just already-owned ones. Owned
+    // recipes win on collision (matches existing resolvedRecipes precedent elsewhere).
+    const lockedResolved = {};
+    lockedRecipesArr.forEach(r => { if (!lockedResolved[r.output_item_id]) lockedResolved[r.output_item_id] = r; });
+    const mergedResolved = { ...lockedResolved, ...resolvedRecipes };
+    const result = await computeLockedCraftItems(lockedRecipesArr, mergedResolved, itemMap, priceMap, ownedMap);
+    if (!result) { setLockedCraftItems([]); return; }
+    // Enrich with discipline min-rating + raw flags for display — buildCraftItems doesn't
+    // carry these (owned crafting never needed them), so stitch them on here by recipeId.
+    const metaById = {};
+    lockedRecipesArr.forEach(r => { metaById[r.id] = { minRating: r.min_rating || 0, flags: r.flags || [] }; });
+    const enriched = result.craftItems.map(ci => ({ ...ci, ...(metaById[ci.recipeId] || {}) }));
+    setLockedCraftItems(enriched);
+  }, []);
+
+  const refreshUnlearnedRecipesCatalog = useCallback(async () => {
+    if (!cacheRef.current.itemMap) return;
+    setUnlearnedLoading(true);
+    try {
+      const { recipes, knownRecipeIds } = cacheRef.current;
+      const knownIds = new Set([...(recipes || []).map(r => r.id), ...(knownRecipeIds || [])]);
+      const freshIdList = await publicFetch(`${BASE}/recipes`);
+      const [idsEntry, detailsEntry] = await cacheGetBulk(["allGameRecipeIds", "allGameRecipes"]);
+      const cachedIds = new Set(idsEntry?.value || []);
+      const cachedDetails = detailsEntry?.value || [];
+      // Incremental diff (per project decision): only fetch details for IDs that are
+      // genuinely new since the last cached ID list AND not already known — GW2 patches
+      // add recipes in batches, so after the first (expensive) run this is normally just
+      // the 1 cheap ID-list request plus at most a couple of detail chunks.
+      const newIds = freshIdList.filter(id => !cachedIds.has(id) && !knownIds.has(id));
+      let newDetails = [];
+      for (const ch of chunk(newIds, 200)) {
+        try {
+          const batch = await publicFetch(`${BASE}/recipes?ids=${ch.join(",")}`);
+          newDetails.push(...(Array.isArray(batch) ? batch : []));
+        } catch {}
+      }
+      // Merge with previously-cached details, then drop anything that has since become
+      // known (discipline leveled up, item learned, etc.) — those live in the normal
+      // owned-recipe list now, not here.
+      const merged = dedupeRecipesById([...cachedDetails, ...newDetails]).filter(r => !knownIds.has(r.id));
+
+      // Expand item/price coverage to the locked catalog's ingredients+outputs — most
+      // won't be in itemMap/priceMap yet since they were never relevant before this tab.
+      const { itemMap, priceMap } = cacheRef.current;
+      const lockedItemIds = new Set();
+      merged.forEach(r => {
+        lockedItemIds.add(r.output_item_id);
+        (r.ingredients || []).forEach(ing => lockedItemIds.add(ing.item_id));
+      });
+      const missingItemIds = [...lockedItemIds].filter(id => id && !itemMap[id]);
+      if (missingItemIds.length) {
+        const ni = await fetchIds("/items", missingItemIds);
+        ni.forEach(i => { itemMap[i.id] = i; });
+      }
+      const missingPriceIds = filterTradeable([...lockedItemIds], itemMap).filter(id => !priceMap[id]);
+      if (missingPriceIds.length) {
+        const np = await fetchPrices(missingPriceIds);
+        Object.assign(priceMap, np);
+      }
+
+      cacheRef.current.itemMap = itemMap;
+      cacheRef.current.priceMap = priceMap;
+      cacheRef.current.lockedRecipes = merged;
+      const now = Date.now();
+      await Promise.all([
+        cacheSet("allGameRecipeIds", freshIdList),
+        cacheSet("allGameRecipes", merged),
+        cacheSet("lastUnlearnedRefresh", now),
+      ]);
+      setUnlearnedRecipeCount(merged.length);
+      setData(prev => prev ? { ...prev, itemMap: { ...prev.itemMap, ...itemMap }, priceMap: { ...prev.priceMap, ...priceMap } } : prev);
+      await computeAndSetLockedCraftItems(merged);
+    } catch (e) {
+      console.warn("[UnlearnedRecipes] catalog refresh failed:", e.message);
+    } finally {
+      setUnlearnedLoading(false);
+    }
+  }, [computeAndSetLockedCraftItems]);
+
   // ── Timers — no data in deps to avoid infinite refresh loop ─────────────────
   const dataReadyRef = useRef(false);
   useEffect(() => { if (data) dataReadyRef.current = true; }, [data]);
@@ -2306,6 +2426,32 @@ export default function App() {
       recipeInterval = setInterval(refreshRecipes, RECIPE_REFRESH_MS);
     }, 100);
     return () => { clearInterval(waitForData); clearInterval(recipeInterval); };
+  }, [loadState.phase]);
+
+  useEffect(() => {
+    if (loadState.phase !== "done") return;
+    let unlearnedInterval;
+    const waitForData = setInterval(() => {
+      if (!dataReadyRef.current) return;
+      clearInterval(waitForData);
+      (async () => {
+        // Fast path: show whatever the last session cached immediately, so the tab
+        // isn't empty while the (possibly slow, first-run-only) catalog diff runs.
+        const [idsEntry, detailsEntry, lastRunEntry] = await cacheGetBulk(["allGameRecipeIds", "allGameRecipes", "lastUnlearnedRefresh"]);
+        if (detailsEntry?.value?.length) {
+          cacheRef.current.lockedRecipes = detailsEntry.value;
+          setUnlearnedRecipeCount(detailsEntry.value.length);
+          computeAndSetLockedCraftItems(detailsEntry.value);
+        }
+        // Bootstrap or catch-up: run now if we've never cached a catalog, or it's been
+        // a week or more since the last successful diff (e.g. app wasn't opened for a while).
+        const lastRun = lastRunEntry?.value || 0;
+        const stale = !idsEntry?.value || (Date.now() - lastRun) >= UNLEARNED_REFRESH_MS;
+        if (stale) refreshUnlearnedRecipesCatalog();
+      })();
+      unlearnedInterval = setInterval(refreshUnlearnedRecipesCatalog, UNLEARNED_REFRESH_MS);
+    }, 100);
+    return () => { clearInterval(waitForData); clearInterval(unlearnedInterval); };
   }, [loadState.phase]);
 
   useEffect(() => {
@@ -3092,6 +3238,194 @@ export default function App() {
     );
   }, [data, velocitySummary, trendSummary, showRecMaterials, showRecDaily, showRecDailyOutputs, showRecMissing, expanded, dailyCrafted, myListings, mySoldHistory, craftingChartItem]);
 
+  // ── Unlearned Recipes tab ────────────────────────────────────────────────────
+  // Ranks recipes you don't know by the same craftAdvantage × sellFillsPerHr formula
+  // as ⭐ Recommended (directly comparable rankings), so learned-vs-unlearned is just
+  // another axis instead of a totally separate ranking system. Reuses the same card
+  // shell as Recommended, with a 🔒 badge instead of ✓/✗ Can Craft, plus a "have
+  // materials" badge shown independently since materials-owned and recipe-known are
+  // unrelated for a locked recipe.
+  const UnlearnedRecipesTab = useMemo(() => {
+    if (!data) return null;
+
+    let items = lockedCraftItems;
+    if (hideZeroProfitUnlearned) {
+      items = items.filter(ci => {
+        const advantage = ci.craftAdvantage != null ? ci.craftAdvantage : ci.profitNet;
+        return advantage > 0 && ci.outSell > 0;
+      });
+    }
+
+    const MIN_OBS = 5;
+    items = items.map(ci => {
+      const vel = velocitySummary[ci.outputId];
+      const hasVel = vel && vel.observations >= MIN_OBS;
+      const sellRate = hasVel ? vel.sellFillsPerHr : null;
+      const advantage = ci.craftAdvantage != null ? ci.craftAdvantage : ci.profitNet;
+      const score = (!hasVel || sellRate === 0) ? 0 : Math.max(0, advantage) * sellRate;
+      return { ...ci, score, sellFillsPerHr: sellRate };
+    });
+
+    const sorted = [...items].sort((a, b) => b.score - a.score).slice(0, 100);
+
+    return (
+      <div>
+      <div className="ctrl" style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+      <div style={{ flex: 1 }}>
+      <span style={{ fontFamily: "Cinzel,serif", fontSize: 13, color: "var(--gold2)", letterSpacing: 1 }}>🔒 UNLEARNED RECIPES</span>
+      <span style={{ marginLeft: 12, fontSize: 12, color: "var(--text3)" }}>
+      Recipes you don't currently know, ranked the same way as ⭐ Recommended — see what's worth learning or farming.
+      {unlearnedLoading && <span style={{ color: "var(--gold2)", marginLeft: 8 }}>⏳ refreshing catalog…</span>}
+      </span>
+      </div>
+      <label style={{ fontSize: 12, color: "var(--text3)", display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }} title="Hide recipes with no profit or no TP sell price — keeps junk/vendor recipes out of view">
+      <input type="checkbox" checked={hideZeroProfitUnlearned} onChange={e => setHideZeroProfitUnlearned(e.target.checked)} />
+      Hide zero-profit / no-data recipes
+      </label>
+      </div>
+
+      {unlearnedRecipeCount === 0 && (
+        <div className="empty">
+        {unlearnedLoading
+          ? "Building the unlearned-recipe catalog for the first time — this scans the full game recipe list and can take a little while. Check back shortly."
+          : "No unlearned-recipe catalog cached yet. It refreshes automatically in the background (weekly), or click \"Rescan Auto-Unlocked Recipes\" in Settings to help seed it now."}
+        </div>
+      )}
+      {unlearnedRecipeCount > 0 && sorted.length === 0 && (
+        <div className="empty">No recipes match the current filters. Toggle "Hide zero-profit / no-data recipes" to see the full {unlearnedRecipeCount.toLocaleString()}-recipe catalog.</div>
+      )}
+
+      {sorted.map((ci, rank) => {
+        const key = `locked_${ci.recipeId}`;
+        const isOpen = expanded[key];
+        return (
+          <div key={ci.recipeId} className="ci" style={{ marginBottom: 6 }}>
+          <div className="ci-hdr" onClick={() => setExpanded(e => ({ ...e, [key]: !e[key] }))}>
+          <span style={{ fontFamily: "Cinzel,serif", fontSize: 12, color: rank < 3 ? "var(--gold2)" : "var(--text3)", width: 28, textAlign: "center", flexShrink: 0 }}>
+          {rank === 0 ? "🥇" : rank === 1 ? "🥈" : rank === 2 ? "🥉" : `#${rank + 1}`}
+          </span>
+          {ci.icon ? <img className="iico" src={ci.icon} alt="" /> : <div className="iico-ph" />}
+          <span className={`ci-name rar-${ci.rarity}`}>{ci.name}</span>
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+          {getRecipeDisciplines(ci).map(d => (
+            <span key={d} style={{ fontSize: 10, fontFamily: "Cinzel,serif", letterSpacing: 1, padding: "2px 7px", borderRadius: 3, background: "rgba(200,150,42,0.1)", border: "1px solid rgba(200,150,42,0.3)", color: "var(--gold2)" }}>
+            {d}{ci.minRating ? ` ${ci.minRating}` : ""}
+            </span>
+          ))}
+          </div>
+          <span style={{ fontSize: 10, fontFamily: "Cinzel,serif", letterSpacing: 1, padding: "3px 8px", borderRadius: 3, background: "rgba(159,77,255,.12)", border: "1px solid rgba(159,77,255,.4)", color: "#9f4dff", whiteSpace: "nowrap" }}>🔒 Not Learned</span>
+          {ci.canCraft ? <span className="bhave">✓ Have Mats</span> : <span className="bmiss">✗ Missing Mats</span>}
+          {ci.flags?.includes("LearnedFromItem") && (
+            <span title="Learned from a consumable recipe sheet/scroll — check the wiki for where to find it" style={{ fontSize: 10, fontFamily: "Cinzel,serif", letterSpacing: 1, padding: "2px 7px", borderRadius: 3, background: "rgba(90,160,210,.12)", border: "1px solid rgba(90,160,210,.35)", color: "var(--blue2)" }}>📖 Recipe Sheet</span>
+          )}
+
+          <div style={{ display: "flex", gap: 14, alignItems: "center", marginLeft: "auto" }}>
+          {(() => {
+            const sellPrice = ci.outSell * (ci.outputCount || 1);
+            const afterTax = Math.floor(sellPrice * 0.85);
+            const taxAmt = sellPrice - afterTax;
+            return (
+              <>
+              <div className="stat-cell" style={{ minWidth: 0 }}>
+              <span className="stat-lbl">SELL PRICE</span>
+              <span><Gold v={sellPrice} size={13} /></span>
+              </div>
+              <ReceiptStat
+              label="NET PROFIT"
+              value={ci.profitNet}
+              size={13}
+              wrapClass="stat-cell"
+              lblClass="stat-lbl"
+              lines={[
+                { label: "Sell Price", value: sellPrice },
+                { label: "− 15% TP Tax", value: -taxAmt },
+                { label: "− Must-Buy Mats", value: -(ci.totalMustBuyCostSell || 0) },
+                { label: "Net Profit", value: ci.profitNet, isTotal: true },
+              ]}
+              />
+              {ci.craftAdvantage != null && (
+                <ReceiptStat
+                label="CRAFT ADVANTAGE"
+                value={ci.craftAdvantage}
+                size={13}
+                wrapClass="stat-cell"
+                lblClass="stat-lbl"
+                lines={[
+                  { label: "Net Profit", value: ci.profitNet },
+                  { label: "− Owned Mats Cost", value: -(ci.matSellNet || 0) },
+                  { label: "Craft Advantage", value: ci.craftAdvantage, isTotal: true },
+                ]}
+                />
+              )}
+              </>
+            );
+          })()}
+          <button className={`cbtn${craftingChartItem === ci.outputId ? " on" : ""}`}
+          onClick={e => { e.stopPropagation(); setCraftingChartItem(craftingChartItem === ci.outputId ? null : ci.outputId); }}>
+          📈 Chart
+          </button>
+          </div>
+          </div>
+
+          {craftingChartItem === ci.outputId && (
+            <div style={{ padding: "0 20px 14px", borderTop: "1px solid var(--border)", background: "var(--bg2)" }}>
+            <PriceChart itemId={ci.outputId} itemName={ci.name} />
+            </div>
+          )}
+
+          {isOpen && (
+            <div className="ci-body">
+            <div className="r-tree">
+            <div className="r-hdr">
+            <span style={{ flex: 1 }}>Ingredient</span>
+            <span style={{ width: 60 }}>Need</span>
+            <span style={{ width: 110 }}>Status</span>
+            <span style={{ width: 130, textAlign: "right" }}>Unit Price</span>
+            <span style={{ width: 130, textAlign: "right" }}>Total</span>
+            </div>
+            {ci.matDetails.map(m => {
+              const item = data.itemMap[m.itemId];
+              const col = m.status === "have" ? "var(--green)" : m.status === "hasMaterials" ? "var(--gold)" : "var(--red)";
+              const label = m.status === "have" ? `✓ ${m.owned}` : m.status === "hasMaterials" ? `⚒ ${m.owned}/${m.needed}` : `✗ ${m.owned}/${m.needed}`;
+              const isMustBuy = m.status === "mustBuy";
+              return (
+                <div key={m.itemId} className="r-row">
+                <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8 }}>
+                {item?.icon && <img className="iico-sm" src={item.icon} alt="" />}
+                <span className={`rar-${m.rarity}`}>{m.name}</span>
+                </div>
+                <span style={{ width: 60, color: "var(--text3)", fontSize: 14 }}>×{m.needed}</span>
+                <span style={{ width: 110, fontSize: 13, color: col }}>{label}</span>
+                <span style={{ width: 130, textAlign: "right" }}>{isMustBuy ? <Gold v={m.bestBuyPrice} /> : <span style={{ color: "var(--text3)" }}>—</span>}</span>
+                <span style={{ width: 130, textAlign: "right" }}>{isMustBuy ? <Gold v={m.bestBuyPrice * m.needed} /> : <span style={{ color: "var(--text3)" }}>—</span>}</span>
+                </div>
+              );
+            })}
+            <div className="r-row r-tot">
+            <span style={{ flex: 1, fontFamily: "Cinzel,serif", fontSize: 11, letterSpacing: 1, color: "var(--text3)" }}>TOTAL MUST-BUY COST</span>
+            <span style={{ width: 60 }} /><span style={{ width: 110 }} /><span style={{ width: 130 }} />
+            <span style={{ width: 130, textAlign: "right", color: "var(--red)" }}><Gold v={ci.totalMustBuyCostSell} /></span>
+            </div>
+            </div>
+            <div style={{ marginTop: 10, fontSize: 12, color: "var(--text3)", lineHeight: 1.6 }}>
+            Acquisition source for this recipe isn't tracked — GW2's API doesn't cleanly expose vendor/drop/achievement mapping, so check the wiki for how to learn it.
+            {ci.minRating > 0 && <> Requires discipline rating <strong style={{ color: "var(--text2)" }}>{ci.minRating}</strong>.</>}
+            </div>
+            </div>
+          )}
+          </div>
+        );
+      })}
+
+      {sorted.length > 0 && (
+        <div style={{ padding: "12px 16px", color: "var(--text3)", fontSize: 12, fontFamily: "Cinzel,serif", letterSpacing: 1, borderTop: "1px solid var(--border)" }}>
+        Showing top {sorted.length} of {items.length} unlearned recipes · {unlearnedRecipeCount.toLocaleString()} total in catalog
+        </div>
+      )}
+      </div>
+    );
+  }, [data, lockedCraftItems, velocitySummary, hideZeroProfitUnlearned, unlearnedRecipeCount, unlearnedLoading, expanded, craftingChartItem]);
+
   const CraftingTab = useMemo(() => {
     if (!data) return null;
     // Known professions first, then any non-standard bucket (e.g. "Uncategorized" —
@@ -3282,6 +3616,11 @@ export default function App() {
           ⭐ Recommended
           {Object.keys(velocitySummary).length > 0 && <span style={{ position: "absolute", top: 2, right: 4, width: 6, height: 6, borderRadius: "50%", background: "var(--green2)" }} title="Velocity data available" />}
           </button>
+          <button className={`dtab${activeDisc === "__unlearned__" ? " on" : ""}`} onClick={() => setActiveDisc("__unlearned__")}
+          style={{ position: "relative", borderColor: activeDisc === "__unlearned__" ? "var(--gold2)" : undefined }}>
+          🔒 Unlearned Recipes<span className="dtab-ct">{unlearnedRecipeCount || ""}</span>
+          {unlearnedLoading && <span style={{ position: "absolute", top: 2, right: 4, width: 6, height: 6, borderRadius: "50%", background: "var(--gold2)" }} title="Refreshing catalog..." />}
+          </button>
           </div>
         );
       })()}
@@ -3301,7 +3640,7 @@ export default function App() {
       </div>
       </div>
 
-      {activeDisc === "__recommended__" ? RecommendedTab : <>
+      {activeDisc === "__recommended__" ? RecommendedTab : activeDisc === "__unlearned__" ? UnlearnedRecipesTab : <>
 
         {sorted.length === 0 && <div className="empty">No craftable items found.</div>}
 
@@ -3727,7 +4066,7 @@ export default function App() {
         </>}
         </div>
     );
-  }, [data, activeDisc, showRecMissing, searchCraft, expanded, dailyCrafted, manualDailyCrafted, resetCountdown, myListings, mySoldHistory, velocitySummary, trendSummary, craftingChartItem, craftPage]);
+  }, [data, activeDisc, showRecMissing, searchCraft, expanded, dailyCrafted, manualDailyCrafted, resetCountdown, myListings, mySoldHistory, velocitySummary, trendSummary, craftingChartItem, craftPage, RecommendedTab, UnlearnedRecipesTab, unlearnedRecipeCount, unlearnedLoading]);
 
   // ── Render ───────────────────────────────────────────────────────────────────
   return (

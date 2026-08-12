@@ -279,6 +279,27 @@ self.onmessage = function(e) {
       self.postMessage({ type: 'craft_items_error', id, error: String(e) });
     }
   }
+  if (type === 'compute_locked_craft_items') {
+    // Unlearned Recipes tab — same buildCraftItems pipeline as compute_craft_items,
+    // but run against the full-catalog "locked" recipe list (recipes not known/learned)
+    // instead of the owned recipe list. Materials-owned and recipe-known are independent
+    // axes here, so items are tagged `locked: true` and the caller (App.jsx) is
+    // responsible for badging accordingly rather than treating canCraft as "can make".
+    const { lockedRecipes, resolvedRecipes, itemMap, priceMap, ownedMap } = e.data.payload;
+    try {
+      const craftItems = buildCraftItems(lockedRecipes, resolvedRecipes, itemMap, priceMap, ownedMap)
+        .map(ci => ({ ...ci, locked: true }));
+      const byDisc = {};
+      const byDiscSeen = {};
+      craftItems.forEach(ci => ((ci.disciplines && ci.disciplines.length > 0) ? ci.disciplines : ['Uncategorized']).forEach(d => {
+        if (!byDisc[d]) { byDisc[d] = []; byDiscSeen[d] = new Set(); }
+        if (!byDiscSeen[d].has(ci.recipeId)) { byDiscSeen[d].add(ci.recipeId); byDisc[d].push(ci); }
+      }));
+      self.postMessage({ type: 'locked_craft_items_result', id, result: { craftItems, byDisc } });
+    } catch(e) {
+      self.postMessage({ type: 'locked_craft_items_error', id, error: String(e) });
+    }
+  }
   if (type === 'process_startup_cache') {
     // Run all startup data processing off the main thread
     try {
