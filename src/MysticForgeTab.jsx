@@ -196,6 +196,8 @@ function ForgeRecipeCard({ item, itemMap, priceMap, ownedMap, spiritShards, tren
   const [open, setOpen] = useState(false);
 
   const trend = trendSummary[item.outputId];
+  const vel = velocitySummary[item.outputId];
+  const sellFills = vel?.observations >= 5 ? vel.sellFillsPerHr : null;
 
   return (
     <div className="ci">
@@ -253,6 +255,15 @@ function ForgeRecipeCard({ item, itemMap, priceMap, ownedMap, spiritShards, tren
                 />
                 {trend && <span style={{ fontSize: 10, color: trend.pct > 0 ? "var(--green2)" : "var(--red2)" }}>{trend.pct > 0 ? "▲" : "▼"} {Math.abs(trend.pct).toFixed(1)}%</span>}
               </div>
+              {sellFills != null && (
+                <div className="ci-stat" style={{ borderLeft: "1px solid var(--border)", paddingLeft: 12 }}
+                title="Buyers paying ask price per hour. High fills + few listings = low undercutting competition.">
+                  <span className="ci-stat-lbl">BUYING HIGH</span>
+                  <span style={{ fontSize: 13, color: sellFills >= 2 ? "var(--green2)" : sellFills === 0 ? "var(--red)" : "var(--gold2)" }}>
+                    {sellFills.toFixed(1)}/hr
+                  </span>
+                </div>
+              )}
               </>
             );
           })()}

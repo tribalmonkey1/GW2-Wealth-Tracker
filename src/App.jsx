@@ -3190,6 +3190,26 @@ export default function App() {
                   ]}
                   />
                 )}
+                {ci.sellFillsPerHr != null && (
+                  <div className="stat-cell" style={{ minWidth: 0 }} title="Buyers paying ask price — sell listings purchased/hr (upper bound). High sell rate + few listings = less competition, your listing clears fast.">
+                  <span className="stat-lbl" style={{ color: !ci.buyDominates ? "var(--green2)" : "var(--text3)" }}>BUYING HIGH</span>
+                  <span style={{ color: ci.sellFillsPerHr >= 2 ? "var(--green2)" : ci.sellFillsPerHr === 0 ? "var(--red)" : "var(--gold2)", fontSize: 13 }}>
+                  {ci.sellFillsPerHr.toFixed(1)}/hr
+                  </span>
+                  </div>
+                )}
+                {ci.buyFillsPerHr != null && (
+                  <div className="stat-cell" style={{ minWidth: 0 }} title={ci.buyDominates ? "⚠ Market moves at floor price — more sellers hitting bids than buyers paying ask. Selling low may be more reliable." : "Sellers fulfilling buy orders/hr (lower bound)"}>
+                  <span className="stat-lbl" style={{ color: ci.buyDominates ? "var(--gold2)" : "var(--text3)" }}>SELLING LOW</span>
+                  <span style={{ color: ci.buyDominates ? "var(--gold2)" : "var(--text3)", fontSize: 13 }}>
+                  {ci.buyFillsPerHr.toFixed(1)}/hr{ci.buyDominates ? " ★" : ""}
+                  </span>
+                  </div>
+                )}
+                <div className="stat-cell" style={{ minWidth: 0 }} title={`Market activity signal · ${ci.priceSignalLabel || "no data yet"}`}>
+                <span className="stat-lbl">WILL IT SELL?</span>
+                <span style={{ fontSize: 12, color: ci.sellSignalColor || "var(--text3)" }}>{ci.sellSignalLabel || "⬜ no data"}</span>
+                </div>
                 </>
               );
             })()}
@@ -3762,6 +3782,31 @@ export default function App() {
                     { label: "Craft Advantage", value: ci.craftAdvantage, isTotal: true },
                   ]}
                   />
+                  </div>
+                )}
+                {ci.sellFillsPerHr != null && (
+                  <div className="ci-stat" style={{ borderLeft: "1px solid var(--border)", paddingLeft: 16 }}
+                  title="Buyers paying ask price per hour. High fills + few listings = low undercutting competition.">
+                  <span className="ci-stat-lbl" style={{ color: !ci.buyDominates ? "var(--green2)" : "var(--text3)" }}>BUYING HIGH</span>
+                  <span style={{ color: ci.sellFillsPerHr >= 2 ? "var(--green2)" : ci.sellFillsPerHr === 0 ? "var(--red)" : "var(--gold2)", fontSize: 14 }}>
+                  {ci.sellFillsPerHr.toFixed(1)}/hr
+                  </span>
+                  </div>
+                )}
+                {ci.buyFillsPerHr != null && (
+                  <div className="ci-stat" style={{ paddingLeft: 16 }}
+                  title={ci.buyDominates ? "⚠ Market moves at floor price — selling low may be more reliable here." : "Sellers fulfilling buy orders/hr (lower bound)"}>
+                  <span className="ci-stat-lbl" style={{ color: ci.buyDominates ? "var(--gold2)" : "var(--text3)" }}>SELLING LOW</span>
+                  <span style={{ color: ci.buyDominates ? "var(--gold2)" : "var(--text3)", fontSize: 14 }}>
+                  {ci.buyFillsPerHr.toFixed(1)}/hr{ci.buyDominates ? " ★" : ""}
+                  </span>
+                  </div>
+                )}
+                {ci.sellSignalLabel && (
+                  <div className="ci-stat" style={{ borderLeft: "1px solid var(--border)", paddingLeft: 16 }}
+                  title={`${ci.priceSignalLabel || "no data"} · ${velocitySummary[ci.outputId]?.observations || 0} snapshot pairs`}>
+                  <span className="ci-stat-lbl">WILL IT SELL?</span>
+                  <span style={{ fontSize: 12, color: ci.sellSignalColor || "var(--text3)" }}>{ci.sellSignalLabel}</span>
                   </div>
                 )}
                 </>
