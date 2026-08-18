@@ -3369,9 +3369,29 @@ export default function App() {
       const vel = velocitySummary[ci.outputId];
       const hasVel = vel && vel.observations >= MIN_OBS;
       const sellRate = hasVel ? vel.sellFillsPerHr : null;
+      const buyRate = hasVel ? vel.buyFillsPerHr : null;
       const advantage = ci.craftAdvantage != null ? ci.craftAdvantage : ci.profitNet;
       const score = (!hasVel || sellRate === 0) ? 0 : Math.max(0, advantage) * sellRate;
-      return { ...ci, score, sellFillsPerHr: sellRate };
+
+      // Same "will it sell?" / turnover / buy-dominates signal logic as Crafting Profits
+      // and Recommended, so Unlearned Recipes cards carry the identical sell-rate context
+      // rather than just the profit numbers.
+      const currentSellListings = data.priceMap[ci.outputId]?.sells?.quantity || 0;
+      const turnoverRatio = (hasVel && currentSellListings > 0) ? sellRate / currentSellListings : null;
+      const buyDominates = hasVel && buyRate != null && sellRate != null && buyRate > sellRate * 2 && buyRate > 1;
+      let sellSignalLabel, sellSignalColor;
+      if (!hasVel) { sellSignalLabel = "⬜ no data yet"; sellSignalColor = "var(--text3)"; }
+      else if (sellRate === 0) { sellSignalLabel = "🔴 rarely sells"; sellSignalColor = "var(--red)"; }
+      else if (sellRate >= 10 || (sellRate >= 2 && turnoverRatio != null && turnoverRatio > 0.01)) { sellSignalLabel = "🟢 actively selling"; sellSignalColor = "var(--green2)"; }
+      else if (sellRate >= 1 || (sellRate >= 0.3 && turnoverRatio != null && turnoverRatio > 0.003)) { sellSignalLabel = "🟡 moderate"; sellSignalColor = "var(--gold2)"; }
+      else { sellSignalLabel = "🟠 slow market"; sellSignalColor = "#e07830"; }
+      const dataHrs = vel?.windowHrs || 0;
+      const priceSignalLabel = dataHrs < 1 ? "⬜ <1hr collected"
+        : dataHrs < 24 ? `🟡 ${dataHrs.toFixed(0)}hr collected`
+        : dataHrs < 72 ? `🟠 ${(dataHrs / 24).toFixed(1)}d collected`
+        : `🟢 ${(dataHrs / 24).toFixed(1)}d collected`;
+
+      return { ...ci, score, sellFillsPerHr: sellRate, buyFillsPerHr: buyRate, buyDominates, sellSignalLabel, sellSignalColor, priceSignalLabel };
     });
 
     const sorted = [...items].sort((a, b) => b.score - a.score).slice(0, 100);
@@ -3472,6 +3492,26 @@ export default function App() {
                 ]}
                 />
               )}
+              {ci.sellFillsPerHr != null && (
+                <div className="stat-cell" style={{ minWidth: 0 }} title="Buyers paying ask price — sell listings purchased/hr (upper bound). High sell rate + few listings = less competition, your listing clears fast.">
+                <span className="stat-lbl" style={{ color: !ci.buyDominates ? "var(--green2)" : "var(--text3)" }}>BUYING HIGH</span>
+                <span style={{ color: ci.sellFillsPerHr >= 2 ? "var(--green2)" : ci.sellFillsPerHr === 0 ? "var(--red)" : "var(--gold2)", fontSize: 13 }}>
+                {ci.sellFillsPerHr.toFixed(1)}/hr
+                </span>
+                </div>
+              )}
+              {ci.buyFillsPerHr != null && (
+                <div className="stat-cell" style={{ minWidth: 0 }} title={ci.buyDominates ? "⚠ Market moves at floor price — more sellers hitting bids than buyers paying ask. Selling low may be more reliable." : "Sellers fulfilling buy orders/hr (lower bound)"}>
+                <span className="stat-lbl" style={{ color: ci.buyDominates ? "var(--gold2)" : "var(--text3)" }}>SELLING LOW</span>
+                <span style={{ color: ci.buyDominates ? "var(--gold2)" : "var(--text3)", fontSize: 13 }}>
+                {ci.buyFillsPerHr.toFixed(1)}/hr{ci.buyDominates ? " ★" : ""}
+                </span>
+                </div>
+              )}
+              <div className="stat-cell" style={{ minWidth: 0 }} title={`Market activity signal · ${ci.priceSignalLabel || "no data yet"}`}>
+              <span className="stat-lbl">WILL IT SELL?</span>
+              <span style={{ fontSize: 12, color: ci.sellSignalColor || "var(--text3)" }}>{ci.sellSignalLabel || "⬜ no data"}</span>
+              </div>
               </>
             );
           })()}
