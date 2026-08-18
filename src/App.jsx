@@ -1475,6 +1475,7 @@ export default function App() {
   const [unlearnedRecipeCount, setUnlearnedRecipeCount] = useState(0); // size of the cached locked-recipe catalog
   const [unlearnedLoading, setUnlearnedLoading] = useState(false);
   const [hideZeroProfitUnlearned, setHideZeroProfitUnlearned] = useState(true); // mirrors showRecMissing's "hide the long tail" role
+  const [hideAutoLearnedUnlearned, setHideAutoLearnedUnlearned] = useState(false); // hide recipes with the "AutoLearned" flag — these unlock automatically at a discipline rating, no learning/purchase/achievement needed
   const [sortMat, setSortMat] = useState({ k: "totalValue", d: -1 });
   const [searchMat, setSearchMat] = useState("");
   const [searchCraft, setSearchCraft] = useState("");
@@ -3355,6 +3356,13 @@ export default function App() {
         return advantage > 0 && ci.outSell > 0;
       });
     }
+    if (hideAutoLearnedUnlearned) {
+      // AutoLearned recipes never need to be "learned" — they become usable the instant
+      // a qualifying discipline hits the required rating (e.g. Piece of Dragon Jade).
+      // They're technically "unlearned" today but aren't actionable the way a vendor/
+      // achievement/recipe-sheet recipe is, so let the user filter them out of this list.
+      items = items.filter(ci => !(ci.flags || []).includes("AutoLearned"));
+    }
 
     const MIN_OBS = 5;
     items = items.map(ci => {
@@ -3381,6 +3389,10 @@ export default function App() {
       <label style={{ fontSize: 12, color: "var(--text3)", display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }} title="Hide recipes with no profit or no TP sell price — keeps junk/vendor recipes out of view">
       <input type="checkbox" checked={hideZeroProfitUnlearned} onChange={e => setHideZeroProfitUnlearned(e.target.checked)} />
       Hide zero-profit / no-data recipes
+      </label>
+      <label style={{ fontSize: 12, color: "var(--text3)", display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }} title="Hide recipes flagged Auto-Learned — these become known automatically once a qualifying discipline hits the required rating, with nothing to buy/find/achieve">
+      <input type="checkbox" checked={hideAutoLearnedUnlearned} onChange={e => setHideAutoLearnedUnlearned(e.target.checked)} />
+      Hide auto-learned recipes
       </label>
       </div>
 
@@ -3417,6 +3429,9 @@ export default function App() {
           {ci.canCraft ? <span className="bhave">✓ Have Mats</span> : <span className="bmiss">✗ Missing Mats</span>}
           {ci.flags?.includes("LearnedFromItem") && (
             <span title="Learned from a consumable recipe sheet/scroll — check the wiki for where to find it" style={{ fontSize: 10, fontFamily: "Cinzel,serif", letterSpacing: 1, padding: "2px 7px", borderRadius: 3, background: "rgba(90,160,210,.12)", border: "1px solid rgba(90,160,210,.35)", color: "var(--blue2)" }}>📖 Recipe Sheet</span>
+          )}
+          {ci.flags?.includes("AutoLearned") && (
+            <span title="Automatically becomes known once a qualifying discipline reaches the required rating — nothing to buy, find, or achieve" style={{ fontSize: 10, fontFamily: "Cinzel,serif", letterSpacing: 1, padding: "2px 7px", borderRadius: 3, background: "rgba(122,200,120,.12)", border: "1px solid rgba(122,200,120,.35)", color: "#7ac878" }}>⚙ Auto-Unlocks</span>
           )}
 
           <div style={{ display: "flex", gap: 14, alignItems: "center", marginLeft: "auto" }}>
@@ -3524,7 +3539,7 @@ export default function App() {
       )}
       </div>
     );
-  }, [data, lockedCraftItems, velocitySummary, hideZeroProfitUnlearned, unlearnedRecipeCount, unlearnedLoading, expanded, craftingChartItem]);
+  }, [data, lockedCraftItems, velocitySummary, hideZeroProfitUnlearned, hideAutoLearnedUnlearned, unlearnedRecipeCount, unlearnedLoading, expanded, craftingChartItem]);
 
   const CraftingTab = useMemo(() => {
     if (!data) return null;
