@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   MATERIAL_PROMOTION_RECIPES,
   EQUIPMENT_RECIPES_GENERIC,
@@ -63,15 +64,67 @@ const Gold = ({ v, size = 14 }) => {
 // Mirrors the ReceiptStat component in App.jsx — renders a stat with a
 // vertical receipt breakdown shown on hover (desktop only). Kept as a local
 // copy since MysticForgeTab.jsx has no shared UI module with App.jsx.
+// ── Portal-based hover tooltip ──────────────────────────────────────────────
+// Renders into document.body with position:fixed, positioned from the trigger's
+// getBoundingClientRect(). This deliberately escapes any ancestor's overflow:hidden
+// (the .ci card's rounded corners) so the tooltip is never clipped, whether the
+// card is collapsed or expanded. Re-measures on open and while visible on
+// scroll/resize so it keeps tracking the trigger.
+function TooltipPortal({ anchorRef, visible, children, minWidth = 260, maxWidth = 460 }) {
+  const [pos, setPos] = useState(null);
+
+  const measure = useCallback(() => {
+    const el = anchorRef.current;
+    if (!el) { setPos(null); return; }
+    const rect = el.getBoundingClientRect();
+    let left = rect.left;
+    const overflowRight = left + maxWidth - (window.innerWidth - 12);
+    if (overflowRight > 0) left = Math.max(12, left - overflowRight);
+    let top = rect.bottom + 6;
+    if (top + 160 > window.innerHeight - 12 && rect.top > window.innerHeight - rect.bottom) {
+      setPos({ top: undefined, left, bottom: window.innerHeight - rect.top + 6 });
+      return;
+    }
+    setPos({ top, left, bottom: undefined });
+  }, [anchorRef, maxWidth]);
+
+  useEffect(() => {
+    if (!visible) { setPos(null); return; }
+    measure();
+    const onMove = () => measure();
+    window.addEventListener("scroll", onMove, true);
+    window.addEventListener("resize", onMove);
+    return () => {
+      window.removeEventListener("scroll", onMove, true);
+      window.removeEventListener("resize", onMove);
+    };
+  }, [visible, measure]);
+
+  if (!visible || !pos) return null;
+  return createPortal(
+    <div className="tt-portal" style={{ top: pos.top, bottom: pos.bottom, left: pos.left, minWidth, maxWidth }}>
+      {children}
+    </div>,
+    document.body
+  );
+}
+
 function ReceiptStat({ label, value, lines, size = 14 }) {
+  const [hovered, setHovered] = useState(false);
+  const anchorRef = useRef(null);
   const positive = value >= 0;
   return (
-    <div className="ci-stat tt-wrap">
+    <div
+      ref={anchorRef}
+      className="ci-stat"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
       <span className="ci-stat-lbl">{label}</span>
       <span className={positive ? "pp" : "pn"} style={{ fontSize: size }}>
         {positive ? "+" : ""}<Gold v={value} size={size} />
       </span>
-      <div className="tt" style={{ minWidth: 260, textAlign: "left" }}>
+      <TooltipPortal anchorRef={anchorRef} visible={hovered}>
         {lines.map((l, i) => (
           <div key={i} style={{
             display: "flex", justifyContent: "space-between", gap: 20,
@@ -85,7 +138,7 @@ function ReceiptStat({ label, value, lines, size = 14 }) {
             </span>
           </div>
         ))}
-      </div>
+      </TooltipPortal>
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { invoke } from "@tauri-apps/api/core";
 import MysticForgeTab from "./MysticForgeTab.jsx";
 import { buildForgeRecipeMap } from "./mystic-forge-data.js";
@@ -200,15 +201,77 @@ const Gold = ({ v, size = 14 }) => {
 // vertical receipt breakdown on hover. `lines` is an ordered array of
 // { label, value, isTotal? } — always rendered in full, including 0c lines.
 // Desktop-only (hover), reuses the existing .tt-wrap/.tt tooltip CSS.
+// ── Portal-based hover tooltip ──────────────────────────────────────────────
+// Renders into document.body with position:fixed, positioned from the trigger's
+// getBoundingClientRect(). This deliberately escapes any ancestor's overflow:hidden
+// (e.g. .ci card corners) so the tooltip is never clipped, regardless of whether
+// the card is collapsed or expanded. Re-measures on open and on scroll/resize
+// while visible so it tracks the trigger if the page moves under it.
+function TooltipPortal({ anchorRef, visible, children, minWidth = 260, maxWidth = 460 }) {
+  const [pos, setPos] = useState(null);
+
+  const measure = useCallback(() => {
+    const el = anchorRef.current;
+    if (!el) { setPos(null); return; }
+    const rect = el.getBoundingClientRect();
+    let left = rect.left;
+    const overflowRight = left + maxWidth - (window.innerWidth - 12);
+    if (overflowRight > 0) left = Math.max(12, left - overflowRight);
+    let top = rect.bottom + 6;
+    // Flip above the trigger if there isn't room below
+    if (top + 160 > window.innerHeight - 12 && rect.top > window.innerHeight - rect.bottom) {
+      top = Math.max(12, rect.top - 6);
+      setPos({ top, left, flip: true });
+      return;
+    }
+    setPos({ top, left, flip: false });
+  }, [anchorRef, maxWidth]);
+
+  useEffect(() => {
+    if (!visible) { setPos(null); return; }
+    measure();
+    const onMove = () => measure();
+    window.addEventListener("scroll", onMove, true);
+    window.addEventListener("resize", onMove);
+    return () => {
+      window.removeEventListener("scroll", onMove, true);
+      window.removeEventListener("resize", onMove);
+    };
+  }, [visible, measure]);
+
+  if (!visible || !pos) return null;
+  return createPortal(
+    <div
+      className="tt-portal"
+      style={{
+        top: pos.flip ? undefined : pos.top,
+        bottom: pos.flip ? (window.innerHeight - pos.top) : undefined,
+        left: pos.left,
+        minWidth, maxWidth,
+      }}
+    >
+      {children}
+    </div>,
+    document.body
+  );
+}
+
 function ReceiptStat({ label, value, lines, size = 15, wrapClass = "ci-stat", lblClass = "ci-stat-lbl" }) {
+  const [hovered, setHovered] = useState(false);
+  const anchorRef = useRef(null);
   const positive = value >= 0;
   return (
-    <div className={`${wrapClass} tt-wrap`}>
+    <div
+      ref={anchorRef}
+      className={wrapClass}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
       <span className={lblClass}>{label}</span>
       <span className={positive ? "pp" : "pn"} style={{ fontSize: size }}>
         {positive ? "+" : ""}<Gold v={value} size={size} />
       </span>
-      <div className="tt" style={{ minWidth: 260, textAlign: "left" }}>
+      <TooltipPortal anchorRef={anchorRef} visible={hovered}>
         {lines.map((l, i) => (
           <div key={i} style={{
             display: "flex", justifyContent: "space-between", gap: 20,
@@ -222,7 +285,42 @@ function ReceiptStat({ label, value, lines, size = 15, wrapClass = "ci-stat", lb
             </span>
           </div>
         ))}
-      </div>
+      </TooltipPortal>
+    </div>
+  );
+}
+
+// "Best crafting use" hover cell (Materials tab) — same portal-tooltip pattern as
+// ReceiptStat so it isn't clipped by the table wrapper's overflow-x:auto either.
+function BestCraftingUseCell({ best, velocitySummary, trendSummary }) {
+  const [hovered, setHovered] = useState(false);
+  const anchorRef = useRef(null);
+  return (
+    <div
+      ref={anchorRef}
+      style={{ display: "inline-block" }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      <span style={{ color: "var(--gold)", cursor: "help", fontSize: 14 }}>{best[0].name} →</span>
+      <TooltipPortal anchorRef={anchorRef} visible={hovered}>
+        <div style={{ fontFamily: "Cinzel,serif", fontSize: 11, letterSpacing: 2, color: "var(--text3)", marginBottom: 10 }}>BEST CRAFTING USES</div>
+        {best.map(ci => {
+          const vel = velocitySummary[ci.outputId];
+          const sellFills = vel?.observations >= 5 ? vel.sellFillsPerHr : null;
+          const trend = trendSummary[ci.outputId];
+          return (
+            <div key={ci.recipeId} style={{ marginBottom: 10 }}>
+            <div className={`rar-${ci.rarity}`} style={{ fontWeight: 600, fontSize: 15 }}>{ci.name}</div>
+            <div style={{ color: "var(--text3)", fontSize: 13 }}>Craft advantage: <span className={ci.craftAdvantage >= 0 ? "pp" : "pn"}>{ci.craftAdvantage >= 0 ? "+" : ""}<Gold v={ci.craftAdvantage} size={13} /></span></div>
+            <div style={{ color: "var(--text3)", fontSize: 13 }}>Net profit: <span className={ci.profitNet >= 0 ? "pp" : "pn"}>{ci.profitNet >= 0 ? "+" : ""}<Gold v={ci.profitNet} size={13} /></span></div>
+            {sellFills != null && <div style={{ color: sellFills > 0.5 ? "var(--green2)" : "var(--gold2)", fontSize: 12 }}>↑ {sellFills.toFixed(1)} buys/hr</div>}
+            {trend && <div><TrendBadge trend={trend} /></div>}
+            <div style={{ color: "var(--text3)", fontSize: 12 }}>{ci.disciplines?.join(", ")}</div>
+            </div>
+          );
+        })}
+      </TooltipPortal>
     </div>
   );
 }
@@ -796,6 +894,10 @@ tbody td { padding:11px 14px; color:var(--text2); vertical-align:middle; }
 .tt-wrap { position:relative; }
 .tt { display:none; position:absolute; z-index:200; left:0; top:100%; min-width:300px; max-width:460px; background:var(--bg4); border:1px solid var(--gold); border-radius:5px; padding:14px 16px; font-size:14px; color:var(--text2); box-shadow:0 10px 40px rgba(0,0,0,.8); pointer-events:none; }
 .tt-wrap:hover .tt { display:block; }
+/* Portal tooltip — rendered into document.body via createPortal so it's never
+   clipped by an ancestor's overflow:hidden (e.g. .ci card corners). Positioned
+   with position:fixed from the trigger's getBoundingClientRect(). */
+.tt-portal { position:fixed; z-index:9999; background:var(--bg4); border:1px solid var(--gold); border-radius:5px; padding:14px 16px; font-size:14px; color:var(--text2); box-shadow:0 10px 40px rgba(0,0,0,.8); pointer-events:none; text-align:left; }
 
 /* ── Loading ── */
 .load-wrap { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:100px 20px; gap:20px; }
@@ -2810,29 +2912,7 @@ export default function App() {
           </td>
           <td><Gold v={row.totalValue} /></td>
           <td>
-          {best.length > 0 ? (
-            <div className="tt-wrap">
-            <span style={{ color: "var(--gold)", cursor: "help", fontSize: 14 }}>{best[0].name} →</span>
-            <div className="tt">
-            <div style={{ fontFamily: "Cinzel,serif", fontSize: 11, letterSpacing: 2, color: "var(--text3)", marginBottom: 10 }}>BEST CRAFTING USES</div>
-            {best.map(ci => {
-              const vel = velocitySummary[ci.outputId];
-              const sellFills = vel?.observations >= 5 ? vel.sellFillsPerHr : null;
-              const trend = trendSummary[ci.outputId];
-              return (
-                <div key={ci.recipeId} style={{ marginBottom: 10 }}>
-                <div className={`rar-${ci.rarity}`} style={{ fontWeight: 600, fontSize: 15 }}>{ci.name}</div>
-                <div style={{ color: "var(--text3)", fontSize: 13 }}>Craft advantage: <span className={ci.craftAdvantage >= 0 ? "pp" : "pn"}>{ci.craftAdvantage >= 0 ? "+" : ""}<Gold v={ci.craftAdvantage} size={13} /></span></div>
-                <div style={{ color: "var(--text3)", fontSize: 13 }}>Net profit: <span className={ci.profitNet >= 0 ? "pp" : "pn"}>{ci.profitNet >= 0 ? "+" : ""}<Gold v={ci.profitNet} size={13} /></span></div>
-                {sellFills != null && <div style={{ color: sellFills > 0.5 ? "var(--green2)" : "var(--gold2)", fontSize: 12 }}>↑ {sellFills.toFixed(1)} buys/hr</div>}
-                {trend && <div><TrendBadge trend={trend} /></div>}
-                <div style={{ color: "var(--text3)", fontSize: 12 }}>{ci.disciplines?.join(", ")}</div>
-                </div>
-              );
-            })}
-            </div>
-            </div>
-          ) : <span style={{ color: "var(--text3)" }}>—</span>}
+          {best.length > 0 ? <BestCraftingUseCell best={best} velocitySummary={velocitySummary} trendSummary={trendSummary} /> : <span style={{ color: "var(--text3)" }}>—</span>}
           </td>
           <td>
           <button
