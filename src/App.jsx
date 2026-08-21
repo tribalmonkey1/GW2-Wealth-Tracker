@@ -10,6 +10,7 @@ const BASE = "https://api.guildwars2.com/v2";
 const PRICE_REFRESH_MS = 60_000;
 const RECIPE_REFRESH_MS = 4 * 60 * 60_000;
 const UPDATE_CHECK_MS = 4 * 60 * 60_000; // 4h — GitHub Releases doesn't need aggressive polling
+const GEM_QUANTITY_COPPER = 4_000_000; // 400g sample — coins_per_gem is stable enough at this size to extrapolate ×400
 const UNLEARNED_REFRESH_MS = 7 * 24 * 60 * 60_000; // weekly — full-catalog recipe ID diff for Unlearned Recipes tab
 const SIX_MONTHS_MS = 6 * 30 * 24 * 60 * 60 * 1000;
 const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
@@ -518,6 +519,66 @@ function TrendBadge({ trend }) {
 }
 
 
+// ── Lightweight Markdown renderer (changelog only) ───────────────────────────
+// Handles the subset GitHub release notes actually use: #/##/### headers,
+// **bold**, *italic*, and "- " bullet lists. Not a general-purpose parser.
+function renderMarkdownInline(line, key) {
+  const parts = [];
+  const regex = /\*\*(.+?)\*\*|\*(.+?)\*/g;
+  let lastIndex = 0, match;
+  while ((match = regex.exec(line))) {
+    if (match.index > lastIndex) parts.push(line.slice(lastIndex, match.index));
+    parts.push(
+      match[1] !== undefined
+        ? <strong key={`${key}-b${match.index}`}>{match[1]}</strong>
+        : <em key={`${key}-i${match.index}`}>{match[2]}</em>
+    );
+    lastIndex = regex.lastIndex;
+  }
+  if (lastIndex < line.length) parts.push(line.slice(lastIndex));
+  return parts;
+}
+
+function renderMarkdown(text) {
+  if (!text) return null;
+  const blocks = [];
+  let listItems = null;
+  const flushList = () => {
+    if (listItems) {
+      blocks.push(<ul key={`ul-${blocks.length}`} style={{ margin: "4px 0 10px 20px", padding: 0 }}>{listItems}</ul>);
+      listItems = null;
+    }
+  };
+  text.split("\n").forEach((raw, idx) => {
+    const line = raw.trimEnd();
+    if (line.trim() === "") { flushList(); return; }
+
+    const h = line.match(/^(#{1,6})\s+(.*)$/);
+    if (h) {
+      flushList();
+      const sizes = { 1: 18, 2: 16, 3: 14, 4: 13 };
+      blocks.push(
+        <div key={`h-${idx}`} style={{ fontSize: sizes[h[1].length] || 13, fontWeight: 700, color: "var(--gold2)", marginTop: idx === 0 ? 0 : 12, marginBottom: 4 }}>
+          {renderMarkdownInline(h[2], `h-${idx}`)}
+        </div>
+      );
+      return;
+    }
+
+    const b = line.match(/^[-*]\s+(.*)$/);
+    if (b) {
+      if (!listItems) listItems = [];
+      listItems.push(<li key={`li-${idx}`} style={{ fontSize: 12, color: "var(--text2)", marginBottom: 4, lineHeight: 1.5 }}>{renderMarkdownInline(b[1], `li-${idx}`)}</li>);
+      return;
+    }
+
+    flushList();
+    blocks.push(<div key={`p-${idx}`} style={{ fontSize: 12, color: "var(--text2)", marginBottom: 6, lineHeight: 1.5 }}>{renderMarkdownInline(line, `p-${idx}`)}</div>);
+  });
+  flushList();
+  return blocks;
+}
+
 // Compatibility shim: the app calls manualDailySetCount(itemId, count, resetTs)
 // storage.js exports manualDailySet — already aliased above.
 
@@ -838,7 +899,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--font-body);
 .alert-item:last-child { border-bottom:none; }
 
 /* ── Summary cards ── */
-.cards { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:24px; }
+.cards { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:24px; }
 .card { background:var(--bg3); border:1px solid var(--border2); border-radius:5px; padding:20px 24px; position:relative; overflow:hidden; }
 .card::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; background:linear-gradient(90deg,transparent,var(--gold),transparent); }
 .card-lbl { font-family:var(--font-ui); font-size:11px; letter-spacing:2px; color:var(--text3); text-transform:uppercase; margin-bottom:10px; }
@@ -1437,6 +1498,10 @@ export default function App() {
   const [nextRecipeIn, setNextRecipeIn] = useState(RECIPE_REFRESH_MS);
   const [secsAgo, setSecsAgo] = useState(0);
   const [toast, setToast] = useState(null);
+  const [gemPrice, setGemPrice] = useState(null); // { coinsPerGem, costFor400, ts }
+  const [gemAlertThresholdGold, setGemAlertThresholdGold] = useState(0); // 0 = disabled
+  const [settingsGemAlertThresholdGold, setSettingsGemAlertThresholdGold] = useState(0);
+  const gemAlertFiredRef = useRef(false); // prevents re-toasting every minute while still under threshold
   const [priceAlerts, setPriceAlerts] = useState([]);
   const [forgeWallet, setForgeWallet] = useState({}); // spirit_shards, volatile_magic, unbound_magic, karma, laurels
   const [alertSort, setAlertSort] = useState("totalNet"); // totalNet | cur | pctOfMax
@@ -2099,6 +2164,12 @@ export default function App() {
     invoke("get_market_db_info").then(info => { if (info.path) setSettingsNasSsh(info.path); }).catch(() => {});
     invoke("cache_get", { key: "nas_ssh" }).then(e => { if (e?.value) setSettingsNasSsh(e.value); }).catch(() => {});
     invoke("cache_get", { key: "alert_threshold" }).then(e => { if (e?.value) { const v = Number(e.value); if (v >= 50 && v <= 100) { setAlertThreshold(v); setSettingsAlertThreshold(v); } } }).catch(() => {});
+    invoke("cache_get", { key: "gem_alert_threshold_gold" }).then(e => {
+      if (e?.value) { const v = Number(e.value); if (v >= 0) { setGemAlertThresholdGold(v); setSettingsGemAlertThresholdGold(v); } }
+    }).catch(() => {});
+    invoke("cache_get", { key: "lastGemPrice" }).then(e => {
+      if (e?.value) { try { setGemPrice(JSON.parse(e.value)); } catch {} }
+    }).catch(() => {});
     invoke("cache_get", { key: "weekly_key_done" }).then(e => {
       if (e?.value) {
         const { done, weeklyResetTs } = JSON.parse(e.value);
@@ -2574,6 +2645,58 @@ export default function App() {
     }, 1000);
     return () => clearInterval(t);
   }, [lastRecipe]);
+
+  // ── Toast auto-dismiss ────────────────────────────────────────────────────────
+  // Every setToast() call site is expected to pair with its own setTimeout clear,
+  // but that's easy to forget (e.g. handleCheckForUpdates' "up to date" message
+  // used to never clear). Centralizing the dismiss here means every toast — current
+  // and future — always disappears on its own, on top of the manual X button.
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 5000);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  // ── Gem Price (commerce exchange) ────────────────────────────────────────────
+  // Public/unauthenticated endpoint — no API key needed, safe to poll on the same
+  // cadence as TP prices. coins_per_gem is stable across quantity, so we sample at
+  // a representative 400g and extrapolate ×400 rather than trying to solve for the
+  // exact coin amount that yields exactly 400 gems.
+  const fetchGemPrice = useCallback(async () => {
+    try {
+      const res = await publicFetch(`${BASE}/commerce/exchange/coins?quantity=${GEM_QUANTITY_COPPER}`);
+      const coinsPerGem = res.coins_per_gem;
+      const costFor400 = Math.round(coinsPerGem * 400);
+      const entry = { coinsPerGem, costFor400, ts: Date.now() };
+      setGemPrice(entry);
+      cacheSet("lastGemPrice", entry);
+
+      if (gemAlertThresholdGold > 0) {
+        const thresholdCopper = gemAlertThresholdGold * 10000;
+        if (costFor400 <= thresholdCopper) {
+          if (!gemAlertFiredRef.current) {
+            gemAlertFiredRef.current = true;
+            const g = Math.floor(costFor400 / 10000), s = Math.floor((costFor400 % 10000) / 100);
+            setToast(`💎 Gems are cheap — ${g}g ${s}s for 400`);
+          }
+        } else {
+          gemAlertFiredRef.current = false; // reset so it can fire again next time it dips
+        }
+      }
+    } catch (e) { console.warn("[GemPrice] fetch failed:", e.message); }
+  }, [gemAlertThresholdGold]);
+
+  useEffect(() => {
+    if (loadState.phase !== "done") return;
+    let gemInterval;
+    const waitForData = setInterval(() => {
+      if (!dataReadyRef.current) return;
+      clearInterval(waitForData);
+      fetchGemPrice();
+      gemInterval = setInterval(fetchGemPrice, PRICE_REFRESH_MS);
+    }, 100);
+    return () => { clearInterval(waitForData); clearInterval(gemInterval); };
+  }, [loadState.phase, fetchGemPrice]);
 
   // ── Update check + changelog ─────────────────────────────────────────────────
   const [appVersion, setAppVersion] = useState(null);
@@ -4376,6 +4499,18 @@ export default function App() {
       <span style={{ width: 40, color: "var(--gold2)", fontFamily: "monospace", fontSize: 13 }}>{settingsAlertThreshold}%</span>
       </div>
       </div>
+      <div style={{ fontSize: 12, color: "var(--text2)", marginTop: 8 }}>
+      <strong style={{ color: "var(--gold1)" }}>Gem Price Alert</strong>
+      <div style={{ fontSize: 11, color: "var(--text3)", marginBottom: 6 }}>
+      Alert when the gold cost for 400 gems (cheapest exchange rate) drops to or below this. Set to 0 to disable.
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <input type="number" min={0} step={1} value={settingsGemAlertThresholdGold}
+      onChange={e => setSettingsGemAlertThresholdGold(Math.max(0, Number(e.target.value) || 0))}
+      style={{ width: 100, background: "var(--bg3)", border: "1px solid var(--border)", borderRadius: 4, padding: "5px 10px", color: "var(--text1)", fontSize: 13 }} />
+      <span style={{ color: "var(--text3)", fontSize: 12 }}>gold</span>
+      </div>
+      </div>
       <div style={{ fontSize: 12, color: "var(--text2)", marginTop: 8, paddingTop: 14, borderTop: "1px solid var(--border)" }}>
       <strong style={{ color: "var(--gold1)" }}>Rescan Auto-Unlocked Recipes</strong>
       <div style={{ fontSize: 11, color: "var(--text3)", marginBottom: 8, lineHeight: 1.6 }}>
@@ -4424,7 +4559,7 @@ export default function App() {
                 <div key={r.tag} style={{ marginBottom: 12, paddingBottom: 12, borderBottom: "1px solid var(--border)" }}>
                   <div style={{ fontSize: 13, color: "var(--gold2)", fontWeight: 600 }}>{r.name}</div>
                   <div style={{ fontSize: 10, color: "var(--text3)", marginBottom: 4 }}>{new Date(r.date).toLocaleDateString()}</div>
-                  <div style={{ fontSize: 12, color: "var(--text2)", whiteSpace: "pre-wrap" }}>{r.body || "—"}</div>
+                  <div style={{ fontSize: 12, color: "var(--text2)" }}>{r.body ? renderMarkdown(r.body) : "—"}</div>
                 </div>
               ))}
             </div>
@@ -4441,8 +4576,10 @@ export default function App() {
           const msg = await invoke("set_market_db_path", { path: settingsNasSsh });
           await invoke("cache_set", { key: "nas_ssh", value: settingsNasSsh });
           await invoke("cache_set", { key: "alert_threshold", value: String(settingsAlertThreshold) });
+          await invoke("cache_set", { key: "gem_alert_threshold_gold", value: String(settingsGemAlertThresholdGold) });
           await invoke("cache_set", { key: "api_key", value: settingsApiKey.trim() });
           setAlertThreshold(settingsAlertThreshold);
+          setGemAlertThresholdGold(settingsGemAlertThresholdGold);
           if (settingsApiKey.trim()) { setApiKey(settingsApiKey.trim()); window.__gw2ApiKey = settingsApiKey.trim(); }
           setSettingsMsg({ ok: true, text: msg });
         } catch(e) { setSettingsMsg({ ok: false, text: String(e) }); }
@@ -4584,6 +4721,21 @@ export default function App() {
       <div className="card-lbl">🏦 Total Wealth</div>
       <div className="card-val"><Gold v={data.goldCopper + data.totalMaterialValue} size={26} /></div>
       <div className="card-sub">Gold + materials value after TP tax</div>
+      </div>
+      <div className="card" style={
+        gemPrice && gemAlertThresholdGold > 0 && gemPrice.costFor400 <= gemAlertThresholdGold * 10000
+          ? { border: "1px solid var(--green2)", boxShadow: "0 0 16px rgba(122,222,122,.25)" }
+          : undefined
+      }>
+      <div className="card-lbl">💎 Gems (400)</div>
+      <div className="card-val">
+      {gemPrice ? <Gold v={gemPrice.costFor400} size={26} /> : <span style={{ color: "var(--text3)", fontSize: 16 }}>—</span>}
+      </div>
+      <div className="card-sub">
+      {gemAlertThresholdGold > 0 && gemPrice && gemPrice.costFor400 <= gemAlertThresholdGold * 10000
+        ? <span style={{ color: "var(--green2)" }}>🔔 below your alert</span>
+        : "cheapest gold cost via exchange"}
+      </div>
       </div>
       </div>
 
@@ -5200,7 +5352,14 @@ export default function App() {
       </>
     )}
     </div>
-    {toast && <div className="toast">{toast}</div>}
+    {toast && (
+      <div className="toast" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <span>{toast}</span>
+      <button onClick={() => setToast(null)}
+      style={{ background: "transparent", border: "none", color: "inherit", cursor: "pointer", fontSize: 16, lineHeight: 1, opacity: .7 }}
+      title="Dismiss">×</button>
+      </div>
+    )}
     </>
   );
 }
