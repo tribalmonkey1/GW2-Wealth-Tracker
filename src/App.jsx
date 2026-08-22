@@ -501,6 +501,7 @@ import {
   getDbStats, importFromBrowser, exportAllData,
 } from "./storage.js";
 import { getCurrentVersion, checkForUpdate, getChangelog } from "./updater.js";
+import { DEFAULT_RARITY_FILTER, passesRarityFilter, RarityDropdown } from "./RarityFilter.jsx";
 
 function TrendBadge({ trend }) {
   if (!trend) return null;
@@ -1558,6 +1559,8 @@ export default function App() {
   const [settingsMsg, setSettingsMsg] = useState(null);
   const [alertThreshold, setAlertThreshold] = useState(85); // % of 7-day high to trigger price alert
   const [settingsAlertThreshold, setSettingsAlertThreshold] = useState(85);
+  const [rarityFilter, setRarityFilter] = useState(DEFAULT_RARITY_FILTER); // rarity -> boolean, filters Crafting/Recommended/Unlearned/Mystic Forge material promotion
+  const rarityFilterLoadedRef = useRef(false); // guards against persisting the default before the cached value has loaded
   const [extraDailyItems, setExtraDailyItems] = useState({}); // itemId -> {name, icon} for non-TP items
 
   const prog = (pct, msg) => setLoadState({ phase: "loading", pct, msg });
@@ -2170,6 +2173,10 @@ export default function App() {
     invoke("cache_get", { key: "lastGemPrice" }).then(e => {
       if (e?.value) { try { setGemPrice(JSON.parse(e.value)); } catch {} }
     }).catch(() => {});
+    invoke("cache_get", { key: "rarityFilter" }).then(e => {
+      if (e?.value) { try { setRarityFilter(JSON.parse(e.value)); } catch {} }
+      rarityFilterLoadedRef.current = true;
+    }).catch(() => { rarityFilterLoadedRef.current = true; });
     invoke("cache_get", { key: "weekly_key_done" }).then(e => {
       if (e?.value) {
         const { done, weeklyResetTs } = JSON.parse(e.value);
@@ -2645,6 +2652,13 @@ export default function App() {
     }, 1000);
     return () => clearInterval(t);
   }, [lastRecipe]);
+
+  // Persist rarity filter changes — skipped until the initial cached value has loaded,
+  // so we never overwrite a saved filter with the default before it's read.
+  useEffect(() => {
+    if (!rarityFilterLoadedRef.current) return;
+    cacheSet("rarityFilter", rarityFilter);
+  }, [rarityFilter]);
 
   // ── Toast auto-dismiss ────────────────────────────────────────────────────────
   // Every setToast() call site is expected to pair with its own setTimeout clear,
@@ -3128,6 +3142,7 @@ export default function App() {
                                  ...matCandidates,
     ].filter(i => showRecDaily || !dailyIds.has(i.outputId))
     .filter(i => showRecDailyOutputs || !dailyIds.has(i.outputId))
+    .filter(i => passesRarityFilter(i.rarity, rarityFilter))
 
 
     // Score all items
@@ -3266,10 +3281,6 @@ export default function App() {
         </span>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-        <label style={{ fontSize: 12, color: "var(--text3)", display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }} title="Also applies to individual profession tabs">
-        <input type="checkbox" checked={showRecMissing} onChange={e => setShowRecMissing(e.target.checked)} />
-        Show missing materials
-        </label>
         <label style={{ fontSize: 12, color: "var(--text3)", display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}>
         <input type="checkbox" checked={showRecMaterials} onChange={e => setShowRecMaterials(e.target.checked)} />
         Include raw materials
@@ -3282,6 +3293,7 @@ export default function App() {
         <input type="checkbox" checked={showRecDailyOutputs} onChange={e => setShowRecDailyOutputs(e.target.checked)} />
         Include crafts using daily ingredients
         </label>
+        <RarityDropdown rarityFilter={rarityFilter} setRarityFilter={setRarityFilter} />
         </div>
         </div>
 
@@ -3460,7 +3472,7 @@ export default function App() {
         )}
         </div>
     );
-  }, [data, velocitySummary, trendSummary, showRecMaterials, showRecDaily, showRecDailyOutputs, showRecMissing, expanded, dailyCrafted, myListings, mySoldHistory, craftingChartItem]);
+  }, [data, velocitySummary, trendSummary, showRecMaterials, showRecDaily, showRecDailyOutputs, showRecMissing, rarityFilter, expanded, dailyCrafted, myListings, mySoldHistory, craftingChartItem]);
 
   // ── Unlearned Recipes tab ────────────────────────────────────────────────────
   // Ranks recipes you don't know by the same craftAdvantage × sellFillsPerHr formula
@@ -3486,6 +3498,7 @@ export default function App() {
       // achievement/recipe-sheet recipe is, so let the user filter them out of this list.
       items = items.filter(ci => !(ci.flags || []).includes("AutoLearned"));
     }
+    items = items.filter(ci => passesRarityFilter(ci.rarity, rarityFilter));
 
     const MIN_OBS = 5;
     items = items.map(ci => {
@@ -3702,7 +3715,7 @@ export default function App() {
       )}
       </div>
     );
-  }, [data, lockedCraftItems, velocitySummary, hideZeroProfitUnlearned, hideAutoLearnedUnlearned, unlearnedRecipeCount, unlearnedLoading, expanded, craftingChartItem]);
+  }, [data, lockedCraftItems, velocitySummary, hideZeroProfitUnlearned, hideAutoLearnedUnlearned, rarityFilter, unlearnedRecipeCount, unlearnedLoading, expanded, craftingChartItem]);
 
   const CraftingTab = useMemo(() => {
     if (!data) return null;
@@ -3762,6 +3775,7 @@ export default function App() {
     };
     let items = data.byDisc[disc] || [];
     if (!showRecMissing) items = items.filter(i => i.canCraft);
+    items = items.filter(ci => passesRarityFilter(ci.rarity, rarityFilter));
 
     // Recommendation score — uses accumulated global market velocity data
     // sellFillsPerHr: how many sell listings are getting snapped up by buyers per hour (global)
@@ -4369,7 +4383,7 @@ export default function App() {
         </>}
         </div>
     );
-  }, [data, activeDisc, showRecMissing, searchCraft, expanded, dailyCrafted, manualDailyCrafted, resetCountdown, myListings, mySoldHistory, velocitySummary, trendSummary, craftingChartItem, craftPage, RecommendedTab, UnlearnedRecipesTab, unlearnedRecipeCount, unlearnedLoading]);
+  }, [data, activeDisc, showRecMissing, rarityFilter, searchCraft, expanded, dailyCrafted, manualDailyCrafted, resetCountdown, myListings, mySoldHistory, velocitySummary, trendSummary, craftingChartItem, craftPage, RecommendedTab, UnlearnedRecipesTab, unlearnedRecipeCount, unlearnedLoading]);
 
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
@@ -4776,6 +4790,8 @@ export default function App() {
           trendSummary={trendSummary}
           wallet={forgeWallet}
           legendaryAchievements={legendaryAchievements}
+          rarityFilter={rarityFilter}
+          setRarityFilter={setRarityFilter}
         />
       )}
       {activeTab === "flipping" && data && (() => {

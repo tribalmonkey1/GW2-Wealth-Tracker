@@ -40,6 +40,7 @@ import {
   LEGENDARY_OTHER_RECIPES,
   LEGENDARY_OTHER_CATEGORIES,
 } from "./legendary-data-other.js";
+import { RarityDropdown, passesRarityFilter } from "./RarityFilter.jsx";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const Gold = ({ v, size = 14 }) => {
@@ -621,7 +622,7 @@ function LegendaryRecipeCard({ recipe, itemMap, priceMap, ownedMap, legendaryAch
   );
 }
 
-export default function MysticForgeTab({ data, priceMap, ownedMap, velocitySummary, trendSummary, wallet, legendaryAchievements = {} }) {
+export default function MysticForgeTab({ data, priceMap, ownedMap, velocitySummary, trendSummary, wallet, legendaryAchievements = {}, rarityFilter = {}, setRarityFilter = () => {} }) {
   const [subTab, setSubTab] = useState("material");
   const [matSubcat, setMatSubcat] = useState("All");
   const [searchForge, setSearchForge] = useState("");
@@ -703,8 +704,9 @@ export default function MysticForgeTab({ data, priceMap, ownedMap, velocitySumma
     let items = forgeItems;
     if (matSubcat !== "All") items = items.filter(i => i.subcategory === matSubcat);
     if (searchForge) items = items.filter(i => i.name.toLowerCase().includes(searchForge.toLowerCase()));
+    items = items.filter(i => passesRarityFilter(i.itemData?.rarity, rarityFilter));
     return items;
-  }, [forgeItems, matSubcat, searchForge]);
+  }, [forgeItems, matSubcat, searchForge, rarityFilter]);
 
   const subTabs = [
     { key: "material",    label: "Material Promotion" },
@@ -755,6 +757,7 @@ export default function MysticForgeTab({ data, priceMap, ownedMap, velocitySumma
                 </button>
               ))}
             </div>
+            <RarityDropdown rarityFilter={rarityFilter} setRarityFilter={setRarityFilter} />
           </div>
 
           {filteredItems.length === 0 && (
