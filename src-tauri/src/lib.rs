@@ -25,6 +25,7 @@ fn open_personal_db(path: &std::path::Path) -> Connection {
         PRAGMA synchronous=NORMAL;
         PRAGMA cache_size=-8000;
         PRAGMA temp_store=MEMORY;
+        PRAGMA foreign_keys=ON;
     ").expect("Failed to set pragmas");
     conn.execute_batch("
         CREATE TABLE IF NOT EXISTS app_cache (
@@ -57,6 +58,27 @@ fn open_personal_db(path: &std::path::Path) -> Connection {
             item_id INTEGER PRIMARY KEY,
             count INTEGER NOT NULL,
             reset_ts INTEGER NOT NULL
+        );
+        -- Friend Recipe Lookup — read-only, single-purpose. Stores a friend's GW2
+        -- API key ONLY to read which recipes they know (/v2/account/recipes).
+        -- We never fetch their materials, wallet, or characters — this is
+        -- intentionally narrow and is NOT multi-account support. Scoring for
+        -- friend-only recipe candidates always uses the LOCAL user's own materials
+        -- and NAS market data; the friend's own collector/database is never queried
+        -- (GW2's Trading Post is a single global market, so local price/velocity
+        -- data is valid regardless of whose collector gathered it).
+        CREATE TABLE IF NOT EXISTS friend_keys (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            name            TEXT NOT NULL,
+            api_key         TEXT NOT NULL,
+            added_ts        INTEGER NOT NULL,
+            last_refresh_ts INTEGER,
+            last_refresh_ok INTEGER NOT NULL DEFAULT 1
+        );
+        CREATE TABLE IF NOT EXISTS friend_recipes_known (
+            friend_id INTEGER NOT NULL REFERENCES friend_keys(id) ON DELETE CASCADE,
+            recipe_id INTEGER NOT NULL,
+            PRIMARY KEY (friend_id, recipe_id)
         );
     ").expect("Failed to create personal tables");
     conn
@@ -101,6 +123,11 @@ pub fn run() {
             commands::get_market_db_info,
             commands::set_market_db_path,
             commands::get_market_summary,
+            commands::add_friend_key,
+            commands::refresh_friend_key,
+            commands::delete_friend_key,
+            commands::get_friends,
+            commands::get_friend_recipes_known,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

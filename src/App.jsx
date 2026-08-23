@@ -12,6 +12,7 @@ const RECIPE_REFRESH_MS = 4 * 60 * 60_000;
 const UPDATE_CHECK_MS = 4 * 60 * 60_000; // 4h — GitHub Releases doesn't need aggressive polling
 const GEM_QUANTITY_COPPER = 4_000_000; // 400g sample — coins_per_gem is stable enough at this size to extrapolate ×400
 const UNLEARNED_REFRESH_MS = 7 * 24 * 60 * 60_000; // weekly — full-catalog recipe ID diff for Unlearned Recipes tab
+const FRIEND_REFRESH_MS = 24 * 60 * 60_000; // daily — friend recipes-known rarely changes, no need for tighter polling
 const SIX_MONTHS_MS = 6 * 30 * 24 * 60 * 60 * 1000;
 const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
@@ -499,9 +500,24 @@ import {
   manualDailyGetAll, manualDailySet as manualDailySetCount,
   pruneOldData as pruneOldSnapshots,
   getDbStats, importFromBrowser, exportAllData,
+  addFriendKey, refreshFriendKey, deleteFriendKey, getFriends, getFriendRecipesKnown,
 } from "./storage.js";
 import { getCurrentVersion, checkForUpdate, getChangelog } from "./updater.js";
 import { DEFAULT_RARITY_FILTER, passesRarityFilter, RarityDropdown } from "./RarityFilter.jsx";
+import { DEFAULT_FRIEND_FILTER, passesFriendFilter, FriendFilterDropdown } from "./FriendFilter.jsx";
+
+// Builds recipeId -> [{friendId, friendName}] from the get_friend_recipes_known
+// backend response — used to tag craft items with which friend(s) know them.
+function buildFriendRecipeMap(entries) {
+  const map = {};
+  for (const { friend_id, friend_name, recipe_ids } of (entries || [])) {
+    for (const rid of recipe_ids) {
+      if (!map[rid]) map[rid] = [];
+      map[rid].push({ friendId: friend_id, friendName: friend_name });
+    }
+  }
+  return map;
+}
 
 function TrendBadge({ trend }) {
   if (!trend) return null;
@@ -605,11 +621,14 @@ function buildTreeSync(itemId, count, resolvedRecipes, depth = 0, rootRecipe = n
   return { itemId, count, outputCount, children, isLeaf: false };
 }
 
-function flatLeaves(node, ownedMap = {}, needed = null) {
+function flatLeaves(node, ownedMap = {}, needed = null, isRoot = true) {
   const count = needed !== null ? needed : node.count;
   const owned = ownedMap[node.itemId] || 0;
-  // If we own enough of this node (even if it's craftable), treat it as a leaf — don't flatten deeper
-  if (node.isLeaf || owned >= count) return [{ itemId: node.itemId, count }];
+  // If we own enough of this node (even if it's craftable), treat it as a leaf — don't flatten deeper.
+  // EXCEPTION: the root node is the recipe's own output item, not an ingredient — owning existing
+  // copies of the finished item (e.g. one sitting in your bags) must never short-circuit the
+  // ingredient breakdown for crafting ANOTHER one. Only intermediate ingredients get this shortcut.
+  if (node.isLeaf || (!isRoot && owned >= count)) return [{ itemId: node.itemId, count }];
   // child.count in the tree is already the total needed quantity (buildTreeSync pre-multiplies)
   // When called recursively with a specific needed count, we may need to scale children proportionally
   const outputCount = node.outputCount || 1;
@@ -619,7 +638,7 @@ function flatLeaves(node, ownedMap = {}, needed = null) {
   const acc = {};
   for (const child of node.children) {
     const childNeeded = Math.ceil(child.count * scale);
-    for (const leaf of flatLeaves(child, ownedMap, childNeeded)) {
+    for (const leaf of flatLeaves(child, ownedMap, childNeeded, false)) {
       acc[leaf.itemId] = (acc[leaf.itemId] || 0) + leaf.count;
     }
   }
@@ -1562,6 +1581,15 @@ export default function App() {
   const [rarityFilter, setRarityFilter] = useState(DEFAULT_RARITY_FILTER); // rarity -> boolean, filters Crafting/Recommended/Unlearned/Mystic Forge material promotion
   const rarityFilterLoadedRef = useRef(false); // guards against persisting the default before the cached value has loaded
   const [extraDailyItems, setExtraDailyItems] = useState({}); // itemId -> {name, icon} for non-TP items
+  // ── Friend Recipe Lookup — read-only. See FriendFilter.jsx / commands.rs for design notes. ──
+  const [friends, setFriends] = useState([]); // [{id, name, added_ts, last_refresh_ts, last_refresh_ok, recipe_count}]
+  const [friendRecipeMap, setFriendRecipeMap] = useState({}); // recipeId -> [{friendId, friendName}]
+  const [friendFilter, setFriendFilter] = useState(DEFAULT_FRIEND_FILTER);
+  const [friendNameInput, setFriendNameInput] = useState("");
+  const [friendKeyInput, setFriendKeyInput] = useState("");
+  const [friendBusy, setFriendBusy] = useState(false);
+  const [friendActionMsg, setFriendActionMsg] = useState(null); // {ok, text}
+  const [showDeleteFriendConfirm, setShowDeleteFriendConfirm] = useState(null); // friend id pending delete confirmation
 
   const prog = (pct, msg) => setLoadState({ phase: "loading", pct, msg });
   const fullLoadInProgressRef = useRef(false);
@@ -2191,6 +2219,12 @@ export default function App() {
       const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0,0,0,0);
       setFlipHistory(rows.filter(r => r.sellTime >= monthStart.getTime()));
     }).catch(() => {});
+    // Load friend recipe lookup data from personal.db
+    getFriends().then(setFriends).catch(() => {});
+    getFriendRecipesKnown().then(entries => setFriendRecipeMap(buildFriendRecipeMap(entries))).catch(() => {});
+    invoke("cache_get", { key: "friendFilter" }).then(e => {
+      if (e?.value) { try { setFriendFilter(JSON.parse(e.value)); } catch {} }
+    }).catch(() => {});
   }, [fullLoad]);
 
   useEffect(() => {
@@ -2517,6 +2551,84 @@ export default function App() {
     setLockedCraftItems(enriched);
   }, []);
 
+  // ── Friend Recipe Lookup: friend-only craft candidates ──────────────────────
+  // Recipes the user does NOT know, but at least one added friend does. Reuses
+  // the exact lockedCraftItems pipeline above (full-catalog recipe details ×
+  // the user's own materials/prices) rather than any friend-side data, so
+  // craftAdvantage/canCraft/sellFillsPerHr scoring is identical to the user's
+  // own recipes and always reflects the LOCAL user's inventory only — the
+  // "still only show your materials" requirement falls out of this for free,
+  // since lockedCraftItems was already built against cacheRef.current.ownedMap.
+  const friendOnlyCraftItems = useMemo(() => {
+    if (!lockedCraftItems.length || Object.keys(friendRecipeMap).length === 0) return [];
+    return lockedCraftItems
+      .filter(ci => friendRecipeMap[ci.recipeId])
+      .map(ci => ({ ...ci, friendBadges: friendRecipeMap[ci.recipeId], isFriendOnly: true }));
+  }, [lockedCraftItems, friendRecipeMap]);
+
+  // ── Friend key management ────────────────────────────────────────────────────
+  const handleAddFriend = useCallback(async () => {
+    const name = friendNameInput.trim();
+    const key = friendKeyInput.trim();
+    if (!name || !key) { setFriendActionMsg({ ok: false, text: "Name and API key are both required." }); return; }
+    setFriendBusy(true); setFriendActionMsg(null);
+    try {
+      const summary = await addFriendKey(name, key);
+      setFriends(prev => [...prev, summary]);
+      const entries = await getFriendRecipesKnown();
+      setFriendRecipeMap(buildFriendRecipeMap(entries));
+      setFriendNameInput(""); setFriendKeyInput("");
+      setFriendActionMsg({ ok: true, text: `✓ Added ${summary.name} — ${summary.recipe_count} recipes known.` });
+    } catch (e) {
+      setFriendActionMsg({ ok: false, text: String(e) });
+    } finally {
+      setFriendBusy(false);
+    }
+  }, [friendNameInput, friendKeyInput]);
+
+  const handleRefreshFriend = useCallback(async (id) => {
+    setFriendBusy(true); setFriendActionMsg(null);
+    try {
+      const summary = await refreshFriendKey(id);
+      setFriends(prev => prev.map(f => f.id === id ? summary : f));
+      const entries = await getFriendRecipesKnown();
+      setFriendRecipeMap(buildFriendRecipeMap(entries));
+      setFriendActionMsg({ ok: true, text: `✓ Refreshed ${summary.name} — ${summary.recipe_count} recipes known.` });
+    } catch (e) {
+      // Keep showing last-known recipes — just flag the failure (matches backend,
+      // which also preserves friend_recipes_known on a failed refresh).
+      setFriends(prev => prev.map(f => f.id === id ? { ...f, last_refresh_ok: false } : f));
+      setFriendActionMsg({ ok: false, text: String(e) });
+    } finally {
+      setFriendBusy(false);
+    }
+  }, []);
+
+  const handleDeleteFriend = useCallback(async (id) => {
+    setFriendBusy(true);
+    try {
+      await deleteFriendKey(id);
+      setFriends(prev => prev.filter(f => f.id !== id));
+      setFriendRecipeMap(prev => {
+        const next = {};
+        for (const [rid, badges] of Object.entries(prev)) {
+          const filtered = badges.filter(b => b.friendId !== id);
+          if (filtered.length) next[rid] = filtered;
+        }
+        return next;
+      });
+      setFriendFilter(prev => {
+        const { [id]: _removed, ...rest } = prev.byFriend;
+        return { ...prev, byFriend: rest };
+      });
+      setShowDeleteFriendConfirm(null);
+    } catch (e) {
+      setFriendActionMsg({ ok: false, text: String(e) });
+    } finally {
+      setFriendBusy(false);
+    }
+  }, []);
+
   const refreshUnlearnedRecipesCatalog = useCallback(async () => {
     if (!cacheRef.current.itemMap) return;
     setUnlearnedLoading(true);
@@ -2635,6 +2747,39 @@ export default function App() {
     return () => { clearInterval(waitForData); clearInterval(unlearnedInterval); };
   }, [loadState.phase]);
 
+  // Once-daily background refresh of every added friend's known-recipe list.
+  // Manual refresh (🔄 in Settings) is also always available — this just catches
+  // friends up automatically without the user needing to remember to click it.
+  useEffect(() => {
+    if (loadState.phase !== "done") return;
+    let friendInterval;
+    const runFriendRefresh = async () => {
+      const list = await getFriends().catch(() => []);
+      for (const f of list) {
+        await refreshFriendKey(f.id).catch(() => {}); // per-friend failure shouldn't block the others
+      }
+      const [refreshed, entries] = await Promise.all([
+        getFriends().catch(() => list),
+        getFriendRecipesKnown().catch(() => []),
+      ]);
+      setFriends(refreshed);
+      setFriendRecipeMap(buildFriendRecipeMap(entries));
+      cacheSet("lastFriendRefresh", Date.now());
+    };
+    const waitForData = setInterval(() => {
+      if (!dataReadyRef.current) return;
+      clearInterval(waitForData);
+      (async () => {
+        const lastRunEntry = await cacheGet("lastFriendRefresh").catch(() => null);
+        const lastRun = lastRunEntry?.value || 0;
+        const stale = (Date.now() - lastRun) >= FRIEND_REFRESH_MS;
+        if (stale) runFriendRefresh();
+      })();
+      friendInterval = setInterval(runFriendRefresh, FRIEND_REFRESH_MS);
+    }, 100);
+    return () => { clearInterval(waitForData); clearInterval(friendInterval); };
+  }, [loadState.phase]);
+
   useEffect(() => {
     if (!lastPrice) return;
     const t = setInterval(() => {
@@ -2659,6 +2804,11 @@ export default function App() {
     if (!rarityFilterLoadedRef.current) return;
     cacheSet("rarityFilter", rarityFilter);
   }, [rarityFilter]);
+
+  // Persist friend filter changes (master toggle + per-friend selection)
+  useEffect(() => {
+    cacheSet("friendFilter", friendFilter);
+  }, [friendFilter]);
 
   // ── Toast auto-dismiss ────────────────────────────────────────────────────────
   // Every setToast() call site is expected to pair with its own setTimeout clear,
@@ -3122,6 +3272,19 @@ export default function App() {
       }
     }
 
+    // Friend-only candidates: recipes the user doesn't know but an added friend
+    // does. These are never in data.byDisc (they're not known/learned), so they
+    // can't already be in `seen` — merged in here, scored by the exact same
+    // formula below since they carry the same shape (craftAdvantage, outputId,
+    // matDetails, tree, etc.) as any other craft item. Gated by the master
+    // "show friend-known recipes" toggle + per-friend selection.
+    for (const ci of friendOnlyCraftItems) {
+      if (seen.has(ci.recipeId)) continue;
+      if (!passesFriendFilter(ci, friendFilter)) continue;
+      seen.add(ci.recipeId);
+      allItems.push(ci);
+    }
+
     // Base materials as "sell raw" candidates - only if toggled on
     // Prevent duplicates by checking seen set (some materials also have craft recipes)
     const matCandidates = showRecMaterials ? data.materialRows
@@ -3308,7 +3471,7 @@ export default function App() {
           const totalListed = listings.reduce((s, l) => s + l.quantity, 0);
 
           return (
-            <div key={ci.recipeId} className="ci" style={{ marginBottom: 6 }}>
+            <div key={ci.recipeId} className="ci" style={{ marginBottom: 6, borderLeft: ci.isFriendOnly ? "3px solid #9f4dff" : undefined }}>
             <div className="ci-hdr" onClick={() => ci.recipeId && setExpanded(e => ({ ...e, [ci.recipeId]: !e[ci.recipeId] }))}>
             {/* Rank badge */}
             <span style={{ fontFamily: "Cinzel,serif", fontSize: 12, color: rank < 3 ? "var(--gold2)" : "var(--text3)", width: 28, textAlign: "center", flexShrink: 0 }}>
@@ -3326,6 +3489,14 @@ export default function App() {
               ? <span className="bhave" style={{ background: "rgba(80,120,200,0.15)", borderColor: "rgba(80,120,200,0.4)", color: "#9bbcf5" }}>📦 Raw</span>
               : ci.canCraft ? <span className="bhave">✓ Can Craft</span> : <span className="bmiss">✗ Missing</span>
             }
+            {/* Friend-only badge: shown only when the user doesn't know this recipe
+                themselves and a friend does — not shown if the user also knows it. */}
+            {ci.isFriendOnly && ci.friendBadges?.map(b => (
+              <span key={b.friendId} title={`${b.friendName} knows this recipe — you don't. Materials shown are yours.`}
+                style={{ fontSize: 10, fontFamily: "Cinzel,serif", letterSpacing: 1, padding: "2px 7px", borderRadius: 3, background: "rgba(159,77,255,.12)", border: "1px solid rgba(159,77,255,.4)", color: "#c9a0ff", whiteSpace: "nowrap" }}>
+                🛠 {b.friendName}
+              </span>
+            ))}
             {/* Better-use hint: crafting downstream recipe beats selling this ingredient raw */}
             {betterUseMap[ci.outputId]?.length > 0 && (() => {
               const best = betterUseMap[ci.outputId][0];
@@ -3472,7 +3643,7 @@ export default function App() {
         )}
         </div>
     );
-  }, [data, velocitySummary, trendSummary, showRecMaterials, showRecDaily, showRecDailyOutputs, showRecMissing, rarityFilter, expanded, dailyCrafted, myListings, mySoldHistory, craftingChartItem]);
+  }, [data, velocitySummary, trendSummary, showRecMaterials, showRecDaily, showRecDailyOutputs, showRecMissing, rarityFilter, expanded, dailyCrafted, myListings, mySoldHistory, craftingChartItem, friendOnlyCraftItems, friendFilter]);
 
   // ── Unlearned Recipes tab ────────────────────────────────────────────────────
   // Ranks recipes you don't know by the same craftAdvantage × sellFillsPerHr formula
@@ -3774,6 +3945,19 @@ export default function App() {
       return others; // [{ name, count }, ...]
     };
     let items = data.byDisc[disc] || [];
+    // Friend-only candidates for this discipline: recipes the user doesn't know
+    // but an added friend does, filtered to the disciplines that recipe actually
+    // uses and gated by the friend filter — same merge as the Recommended tab,
+    // scoped per-discipline since Crafting Profits is organized that way.
+    if (friendFilter.enabled && friendOnlyCraftItems.length > 0) {
+      const existingIds = new Set(items.map(i => i.recipeId));
+      const friendItemsForDisc = friendOnlyCraftItems.filter(ci =>
+        getRecipeDisciplines(ci).includes(disc) &&
+        !existingIds.has(ci.recipeId) &&
+        passesFriendFilter(ci, friendFilter)
+      );
+      items = [...items, ...friendItemsForDisc];
+    }
     if (!showRecMissing) items = items.filter(i => i.canCraft);
     items = items.filter(ci => passesRarityFilter(ci.rarity, rarityFilter));
 
@@ -3927,6 +4111,7 @@ export default function App() {
       <input type="checkbox" checked={showRecMissing} onChange={e => setShowRecMissing(e.target.checked)} />
       Show missing materials
       </label>
+      <FriendFilterDropdown friends={friends} friendFilter={friendFilter} setFriendFilter={setFriendFilter} />
       <div style={{ marginLeft:"auto", fontSize:11, color:"var(--text3)", fontFamily:"Cinzel,serif", letterSpacing:1 }}>
       Ranked by profit × market velocity
       </div>
@@ -3947,7 +4132,7 @@ export default function App() {
         {sorted.slice(craftPage*PAGE_SIZE, (craftPage+1)*PAGE_SIZE).map(ci => {
           const isOpen = expanded[ci.recipeId];
           return (
-            <div key={ci.recipeId} className="ci">
+            <div key={ci.recipeId} className="ci" style={{ borderLeft: ci.isFriendOnly ? "3px solid #9f4dff" : undefined }}>
             <div className="ci-hdr" onClick={() => setExpanded(e => ({ ...e, [ci.recipeId]: !e[ci.recipeId] }))}>
             {ci.icon ? <img className="iico" src={ci.icon} alt="" /> : <div className="iico-ph" />}
             <span className={`ci-name rar-${ci.rarity}`}>{ci.name}</span>
@@ -3958,6 +4143,12 @@ export default function App() {
             )}
             {ci.outputCount > 1 && <span style={{ color: "var(--text3)", fontSize: 13 }}>×{ci.outputCount}</span>}
             {ci.canCraft ? <span className="bhave">✓ Can Craft</span> : <span className="bmiss">✗ Missing</span>}
+            {ci.isFriendOnly && ci.friendBadges?.map(b => (
+              <span key={b.friendId} title={`${b.friendName} knows this recipe — you don't. Materials shown are yours.`}
+                style={{ fontSize: 10, fontFamily: "Cinzel,serif", letterSpacing: 1, padding: "2px 7px", borderRadius: 3, background: "rgba(159,77,255,.12)", border: "1px solid rgba(159,77,255,.4)", color: "#c9a0ff", whiteSpace: "nowrap" }}>
+                🛠 {b.friendName}
+              </span>
+            ))}
             {DAILY_CRAFT_IDS.has(ci.outputId) && (
               dailyCrafted.has(ci.outputId)
               ? <span className="bdaily-done" title={`Resets in ${resetCountdown}`}>⏳ Crafted Today · resets {resetCountdown}</span>
@@ -4383,7 +4574,7 @@ export default function App() {
         </>}
         </div>
     );
-  }, [data, activeDisc, showRecMissing, rarityFilter, searchCraft, expanded, dailyCrafted, manualDailyCrafted, resetCountdown, myListings, mySoldHistory, velocitySummary, trendSummary, craftingChartItem, craftPage, RecommendedTab, UnlearnedRecipesTab, unlearnedRecipeCount, unlearnedLoading]);
+  }, [data, activeDisc, showRecMissing, rarityFilter, searchCraft, expanded, dailyCrafted, manualDailyCrafted, resetCountdown, myListings, mySoldHistory, velocitySummary, trendSummary, craftingChartItem, craftPage, RecommendedTab, UnlearnedRecipesTab, unlearnedRecipeCount, unlearnedLoading, friendOnlyCraftItems, friendFilter, friends]);
 
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
@@ -4437,9 +4628,9 @@ export default function App() {
            You will need to restart the collector on your NAS after resetting.<br /><br />
            <span style={{ color: "var(--gold2)" }}>Your personal data (flip tracking, sold history, API key) is NOT affected.</span></>)
         : (<>Deletes all your personal app data stored locally.<br /><br />
-           This removes: known crafting recipes, your GW2 API key, flip tracking history, sold order history, daily crafting records, price alerts, and all app settings.<br /><br />
+           This removes: known crafting recipes, your GW2 API key, flip tracking history, sold order history, daily crafting records, price alerts, added friend API keys, and all app settings.<br /><br />
            <span style={{ color: "var(--gold2)" }}>Market price history on your NAS is NOT affected.</span><br /><br />
-           <span style={{ color: "var(--red2,#e05555)" }}>You will need to re-enter your API key and settings after resetting.</span></>);
+           <span style={{ color: "var(--red2,#e05555)" }}>You will need to re-enter your API key, settings, and any friend API keys after resetting.</span></>);
       const confirmLabel = isMarket ? "🗑 Reset Market DB" : "🗑 Reset Personal DB";
       const doReset = async () => {
         try {
@@ -4473,6 +4664,31 @@ export default function App() {
         <button onClick={doReset}
         style={{ fontSize: 12, color: "#fff", background: "var(--red2,#e05555)", border: "none", borderRadius: 4, padding: "6px 20px", cursor: "pointer", fontFamily: "Cinzel,serif", letterSpacing: 1 }}>
         {confirmLabel}
+        </button>
+        </div>
+        </div>
+        </div>
+      );
+    })()}
+
+    {/* Friend deletion confirmation */}
+    {showDeleteFriendConfirm != null && (() => {
+      const f = friends.find(x => x.id === showDeleteFriendConfirm);
+      return (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ background: "var(--bg2)", border: "2px solid var(--red2,#e05555)", borderRadius: 8, padding: 32, maxWidth: 440, width: "90%", textAlign: "center" }}>
+        <div style={{ fontFamily: "Cinzel,serif", fontSize: 15, color: "var(--red2,#e05555)", letterSpacing: 1, marginBottom: 16 }}>⚠ REMOVE {f?.name?.toUpperCase() || "FRIEND"}</div>
+        <div style={{ fontSize: 13, color: "var(--text2)", marginBottom: 20, lineHeight: 1.6 }}>
+        Deletes their API key and everything they're known to be able to craft from your Crafting Profits and Recommended tabs. Your own recipes, materials, and recommendations are not affected.
+        </div>
+        <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
+        <button onClick={() => setShowDeleteFriendConfirm(null)}
+        style={{ fontSize: 12, color: "var(--gold2)", background: "transparent", border: "1px solid var(--border)", borderRadius: 4, padding: "6px 20px", cursor: "pointer", fontFamily: "Cinzel,serif", letterSpacing: 1 }}>
+        Cancel
+        </button>
+        <button onClick={() => handleDeleteFriend(showDeleteFriendConfirm)} disabled={friendBusy}
+        style={{ fontSize: 12, color: "#fff", background: "var(--red2,#e05555)", border: "none", borderRadius: 4, padding: "6px 20px", cursor: friendBusy ? "not-allowed" : "pointer", fontFamily: "Cinzel,serif", letterSpacing: 1, opacity: friendBusy ? 0.6 : 1 }}>
+        🗑 Remove Friend
         </button>
         </div>
         </div>
@@ -4534,6 +4750,54 @@ export default function App() {
       style={{ fontSize: 11, color: "var(--gold2)", background: "transparent", border: "1px solid var(--border)", borderRadius: 3, padding: "5px 14px", cursor: rescanningRecipes ? "not-allowed" : "pointer", fontFamily: "Cinzel,serif", letterSpacing: 1, opacity: rescanningRecipes ? 0.5 : 1 }}>
       {rescanningRecipes ? "⏳ Scanning all recipes..." : "🔍 Rescan Auto-Unlocked Recipes"}
       </button>
+      </div>
+
+      <div style={{ fontSize: 12, color: "var(--text2)", marginTop: 8, paddingTop: 14, borderTop: "1px solid var(--border)" }}>
+      <strong style={{ color: "var(--gold1)" }}>👥 Friend Crafters</strong>
+      <div style={{ fontSize: 11, color: "var(--text3)", marginBottom: 10, lineHeight: 1.6 }}>
+      Add a friend's GW2 API key to see recipes <em>they</em> know that you don't — Crafting Profits and Recommended will
+      tag those cards with their name. Only their known-recipe list is ever read; your materials, prices, and market
+      data are always what's used to score and craft the item — nothing about your friend's account beyond "does
+      this recipe show up in their unlocks" is fetched or stored.
+      Ask them to generate a key with only the <strong style={{ color: "var(--text2)" }}>Unlocks</strong> permission checked.
+      </div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
+      <input value={friendNameInput} onChange={e => setFriendNameInput(e.target.value)} placeholder="Friend's name"
+      style={{ width: 140, background: "var(--bg3)", border: "1px solid var(--border)", borderRadius: 4, padding: "5px 10px", color: "var(--text1)", fontSize: 12 }} />
+      <input value={friendKeyInput} onChange={e => setFriendKeyInput(e.target.value)} placeholder="Friend's API key"
+      style={{ flex: 1, minWidth: 220, background: "var(--bg3)", border: "1px solid var(--border)", borderRadius: 4, padding: "5px 10px", color: "var(--text1)", fontSize: 12, fontFamily: "monospace" }} />
+      <button onClick={handleAddFriend} disabled={friendBusy}
+      style={{ fontSize: 11, color: "#fff", background: "#7a4fb8", border: "none", borderRadius: 3, padding: "5px 14px", cursor: friendBusy ? "not-allowed" : "pointer", fontFamily: "Cinzel,serif", letterSpacing: 1, opacity: friendBusy ? 0.6 : 1 }}>
+      {friendBusy ? "⏳ Working..." : "+ Add Friend"}
+      </button>
+      </div>
+      {friendActionMsg && (
+        <div style={{ fontSize: 12, color: friendActionMsg.ok ? "#4caf50" : "var(--red2,#e05555)", marginBottom: 8 }}>{friendActionMsg.text}</div>
+      )}
+      {friends.length === 0 && <div style={{ fontSize: 12, color: "var(--text3)", fontStyle: "italic" }}>No friends added yet.</div>}
+      {friends.map(f => (
+        <div key={f.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderBottom: "1px solid var(--border)", flexWrap: "wrap" }}>
+        <span style={{ fontSize: 13, color: "var(--text1)", flex: 1, minWidth: 100 }}>{f.name}</span>
+        <span style={{ fontSize: 11, color: "var(--text3)" }}>{f.recipe_count.toLocaleString()} recipes known</span>
+        {!f.last_refresh_ok && (
+          <span title="Last refresh failed — the key may be invalid or revoked. Still showing their last-known recipes." style={{ fontSize: 10, color: "var(--red2,#e05555)", border: "1px solid rgba(200,60,60,.4)", borderRadius: 3, padding: "1px 6px", cursor: "help" }}>⚠ refresh failed</span>
+        )}
+        <span style={{ fontSize: 10, color: "var(--text3)" }}>{f.last_refresh_ts ? `updated ${new Date(f.last_refresh_ts).toLocaleDateString()}` : "never refreshed"}</span>
+        <button onClick={() => handleRefreshFriend(f.id)} disabled={friendBusy} title="Refresh this friend's known recipes now"
+        style={{ fontSize: 11, color: "var(--gold2)", background: "transparent", border: "1px solid var(--border)", borderRadius: 3, padding: "3px 9px", cursor: friendBusy ? "not-allowed" : "pointer" }}>
+        🔄
+        </button>
+        <button onClick={() => setShowDeleteFriendConfirm(f.id)} disabled={friendBusy} title="Remove this friend"
+        style={{ fontSize: 11, color: "var(--red2,#e05555)", background: "transparent", border: "1px solid rgba(200,60,60,.4)", borderRadius: 3, padding: "3px 9px", cursor: friendBusy ? "not-allowed" : "pointer" }}>
+        🗑
+        </button>
+        </div>
+      ))}
+      <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 8, fontStyle: "italic" }}>
+      Refreshes automatically once a day, or use 🔄 above anytime. A friend's known-recipe list doesn't reflect whether
+      they've already used today's daily-crafting cooldown — just whether they know how to make it.
+      Friend API keys are intentionally excluded from Import/Export backups below, so a shared backup file never contains a friend's credentials.
+      </div>
       </div>
 
       <div style={{ fontSize: 12, color: "var(--text2)", marginTop: 8, paddingTop: 14, borderTop: "1px solid var(--border)" }}>

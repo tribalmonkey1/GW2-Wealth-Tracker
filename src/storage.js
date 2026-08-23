@@ -403,6 +403,31 @@ export function computeLockedCraftItems(lockedRecipes, resolvedRecipes, itemMap,
   });
 }
 
+// ── Friend Recipe Lookup ──────────────────────────────────────────────────────
+// Read-only: a friend's API key is used ONLY to fetch which recipes they know.
+// We never fetch their materials, wallet, or characters. See commands.rs for the
+// full design rationale (single-purpose, not multi-account support).
+
+export async function addFriendKey(name, apiKey) {
+  return invoke("add_friend_key", { name, apiKey });
+}
+
+export async function refreshFriendKey(id) {
+  return invoke("refresh_friend_key", { id });
+}
+
+export async function deleteFriendKey(id) {
+  return invoke("delete_friend_key", { id });
+}
+
+export async function getFriends() {
+  return invoke("get_friends");
+}
+
+export async function getFriendRecipesKnown() {
+  return invoke("get_friend_recipes_known");
+}
+
 // Process startup cache data off the main thread (resolvedRecipes, matRows, totalMatValue)
 export function processStartupCache(allRecipes, itemMap, priceMap, ownedMap) {
   const worker = getWorker();

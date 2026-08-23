@@ -530,6 +530,8 @@ pub fn reset_database(personal: State<'_, PersonalDbState>) -> Result<(), String
         DELETE FROM flip_pending;
         DELETE FROM flip_history;
         DELETE FROM manual_daily_resets;
+        DELETE FROM friend_recipes_known;
+        DELETE FROM friend_keys;
         DELETE FROM app_cache WHERE key NOT IN ('nas_api_url','nas_ssh');
         VACUUM;
     ").map_err(|e| e.to_string())?;
@@ -567,3 +569,184 @@ pub fn get_tracked_item_ids() -> Result<Vec<i64>, String> {
 
 #[tauri::command]
 pub fn append_log(_message: String) -> Result<(), String> { Ok(()) }
+
+// ── Friend Recipe Lookup ────────────────────────────────────────────────────
+// Read-only, single-purpose: a friend's API key is used ONLY to fetch which
+// recipes they know (/v2/account/recipes). We never touch their materials,
+// wallet, or characters. Materials/craftability for friend-only candidates are
+// always computed from the LOCAL user's own owned materials and price data —
+// see App.jsx's friendOnlyCraftItems, which reuses the existing lockedCraftItems
+// (Unlearned Recipes) pipeline rather than any friend-side data.
+//
+// Scoring (craftAdvantage × sellFillsPerHr) for friend-only candidates uses the
+// LOCAL user's own NAS market data. The friend's own collector database is never
+// queried — GW2's Trading Post is a single global market, so local price/velocity
+// numbers are valid for scoring a friend-known recipe too.
+
+const GW2_API_BASE: &str = "https://api.guildwars2.com/v2";
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct FriendSummary {
+    pub id: i64,
+    pub name: String,
+    pub added_ts: i64,
+    pub last_refresh_ts: Option<i64>,
+    pub last_refresh_ok: bool,
+    pub recipe_count: i64,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct FriendRecipesEntry {
+    pub friend_id: i64,
+    pub friend_name: String,
+    pub recipe_ids: Vec<i64>,
+}
+
+fn gw2_get(path: &str, api_key: &str) -> Result<serde_json::Value, String> {
+    let url = format!("{}{}?access_token={}", GW2_API_BASE, path, api_key);
+    let resp = ureq::get(&url)
+        .timeout(std::time::Duration::from_secs(15))
+        .call()
+        .map_err(|e| format!("GW2 API request failed: {}", e))?;
+    resp.into_json::<serde_json::Value>()
+        .map_err(|e| format!("GW2 API response parse failed: {}", e))
+}
+
+// Fetches a friend's known recipe ids, after verifying their key has at least the
+// `unlocks` permission (required to read recipes). Checking tokeninfo first gives
+// a much clearer error than letting the recipes call fail with a generic 403, and
+// lets us warn if the key is broader than necessary.
+fn fetch_friend_recipe_ids(api_key: &str) -> Result<Vec<i64>, String> {
+    let token_info = gw2_get("/tokeninfo", api_key)
+        .map_err(|_| "Couldn't verify that API key — check it was copied correctly.".to_string())?;
+    let permissions: Vec<String> = token_info["permissions"]
+        .as_array()
+        .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+        .unwrap_or_default();
+    if !permissions.iter().any(|p| p == "unlocks") {
+        return Err("This API key is missing the 'Unlocks' permission, which is required to read known recipes. Ask your friend to generate a key with at least 'Unlocks' checked.".to_string());
+    }
+
+    let recipes = gw2_get("/account/recipes", api_key)
+        .map_err(|_| "Couldn't fetch recipes with that key — it may be invalid or revoked.".to_string())?;
+    let ids: Vec<i64> = recipes.as_array()
+        .ok_or_else(|| "Unexpected response from GW2 API (expected a list of recipe ids).".to_string())?
+        .iter()
+        .filter_map(|v| v.as_i64())
+        .collect();
+    Ok(ids)
+}
+
+#[tauri::command]
+pub fn add_friend_key(personal: State<'_, PersonalDbState>, name: String, api_key: String) -> Result<FriendSummary, String> {
+    let name = name.trim().to_string();
+    let api_key = api_key.trim().to_string();
+    if name.is_empty() { return Err("Name is required.".to_string()); }
+    if api_key.is_empty() { return Err("API key is required.".to_string()); }
+
+    let recipe_ids = fetch_friend_recipe_ids(&api_key)?;
+    let now = chrono::Utc::now().timestamp_millis();
+
+    let mut conn = personal.0.lock().map_err(|e| e.to_string())?;
+    let tx = conn.transaction().map_err(|e| e.to_string())?;
+    tx.execute(
+        "INSERT INTO friend_keys (name, api_key, added_ts, last_refresh_ts, last_refresh_ok) VALUES (?,?,?,?,1)",
+        params![name, api_key, now, now],
+    ).map_err(|e| e.to_string())?;
+    let friend_id = tx.last_insert_rowid();
+    {
+        let mut stmt = tx.prepare(
+            "INSERT OR IGNORE INTO friend_recipes_known (friend_id, recipe_id) VALUES (?,?)"
+        ).map_err(|e| e.to_string())?;
+        for rid in &recipe_ids {
+            stmt.execute(params![friend_id, rid]).map_err(|e| e.to_string())?;
+        }
+    }
+    tx.commit().map_err(|e| e.to_string())?;
+
+    Ok(FriendSummary {
+        id: friend_id, name, added_ts: now,
+        last_refresh_ts: Some(now), last_refresh_ok: true,
+        recipe_count: recipe_ids.len() as i64,
+    })
+}
+
+#[tauri::command]
+pub fn refresh_friend_key(personal: State<'_, PersonalDbState>, id: i64) -> Result<FriendSummary, String> {
+    let api_key: String = {
+        let conn = personal.0.lock().map_err(|e| e.to_string())?;
+        conn.query_row("SELECT api_key FROM friend_keys WHERE id=?", params![id], |r| r.get(0))
+            .map_err(|_| "Friend not found.".to_string())?
+    };
+    let now = chrono::Utc::now().timestamp_millis();
+
+    match fetch_friend_recipe_ids(&api_key) {
+        Ok(recipe_ids) => {
+            let mut conn = personal.0.lock().map_err(|e| e.to_string())?;
+            let tx = conn.transaction().map_err(|e| e.to_string())?;
+            tx.execute("DELETE FROM friend_recipes_known WHERE friend_id=?", params![id]).map_err(|e| e.to_string())?;
+            {
+                let mut stmt = tx.prepare(
+                    "INSERT OR IGNORE INTO friend_recipes_known (friend_id, recipe_id) VALUES (?,?)"
+                ).map_err(|e| e.to_string())?;
+                for rid in &recipe_ids {
+                    stmt.execute(params![id, rid]).map_err(|e| e.to_string())?;
+                }
+            }
+            tx.execute("UPDATE friend_keys SET last_refresh_ts=?, last_refresh_ok=1 WHERE id=?", params![now, id]).map_err(|e| e.to_string())?;
+            let name: String = tx.query_row("SELECT name FROM friend_keys WHERE id=?", params![id], |r| r.get(0)).map_err(|e| e.to_string())?;
+            tx.commit().map_err(|e| e.to_string())?;
+            Ok(FriendSummary { id, name, added_ts: 0, last_refresh_ts: Some(now), last_refresh_ok: true, recipe_count: recipe_ids.len() as i64 })
+        }
+        Err(e) => {
+            // Keep last-known-good recipes on failure — just flag it so Settings
+            // can show a warning instead of silently losing the friend's data.
+            let conn = personal.0.lock().map_err(|e| e.to_string())?;
+            conn.execute("UPDATE friend_keys SET last_refresh_ts=?, last_refresh_ok=0 WHERE id=?", params![now, id]).ok();
+            Err(e)
+        }
+    }
+}
+
+#[tauri::command]
+pub fn delete_friend_key(personal: State<'_, PersonalDbState>, id: i64) -> Result<(), String> {
+    let conn = personal.0.lock().map_err(|e| e.to_string())?;
+    // Explicit delete of the child rows even though the FK has ON DELETE CASCADE —
+    // belt-and-suspenders in case PRAGMA foreign_keys wasn't honored on this connection.
+    conn.execute("DELETE FROM friend_recipes_known WHERE friend_id=?", params![id]).map_err(|e| e.to_string())?;
+    conn.execute("DELETE FROM friend_keys WHERE id=?", params![id]).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn get_friends(personal: State<'_, PersonalDbState>) -> Result<Vec<FriendSummary>, String> {
+    let conn = personal.0.lock().map_err(|e| e.to_string())?;
+    let mut stmt = conn.prepare(
+        "SELECT f.id, f.name, f.added_ts, f.last_refresh_ts, f.last_refresh_ok,
+                (SELECT COUNT(*) FROM friend_recipes_known WHERE friend_id = f.id)
+         FROM friend_keys f ORDER BY f.added_ts ASC"
+    ).map_err(|e| e.to_string())?;
+    let rows = stmt.query_map([], |r| Ok(FriendSummary {
+        id: r.get(0)?, name: r.get(1)?, added_ts: r.get(2)?,
+        last_refresh_ts: r.get(3)?, last_refresh_ok: r.get::<_, i64>(4)? != 0,
+        recipe_count: r.get(5)?,
+    })).map_err(|e| e.to_string())?.filter_map(|r| r.ok()).collect();
+    Ok(rows)
+}
+
+#[tauri::command]
+pub fn get_friend_recipes_known(personal: State<'_, PersonalDbState>) -> Result<Vec<FriendRecipesEntry>, String> {
+    let conn = personal.0.lock().map_err(|e| e.to_string())?;
+    let mut stmt = conn.prepare("SELECT id, name FROM friend_keys ORDER BY added_ts ASC").map_err(|e| e.to_string())?;
+    let friends: Vec<(i64, String)> = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
+        .map_err(|e| e.to_string())?.filter_map(|r| r.ok()).collect();
+
+    let mut result = Vec::new();
+    for (friend_id, friend_name) in friends {
+        let mut rstmt = conn.prepare("SELECT recipe_id FROM friend_recipes_known WHERE friend_id=?").map_err(|e| e.to_string())?;
+        let recipe_ids: Vec<i64> = rstmt.query_map(params![friend_id], |r| r.get(0))
+            .map_err(|e| e.to_string())?.filter_map(|r| r.ok()).collect();
+        result.push(FriendRecipesEntry { friend_id, friend_name, recipe_ids });
+    }
+    Ok(result)
+}

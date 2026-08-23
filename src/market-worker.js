@@ -91,10 +91,14 @@ function buildTreeSync(itemId, count, resolvedRecipes, depth = 0, rootRecipe = n
   return { itemId, count, outputCount, children, isLeaf: false };
 }
 
-function flatLeaves(node, ownedMap = {}, needed = null) {
+function flatLeaves(node, ownedMap = {}, needed = null, isRoot = true) {
   const count = needed !== null ? needed : node.count;
   const owned = ownedMap[node.itemId] || 0;
-  if (node.isLeaf || owned >= count) return [{ itemId: node.itemId, count }];
+  // Root node is the recipe's own output item, not an ingredient — owning existing copies
+  // of the finished item (e.g. one already sitting in bags) must never short-circuit the
+  // ingredient breakdown for crafting ANOTHER one. Only intermediate ingredients get the
+  // "already own enough, stop flattening" shortcut. See App.jsx's flatLeaves for the same fix.
+  if (node.isLeaf || (!isRoot && owned >= count)) return [{ itemId: node.itemId, count }];
   const outputCount = node.outputCount || 1;
   const treeRuns = Math.ceil(node.count / outputCount);
   const actualRuns = Math.ceil(count / outputCount);
@@ -102,7 +106,7 @@ function flatLeaves(node, ownedMap = {}, needed = null) {
   const acc = {};
   for (const child of node.children) {
     const childNeeded = Math.ceil(child.count * scale);
-    for (const leaf of flatLeaves(child, ownedMap, childNeeded)) {
+    for (const leaf of flatLeaves(child, ownedMap, childNeeded, false)) {
       acc[leaf.itemId] = (acc[leaf.itemId] || 0) + leaf.count;
     }
   }
