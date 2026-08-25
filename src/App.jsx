@@ -1522,6 +1522,7 @@ export default function App() {
   const [gemAlertThresholdGold, setGemAlertThresholdGold] = useState(0); // 0 = disabled
   const [settingsGemAlertThresholdGold, setSettingsGemAlertThresholdGold] = useState(0);
   const gemAlertFiredRef = useRef(false); // prevents re-toasting every minute while still under threshold
+  const gemAlertThresholdGoldRef = useRef(0); // mirrors gemAlertThresholdGold so fetchGemPrice can stay dependency-free
   const [priceAlerts, setPriceAlerts] = useState([]);
   const [forgeWallet, setForgeWallet] = useState({}); // spirit_shards, volatile_magic, unbound_magic, karma, laurels
   const [alertSort, setAlertSort] = useState("totalNet"); // totalNet | cur | pctOfMax
@@ -2826,17 +2827,29 @@ export default function App() {
   // cadence as TP prices. coins_per_gem is stable across quantity, so we sample at
   // a representative 400g and extrapolate ×400 rather than trying to solve for the
   // exact coin amount that yields exactly 400 gems.
+  //
+  // cache: "no-store" is required here — quantity is a fixed constant, so this is
+  // the same URL on every single poll. Without it, the webview's HTTP cache was
+  // silently serving a stale response instead of hitting the network, so the card
+  // only ever changed whenever the browser cache entry happened to expire rather
+  // than on our 60s cadence. Bypassed via raw fetch rather than publicFetch so the
+  // shared helper (used for items/recipes, where caching is fine) is untouched.
+  useEffect(() => { gemAlertThresholdGoldRef.current = gemAlertThresholdGold; }, [gemAlertThresholdGold]);
+
   const fetchGemPrice = useCallback(async () => {
     try {
-      const res = await publicFetch(`${BASE}/commerce/exchange/coins?quantity=${GEM_QUANTITY_COPPER}`);
-      const coinsPerGem = res.coins_per_gem;
+      const res = await fetch(`${BASE}/commerce/exchange/coins?quantity=${GEM_QUANTITY_COPPER}`, { cache: "no-store" });
+      if (!res.ok) throw new Error(`API error ${res.status}`);
+      const json = await res.json();
+      const coinsPerGem = json.coins_per_gem;
       const costFor400 = Math.round(coinsPerGem * 400);
       const entry = { coinsPerGem, costFor400, ts: Date.now() };
       setGemPrice(entry);
       cacheSet("lastGemPrice", entry);
 
-      if (gemAlertThresholdGold > 0) {
-        const thresholdCopper = gemAlertThresholdGold * 10000;
+      const threshold = gemAlertThresholdGoldRef.current;
+      if (threshold > 0) {
+        const thresholdCopper = threshold * 10000;
         if (costFor400 <= thresholdCopper) {
           if (!gemAlertFiredRef.current) {
             gemAlertFiredRef.current = true;
@@ -2848,7 +2861,7 @@ export default function App() {
         }
       }
     } catch (e) { console.warn("[GemPrice] fetch failed:", e.message); }
-  }, [gemAlertThresholdGold]);
+  }, []); // stable — matches refreshPrices/refreshRecipes, which also never change identity
 
   useEffect(() => {
     if (loadState.phase !== "done") return;
@@ -2860,7 +2873,7 @@ export default function App() {
       gemInterval = setInterval(fetchGemPrice, PRICE_REFRESH_MS);
     }, 100);
     return () => { clearInterval(waitForData); clearInterval(gemInterval); };
-  }, [loadState.phase, fetchGemPrice]);
+  }, [loadState.phase]);
 
   // ── Update check + changelog ─────────────────────────────────────────────────
   const [appVersion, setAppVersion] = useState(null);
