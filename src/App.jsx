@@ -3469,7 +3469,8 @@ export default function App() {
         <input type="checkbox" checked={showRecDailyOutputs} onChange={e => setShowRecDailyOutputs(e.target.checked)} />
         Include crafts using daily ingredients
         </label>
-        <RarityDropdown rarityFilter={rarityFilter} setRarityFilter={setRarityFilter} />
+        {/* Rarities dropdown moved to CraftingTab's shared .ctrl bar (renders above this
+            component on every tab, not just Recommended) — see that bar for the control. */}
         </div>
         </div>
 
@@ -4125,6 +4126,7 @@ export default function App() {
       Show missing materials
       </label>
       <FriendFilterDropdown friends={friends} friendFilter={friendFilter} setFriendFilter={setFriendFilter} />
+      <RarityDropdown rarityFilter={rarityFilter} setRarityFilter={setRarityFilter} />
       <div style={{ marginLeft:"auto", fontSize:11, color:"var(--text3)", fontFamily:"Cinzel,serif", letterSpacing:1 }}>
       Ranked by profit × market velocity
       </div>
