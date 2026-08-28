@@ -1587,6 +1587,7 @@ export default function App() {
   const [friendRecipeMap, setFriendRecipeMap] = useState({}); // recipeId -> [{friendId, friendName}]
   const [friendFilter, setFriendFilter] = useState(DEFAULT_FRIEND_FILTER);
   const [friendNameInput, setFriendNameInput] = useState("");
+  const [recipeLookupId, setRecipeLookupId] = useState("");
   const [friendKeyInput, setFriendKeyInput] = useState("");
   const [friendBusy, setFriendBusy] = useState(false);
   const [friendActionMsg, setFriendActionMsg] = useState(null); // {ok, text}
@@ -4808,6 +4809,57 @@ export default function App() {
         </button>
         </div>
       ))}
+      {friends.length > 0 && (
+        <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--border)" }}>
+          <div style={{ fontSize: 11, color: "var(--text3)", marginBottom: 6, lineHeight: 1.6 }}>
+            <strong style={{ color: "var(--gold1)" }}>🔍 Diagnostic: check a specific recipe ID</strong> — for a "friend
+            knows this but it's not showing" case, this checks each stage of the pipeline directly instead of guessing.
+            Find the recipe's numeric ID on the wiki page (in the "API" row of the Recipes table).
+          </div>
+          <input type="number" value={recipeLookupId} onChange={e => setRecipeLookupId(e.target.value)}
+            placeholder="Recipe ID, e.g. 2555"
+            style={{ width: 180, background: "var(--bg3)", border: "1px solid var(--border)", borderRadius: 4, padding: "5px 10px", color: "var(--text1)", fontSize: 12, fontFamily: "monospace" }} />
+          {recipeLookupId && (() => {
+            const rid = Number(recipeLookupId);
+            const inFriendMap = friendRecipeMap[rid];
+            const lockedEntry = lockedCraftItems.find(ci => ci.recipeId === rid);
+            let knownEntry = null, knownDisc = null;
+            for (const d of Object.keys(data?.byDisc || {})) {
+              const hit = (data.byDisc[d] || []).find(ci => ci.recipeId === rid);
+              if (hit) { knownEntry = hit; knownDisc = d; break; }
+            }
+            const inFriendOnlyItems = friendOnlyCraftItems.find(ci => ci.recipeId === rid);
+            return (
+              <div style={{ marginTop: 10, fontSize: 12, lineHeight: 2, background: "var(--bg3)", border: "1px solid var(--border)", borderRadius: 4, padding: "10px 14px" }}>
+                <div>
+                  <strong style={{ color: "var(--text2)" }}>1. friendRecipeMap</strong> (does a friend actually have this recipe id, per last refresh): {" "}
+                  {inFriendMap
+                    ? <span style={{ color: "var(--green2)" }}>✓ yes — {inFriendMap.map(b => b.friendName).join(", ")}</span>
+                    : <span style={{ color: "var(--red2,#e05555)" }}>✗ not found for any friend</span>}
+                </div>
+                <div>
+                  <strong style={{ color: "var(--text2)" }}>2. lockedCraftItems</strong> (your own unlearned-recipe catalog): {" "}
+                  {lockedEntry
+                    ? <span style={{ color: "var(--green2)" }}>✓ present — disciplines: [{(lockedEntry.disciplines || []).join(", ") || "none, falls back to Uncategorized"}], canCraft: {String(lockedEntry.canCraft)}, rarity: {lockedEntry.rarity || "—"}</span>
+                    : <span style={{ color: "var(--red2,#e05555)" }}>✗ not in your locked catalog at all — not yet scanned, or you already know it</span>}
+                </div>
+                <div>
+                  <strong style={{ color: "var(--text2)" }}>3. Your own known recipes</strong> (data.byDisc, any discipline): {" "}
+                  {knownEntry
+                    ? <span style={{ color: "var(--gold2)" }}>⚠ already known under {knownDisc} — this is why no friend badge shows: you know it yourself</span>
+                    : <span style={{ color: "var(--text3)" }}>not found — you don't know it yourself</span>}
+                </div>
+                <div>
+                  <strong style={{ color: "var(--text2)" }}>4. friendOnlyCraftItems</strong> (the actual merged list Crafting Profits/Recommended read from): {" "}
+                  {inFriendOnlyItems
+                    ? <span style={{ color: "var(--green2)" }}>✓ present — disciplines: [{(inFriendOnlyItems.disciplines || []).join(", ") || "none"}]</span>
+                    : <span style={{ color: "var(--red2,#e05555)" }}>✗ not present</span>}
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
       <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 8, fontStyle: "italic" }}>
       Refreshes automatically once a day, or use 🔄 above anytime. A friend's known-recipe list doesn't reflect whether
       they've already used today's daily-crafting cooldown — just whether they know how to make it.
