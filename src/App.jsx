@@ -2568,6 +2568,31 @@ export default function App() {
       .map(ci => ({ ...ci, friendBadges: friendRecipeMap[ci.recipeId], isFriendOnly: true }));
   }, [lockedCraftItems, friendRecipeMap]);
 
+  // Discovery-eligible recipes that already show as a normal "known" card in Crafting Profits
+  // purely because the discipline rating is met (see the autoUnlocked heuristic in fullLoad),
+  // but were never actually discovered — i.e. not present in the account's real
+  // /account/recipes list. When a friend genuinely knows one of these, this does NOT create a
+  // new card (the recipe already has one, unmodified, in data.byDisc) — it maps recipeId ->
+  // friend badges so CraftingTab/RecommendedTab can attach a badge onto the EXISTING card
+  // instead of adding a duplicate. Deliberately does not touch lockedCraftItems or the
+  // Unlearned Recipes catalog at all — these recipes must keep NOT appearing there, per design.
+  const friendKnownEligibleBadges = useMemo(() => {
+    const map = {};
+    if (!data?.byDisc || Object.keys(friendRecipeMap).length === 0) return map;
+    const trulyKnownIds = new Set(cacheRef.current.knownRecipeIds || []);
+    const seen = new Set();
+    for (const disc of Object.keys(data.byDisc)) {
+      for (const ci of (data.byDisc[disc] || [])) {
+        if (seen.has(ci.recipeId) || trulyKnownIds.has(ci.recipeId)) continue;
+        const badges = friendRecipeMap[ci.recipeId];
+        if (!badges) continue;
+        seen.add(ci.recipeId);
+        map[ci.recipeId] = badges;
+      }
+    }
+    return map;
+  }, [data, friendRecipeMap]);
+
   // ── Friend key management ────────────────────────────────────────────────────
   const handleAddFriend = useCallback(async () => {
     const name = friendNameInput.trim();
@@ -3286,6 +3311,19 @@ export default function App() {
       }
     }
 
+    // Attach a friend badge onto items that already exist above because they're Discovery-eligible
+    // (rating met) but not genuinely discovered — see friendKnownEligibleBadges. Never adds or
+    // removes an item, only decorates an existing one with a badge if a friend genuinely knows it.
+    if (friendFilter.enabled && Object.keys(friendKnownEligibleBadges).length > 0) {
+      for (let i = 0; i < allItems.length; i++) {
+        const badges = friendKnownEligibleBadges[allItems[i].recipeId];
+        if (!badges) continue;
+        const visibleBadges = badges.filter(b => friendFilter.byFriend[b.friendId] !== false);
+        if (visibleBadges.length === 0) continue;
+        allItems[i] = { ...allItems[i], friendBadges: visibleBadges };
+      }
+    }
+
     // Friend-only candidates: recipes the user doesn't know but an added friend
     // does. These are never in data.byDisc (they're not known/learned), so they
     // can't already be in `seen` — merged in here, scored by the exact same
@@ -3504,10 +3542,14 @@ export default function App() {
               ? <span className="bhave" style={{ background: "rgba(80,120,200,0.15)", borderColor: "rgba(80,120,200,0.4)", color: "#9bbcf5" }}>📦 Raw</span>
               : ci.canCraft ? <span className="bhave">✓ Can Craft</span> : <span className="bmiss">✗ Missing</span>
             }
-            {/* Friend-only badge: shown only when the user doesn't know this recipe
-                themselves and a friend does — not shown if the user also knows it. */}
-            {ci.isFriendOnly && ci.friendBadges?.map(b => (
-              <span key={b.friendId} title={`${b.friendName} knows this recipe — you don't. Materials shown are yours.`}
+            {/* Friend badge: Case A (isFriendOnly) = user doesn't know this at all, only a friend
+                does. Case B (friendBadges present without isFriendOnly) = this card already shows
+                as "known" because the user's discipline rating qualifies, but they haven't actually
+                discovered it — a friend genuinely has. Different tooltip explains which applies. */}
+            {ci.friendBadges?.map(b => (
+              <span key={b.friendId} title={ci.isFriendOnly
+                ? `${b.friendName} knows this recipe — you don't. Materials shown are yours.`
+                : `${b.friendName} has genuinely discovered this recipe. You're shown as able to craft it because your discipline rating qualifies, but you haven't actually discovered it yourself yet.`}
                 style={{ fontSize: 10, fontFamily: "Cinzel,serif", letterSpacing: 1, padding: "2px 7px", borderRadius: 3, background: "rgba(159,77,255,.12)", border: "1px solid rgba(159,77,255,.4)", color: "#c9a0ff", whiteSpace: "nowrap" }}>
                 🛠 {b.friendName}
               </span>
@@ -3658,7 +3700,7 @@ export default function App() {
         )}
         </div>
     );
-  }, [data, velocitySummary, trendSummary, showRecMaterials, showRecDaily, showRecDailyOutputs, showRecMissing, rarityFilter, expanded, dailyCrafted, myListings, mySoldHistory, craftingChartItem, friendOnlyCraftItems, friendFilter]);
+  }, [data, velocitySummary, trendSummary, showRecMaterials, showRecDaily, showRecDailyOutputs, showRecMissing, rarityFilter, expanded, dailyCrafted, myListings, mySoldHistory, craftingChartItem, friendOnlyCraftItems, friendFilter, friendKnownEligibleBadges]);
 
   // ── Unlearned Recipes tab ────────────────────────────────────────────────────
   // Ranks recipes you don't know by the same craftAdvantage × sellFillsPerHr formula
@@ -3973,6 +4015,18 @@ export default function App() {
       );
       items = [...items, ...friendItemsForDisc];
     }
+    // Attach a friend badge onto cards that already exist here because they're Discovery-eligible
+    // (rating met) but not genuinely discovered — see friendKnownEligibleBadges above. Never adds
+    // or removes a card, only decorates an existing one with a badge if a friend genuinely knows it.
+    if (friendFilter.enabled && Object.keys(friendKnownEligibleBadges).length > 0) {
+      items = items.map(i => {
+        const badges = friendKnownEligibleBadges[i.recipeId];
+        if (!badges) return i;
+        const visibleBadges = badges.filter(b => friendFilter.byFriend[b.friendId] !== false);
+        if (visibleBadges.length === 0) return i;
+        return { ...i, friendBadges: visibleBadges };
+      });
+    }
     if (!showRecMissing) items = items.filter(i => i.canCraft);
     items = items.filter(ci => passesRarityFilter(ci.rarity, rarityFilter));
 
@@ -4159,8 +4213,10 @@ export default function App() {
             )}
             {ci.outputCount > 1 && <span style={{ color: "var(--text3)", fontSize: 13 }}>×{ci.outputCount}</span>}
             {ci.canCraft ? <span className="bhave">✓ Can Craft</span> : <span className="bmiss">✗ Missing</span>}
-            {ci.isFriendOnly && ci.friendBadges?.map(b => (
-              <span key={b.friendId} title={`${b.friendName} knows this recipe — you don't. Materials shown are yours.`}
+            {ci.friendBadges?.map(b => (
+              <span key={b.friendId} title={ci.isFriendOnly
+                ? `${b.friendName} knows this recipe — you don't. Materials shown are yours.`
+                : `${b.friendName} has genuinely discovered this recipe. You're shown as able to craft it because your discipline rating qualifies, but you haven't actually discovered it yourself yet.`}
                 style={{ fontSize: 10, fontFamily: "Cinzel,serif", letterSpacing: 1, padding: "2px 7px", borderRadius: 3, background: "rgba(159,77,255,.12)", border: "1px solid rgba(159,77,255,.4)", color: "#c9a0ff", whiteSpace: "nowrap" }}>
                 🛠 {b.friendName}
               </span>
@@ -4590,7 +4646,7 @@ export default function App() {
         </>}
         </div>
     );
-  }, [data, activeDisc, showRecMissing, rarityFilter, searchCraft, expanded, dailyCrafted, manualDailyCrafted, resetCountdown, myListings, mySoldHistory, velocitySummary, trendSummary, craftingChartItem, craftPage, RecommendedTab, UnlearnedRecipesTab, unlearnedRecipeCount, unlearnedLoading, friendOnlyCraftItems, friendFilter, friends]);
+  }, [data, activeDisc, showRecMissing, rarityFilter, searchCraft, expanded, dailyCrafted, manualDailyCrafted, resetCountdown, myListings, mySoldHistory, velocitySummary, trendSummary, craftingChartItem, craftPage, RecommendedTab, UnlearnedRecipesTab, unlearnedRecipeCount, unlearnedLoading, friendOnlyCraftItems, friendFilter, friends, friendKnownEligibleBadges]);
 
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
