@@ -3495,22 +3495,10 @@ export default function App() {
         : "Accumulating market data — ranking by profit until enough data collected"}
         </span>
         </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-        <label style={{ fontSize: 12, color: "var(--text3)", display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}>
-        <input type="checkbox" checked={showRecMaterials} onChange={e => setShowRecMaterials(e.target.checked)} />
-        Include raw materials
-        </label>
-        <label style={{ fontSize: 12, color: "var(--text3)", display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }} title="Include time-gated daily crafts (Glob of Elder Spirit Residue, etc.) in recommendations">
-        <input type="checkbox" checked={showRecDaily} onChange={e => setShowRecDaily(e.target.checked)} />
-        Include daily-gated items
-        </label>
-        <label style={{ fontSize: 12, color: "var(--text3)", display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }} title="Show items that REQUIRE a daily material as an ingredient (e.g. Bolt of Damask uses Spool of Weaving Thread). Uncheck to hide crafts that depend on dailies.">
-        <input type="checkbox" checked={showRecDailyOutputs} onChange={e => setShowRecDailyOutputs(e.target.checked)} />
-        Include crafts using daily ingredients
-        </label>
-        {/* Rarities dropdown moved to CraftingTab's shared .ctrl bar (renders above this
-            component on every tab, not just Recommended) — see that bar for the control. */}
-        </div>
+        {/* "Include raw materials" / "Include daily-gated items" / "Include crafts using daily
+            ingredients" checkboxes, and the Rarities dropdown, all moved to CraftingTab's shared
+            .ctrl bar (renders above this component on every tab, not just Recommended) — see
+            that bar for the controls. */}
         </div>
 
         {sorted.length === 0 && (
@@ -4029,6 +4017,8 @@ export default function App() {
     }
     if (!showRecMissing) items = items.filter(i => i.canCraft);
     items = items.filter(ci => passesRarityFilter(ci.rarity, rarityFilter));
+    items = items.filter(i => showRecDaily || !DAILY_CRAFT_IDS.has(i.outputId));
+    items = items.filter(i => showRecDailyOutputs || !DAILY_CRAFT_IDS.has(i.outputId));
 
     // Recommendation score — uses accumulated global market velocity data
     // sellFillsPerHr: how many sell listings are getting snapped up by buyers per hour (global)
@@ -4179,6 +4169,18 @@ export default function App() {
       <label className="cbl" title="Also applies to the Recommended tab">
       <input type="checkbox" checked={showRecMissing} onChange={e => setShowRecMissing(e.target.checked)} />
       Show missing materials
+      </label>
+      <label className="cbl" title="Only affects the ⭐ Recommended tab — raw materials aren't tied to a crafting discipline, so this has no effect on the other tabs">
+      <input type="checkbox" checked={showRecMaterials} onChange={e => setShowRecMaterials(e.target.checked)} />
+      Include raw materials
+      </label>
+      <label className="cbl" title="Include time-gated daily crafts (Glob of Elder Spirit Residue, etc.)">
+      <input type="checkbox" checked={showRecDaily} onChange={e => setShowRecDaily(e.target.checked)} />
+      Include daily-gated items
+      </label>
+      <label className="cbl" title="Show items that REQUIRE a daily material as an ingredient (e.g. Bolt of Damask uses Spool of Weaving Thread). Uncheck to hide crafts that depend on dailies.">
+      <input type="checkbox" checked={showRecDailyOutputs} onChange={e => setShowRecDailyOutputs(e.target.checked)} />
+      Include crafts using daily ingredients
       </label>
       <FriendFilterDropdown friends={friends} friendFilter={friendFilter} setFriendFilter={setFriendFilter} />
       <RarityDropdown rarityFilter={rarityFilter} setRarityFilter={setRarityFilter} />
@@ -4646,7 +4648,7 @@ export default function App() {
         </>}
         </div>
     );
-  }, [data, activeDisc, showRecMissing, rarityFilter, searchCraft, expanded, dailyCrafted, manualDailyCrafted, resetCountdown, myListings, mySoldHistory, velocitySummary, trendSummary, craftingChartItem, craftPage, RecommendedTab, UnlearnedRecipesTab, unlearnedRecipeCount, unlearnedLoading, friendOnlyCraftItems, friendFilter, friends, friendKnownEligibleBadges]);
+  }, [data, activeDisc, showRecMissing, showRecMaterials, showRecDaily, showRecDailyOutputs, rarityFilter, searchCraft, expanded, dailyCrafted, manualDailyCrafted, resetCountdown, myListings, mySoldHistory, velocitySummary, trendSummary, craftingChartItem, craftPage, RecommendedTab, UnlearnedRecipesTab, unlearnedRecipeCount, unlearnedLoading, friendOnlyCraftItems, friendFilter, friends, friendKnownEligibleBadges]);
 
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
