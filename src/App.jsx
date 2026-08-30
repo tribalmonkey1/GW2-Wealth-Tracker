@@ -653,6 +653,23 @@ function flatAllNodes(node, depth = 0) {
   return [self, ...children];
 }
 
+// Checks whether any ingredient ANYWHERE in a recipe's tree (any depth, not just the direct/
+// first-level ones) is itself a daily-gated item — e.g. Bolt of Damask requires Spool of Silk
+// Weaving Thread, which is capped at one craft per day. The root node is the recipe's own
+// OUTPUT, not an ingredient, so it's never itself counted as a "daily ingredient" here — that's
+// a separate question (whether the craft's own output is daily-gated), checked elsewhere via
+// dailySet.has(ci.outputId) directly.
+function treeUsesDailyIngredient(node, dailySet, isRoot = true) {
+  if (!node) return false;
+  if (!isRoot && dailySet.has(node.itemId)) return true;
+  if (node.children) {
+    for (const child of node.children) {
+      if (treeUsesDailyIngredient(child, dailySet, false)) return true;
+    }
+  }
+  return false;
+}
+
 // For a given item+count, find the best sell strategy recursively.
 // Returns { value, path } where path is an array of { itemId, count, name, sellPrice }
 function bestSellValue(itemId, count, resolvedRecipes, priceMap, itemMap, depth = 0) {
@@ -3356,7 +3373,7 @@ export default function App() {
       ...(showRecMissing ? allItems : allItems.filter(i => i.canCraft)),
                                  ...matCandidates,
     ].filter(i => showRecDaily || !dailyIds.has(i.outputId))
-    .filter(i => showRecDailyOutputs || !dailyIds.has(i.outputId))
+    .filter(i => showRecDailyOutputs || !treeUsesDailyIngredient(i.tree, ALL_DAILY_CRAFT_IDS))
     .filter(i => passesRarityFilter(i.rarity, rarityFilter))
 
 
@@ -4018,7 +4035,7 @@ export default function App() {
     if (!showRecMissing) items = items.filter(i => i.canCraft);
     items = items.filter(ci => passesRarityFilter(ci.rarity, rarityFilter));
     items = items.filter(i => showRecDaily || !DAILY_CRAFT_IDS.has(i.outputId));
-    items = items.filter(i => showRecDailyOutputs || !DAILY_CRAFT_IDS.has(i.outputId));
+    items = items.filter(i => showRecDailyOutputs || !treeUsesDailyIngredient(i.tree, ALL_DAILY_CRAFT_IDS));
 
     // Recommendation score — uses accumulated global market velocity data
     // sellFillsPerHr: how many sell listings are getting snapped up by buyers per hour (global)
