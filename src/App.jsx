@@ -3689,6 +3689,7 @@ export default function App() {
     ].filter(i => showRecDaily || !dailyIds.has(i.outputId))
     .filter(i => showRecDailyOutputs || !treeUsesDailyIngredient(i.tree, ALL_DAILY_CRAFT_IDS))
     .filter(i => passesRarityFilter(i.rarity, rarityFilter))
+    .filter(i => i.name.toLowerCase().includes(searchCraft.toLowerCase()))
 
 
     // Score all items
@@ -4016,7 +4017,7 @@ export default function App() {
         )}
         </div>
     );
-  }, [data, velocitySummary, trendSummary, showRecMaterials, showRecDaily, showRecDailyOutputs, showRecMissing, rarityFilter, expanded, dailyCrafted, myListings, mySoldHistory, craftingChartItem, friendOnlyCraftItems, friendFilter, friendKnownEligibleBadges]);
+  }, [data, velocitySummary, trendSummary, showRecMaterials, showRecDaily, showRecDailyOutputs, showRecMissing, rarityFilter, expanded, dailyCrafted, myListings, mySoldHistory, craftingChartItem, friendOnlyCraftItems, friendFilter, friendKnownEligibleBadges, searchCraft]);
 
   // ── Unlearned Recipes tab ────────────────────────────────────────────────────
   // Ranks recipes you don't know by the same craftAdvantage × sellFillsPerHr formula
@@ -4043,6 +4044,7 @@ export default function App() {
       items = items.filter(ci => !(ci.flags || []).includes("AutoLearned"));
     }
     items = items.filter(ci => passesRarityFilter(ci.rarity, rarityFilter));
+    items = items.filter(ci => ci.name.toLowerCase().includes(searchCraft.toLowerCase()));
 
     const MIN_OBS = 5;
     items = items.map(ci => {
@@ -4259,7 +4261,7 @@ export default function App() {
       )}
       </div>
     );
-  }, [data, lockedCraftItems, velocitySummary, hideZeroProfitUnlearned, hideAutoLearnedUnlearned, rarityFilter, unlearnedRecipeCount, unlearnedLoading, expanded, craftingChartItem]);
+  }, [data, lockedCraftItems, velocitySummary, hideZeroProfitUnlearned, hideAutoLearnedUnlearned, rarityFilter, unlearnedRecipeCount, unlearnedLoading, expanded, craftingChartItem, searchCraft]);
 
   const CraftingTab = useMemo(() => {
     if (!data) return null;
