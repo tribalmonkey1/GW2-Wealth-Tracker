@@ -401,6 +401,58 @@ function filterTradeable(ids, itemMap) {
   });
 }
 
+// ── Locked-catalog item/price resolution ──────────────────────────────────────
+// Every place that builds or merges the "locked" (not-owned) recipe catalog for
+// 🔒 Unlearned Recipes — the weekly incremental diff (refreshUnlearnedRecipesCatalog)
+// AND the "Rescan Auto-Unlocked Recipes" button's opportunistic seed — needs the
+// same item-name/icon/price coverage for its output+ingredient IDs, or cards fall
+// back to "Item {id}" with a 0 sell price and a misleading negative Craft Advantage
+// (ingredients still get priced off existing itemMap/priceMap; only the unresolved
+// output stays blank). Historically only the weekly job did this fetch — the
+// rescan-button seed merged straight into the persisted allGameRecipes cache with
+// NO resolution pass at all, which is why most of a rescan-seeded catalog could show
+// unnamed placeholder cards indefinitely: the weekly job's incremental diff only
+// re-fetches genuinely-NEW recipe IDs, so it never revisits IDs the rescan button
+// already wrote into the cache. Centralizing this here gives every caller the same
+// coverage guarantee instead of only the one that happened to remember to do it.
+async function resolveLockedCatalogCoverage(recipesArr, itemMap, priceMap) {
+  const lockedItemIds = new Set();
+  for (const r of recipesArr) {
+    lockedItemIds.add(r.output_item_id);
+    for (const ing of (r.ingredients || [])) lockedItemIds.add(ing.item_id);
+  }
+  const missingItemIds = [...lockedItemIds].filter(id => id && !itemMap[id]);
+  let resolvedItems = 0;
+  if (missingItemIds.length) {
+    const ni = await fetchIds("/items", missingItemIds);
+    ni.forEach(i => { itemMap[i.id] = i; });
+    resolvedItems = ni.length;
+  }
+  const missingPriceIds = filterTradeable([...lockedItemIds], itemMap).filter(id => id && !priceMap[id]);
+  if (missingPriceIds.length) {
+    const np = await fetchPrices(missingPriceIds);
+    Object.assign(priceMap, np);
+  }
+  // requestedItemIds vs resolvedItems lets a caller notice a partial failure (e.g. a
+  // chunk silently dropped) instead of assuming "ran once" means "fully resolved" —
+  // GW2's bulk /items endpoint only ever returns entries for IDs that actually exist,
+  // so some gap here is normal, but a large one is worth logging.
+  return { itemMap, priceMap, requestedItemIds: missingItemIds.length, resolvedItems };
+}
+
+// Persists the stripped name/icon/rarity/type/flags view of itemMap to the personal
+// cache — same shape fullLoad() already writes — so items resolved while building the
+// locked catalog are available immediately on the NEXT app launch instead of needing
+// to be re-fetched every session before the tab shows real names.
+function persistItemMapCache(itemMap) {
+  cacheSet("itemMap", Object.fromEntries(
+    Object.entries(itemMap).map(([id, item]) => [id, {
+      id: item.id, name: item.name, icon: item.icon,
+      rarity: item.rarity, type: item.type, flags: item.flags,
+    }])
+  ));
+}
+
 // ── Character inventory aggregation ──────────────────────────────────────────
 // Returns { itemId: count } from all character bags (not material storage)
 function extractCharacterItems(characters) {
@@ -2779,12 +2831,28 @@ export default function App() {
           const mergedIds = [...new Set([...(idsEntry?.value || []), ...allRecipeIds])];
           const mergedDetails = dedupeRecipesById([...(detailsEntry?.value || []), ...stillLocked])
             .filter(r => !newlyEligibleIds.has(r.id));
+          // Resolve item names/icons/prices for this seed too — this scan can merge
+          // thousands of never-before-seen recipe IDs straight into the persisted
+          // allGameRecipes cache. Without this, most of the catalog would show as
+          // unnamed "Item {id}" placeholders with 0 sell price indefinitely: the
+          // weekly refreshUnlearnedRecipesCatalog job only re-fetches item data for
+          // IDs belonging to genuinely-NEW recipes, so once an unresolved recipe is
+          // written here, nothing else ever revisits it. See resolveLockedCatalogCoverage.
+          const { itemMap, priceMap } = cacheRef.current;
+          const coverage = await resolveLockedCatalogCoverage(mergedDetails, itemMap, priceMap);
+          if (coverage.requestedItemIds > 0) {
+            console.log(`[UnlearnedRecipes] rescan seed resolved ${coverage.resolvedItems}/${coverage.requestedItemIds} item names`);
+          }
+          cacheRef.current.itemMap = itemMap;
+          cacheRef.current.priceMap = priceMap;
           cacheRef.current.lockedRecipes = mergedDetails;
           await Promise.all([
             cacheSet("allGameRecipeIds", mergedIds),
             cacheSet("allGameRecipes", mergedDetails),
           ]);
+          if (coverage.resolvedItems > 0) persistItemMapCache(itemMap);
           setUnlearnedRecipeCount(mergedDetails.length);
+          setData(prev => prev ? { ...prev, itemMap: { ...prev.itemMap, ...itemMap }, priceMap: { ...prev.priceMap, ...priceMap } } : prev);
           computeAndSetLockedCraftItems(mergedDetails);
         } catch (e) { console.warn("[UnlearnedRecipes] seed from rescan failed:", e.message); }
       })();
@@ -3017,20 +3085,9 @@ export default function App() {
       // Expand item/price coverage to the locked catalog's ingredients+outputs — most
       // won't be in itemMap/priceMap yet since they were never relevant before this tab.
       const { itemMap, priceMap } = cacheRef.current;
-      const lockedItemIds = new Set();
-      merged.forEach(r => {
-        lockedItemIds.add(r.output_item_id);
-        (r.ingredients || []).forEach(ing => lockedItemIds.add(ing.item_id));
-      });
-      const missingItemIds = [...lockedItemIds].filter(id => id && !itemMap[id]);
-      if (missingItemIds.length) {
-        const ni = await fetchIds("/items", missingItemIds);
-        ni.forEach(i => { itemMap[i.id] = i; });
-      }
-      const missingPriceIds = filterTradeable([...lockedItemIds], itemMap).filter(id => !priceMap[id]);
-      if (missingPriceIds.length) {
-        const np = await fetchPrices(missingPriceIds);
-        Object.assign(priceMap, np);
+      const coverage = await resolveLockedCatalogCoverage(merged, itemMap, priceMap);
+      if (coverage.requestedItemIds > 0) {
+        console.log(`[UnlearnedRecipes] resolved ${coverage.resolvedItems}/${coverage.requestedItemIds} item names`);
       }
 
       cacheRef.current.itemMap = itemMap;
@@ -3042,6 +3099,7 @@ export default function App() {
         cacheSet("allGameRecipes", merged),
         cacheSet("lastUnlearnedRefresh", now),
       ]);
+      if (coverage.resolvedItems > 0) persistItemMapCache(itemMap);
       setUnlearnedRecipeCount(merged.length);
       setData(prev => prev ? { ...prev, itemMap: { ...prev.itemMap, ...itemMap }, priceMap: { ...prev.priceMap, ...priceMap } } : prev);
       await computeAndSetLockedCraftItems(merged);
@@ -3098,7 +3156,34 @@ export default function App() {
         // a week or more since the last successful diff (e.g. app wasn't opened for a while).
         const lastRun = lastRunEntry?.value || 0;
         const stale = !idsEntry?.value || (Date.now() - lastRun) >= UNLEARNED_REFRESH_MS;
-        if (stale) refreshUnlearnedRecipesCatalog();
+        if (stale) {
+          refreshUnlearnedRecipesCatalog();
+        } else if (detailsEntry?.value?.length) {
+          // Self-heal for a cache that's stuck with unresolved item names — the weekly
+          // diff above only re-fetches item data for IDs belonging to genuinely-NEW
+          // recipes, so a catalog seeded before item resolution was added (or by a
+          // rescan-button run that skipped it) would otherwise show "Item {id}"
+          // placeholders indefinitely, never touched again until it ages past
+          // UNLEARNED_REFRESH_MS. Cheap check every launch (no network unless it finds
+          // something unresolved): count cached recipes whose output item still isn't
+          // in itemMap, and if any are found, run a lightweight top-up — item/price
+          // resolution only, no recipe-ID fetch/diff — instead of a full catalog rescan.
+          const unresolvedCount = detailsEntry.value.filter(r => !cacheRef.current.itemMap?.[r.output_item_id]).length;
+          if (unresolvedCount > 0) {
+            (async () => {
+              const { itemMap: im, priceMap: pm } = cacheRef.current;
+              const coverage = await resolveLockedCatalogCoverage(detailsEntry.value, im, pm);
+              if (coverage.resolvedItems > 0) {
+                console.log(`[UnlearnedRecipes] self-heal resolved ${coverage.resolvedItems}/${coverage.requestedItemIds} previously-unnamed items`);
+                cacheRef.current.itemMap = im;
+                cacheRef.current.priceMap = pm;
+                persistItemMapCache(im);
+                setData(prev => prev ? { ...prev, itemMap: { ...prev.itemMap, ...im }, priceMap: { ...prev.priceMap, ...pm } } : prev);
+                computeAndSetLockedCraftItems(detailsEntry.value);
+              }
+            })();
+          }
+        }
       })();
       unlearnedInterval = setInterval(refreshUnlearnedRecipesCatalog, UNLEARNED_REFRESH_MS);
     }, 100);
