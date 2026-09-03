@@ -531,6 +531,7 @@ pub fn reset_database(personal: State<'_, PersonalDbState>) -> Result<(), String
         DELETE FROM flip_history;
         DELETE FROM manual_daily_resets;
         DELETE FROM friend_recipes_known;
+        DELETE FROM friend_discipline_levels;
         DELETE FROM friend_keys;
         DELETE FROM app_cache WHERE key NOT IN ('nas_api_url','nas_ssh');
         VACUUM;
@@ -602,8 +603,18 @@ pub struct FriendRecipesEntry {
     pub recipe_ids: Vec<i64>,
 }
 
+#[derive(Serialize, Deserialize, Clone)]
+pub struct FriendDisciplineEntry {
+    pub friend_id: i64,
+    pub friend_name: String,
+    pub discipline_levels: std::collections::HashMap<String, i64>,
+}
+
 fn gw2_get(path: &str, api_key: &str) -> Result<serde_json::Value, String> {
-    let url = format!("{}{}?access_token={}", GW2_API_BASE, path, api_key);
+    // `path` may already carry its own query string (e.g. "/characters?ids=all") —
+    // append access_token with the right separator either way.
+    let sep = if path.contains('?') { "&" } else { "?" };
+    let url = format!("{}{}{}access_token={}", GW2_API_BASE, path, sep, api_key);
     let resp = ureq::get(&url)
         .timeout(std::time::Duration::from_secs(15))
         .call()
@@ -637,6 +648,47 @@ fn fetch_friend_recipe_ids(api_key: &str) -> Result<Vec<i64>, String> {
     Ok(ids)
 }
 
+// Fetches a friend's max crafting discipline ratings (one entry per discipline,
+// the highest rating across all of that friend's characters — matches how the
+// account owner's own disciplineLevels are computed in App.jsx's fullLoad).
+// Requires the `characters` permission, checked up front for the same clearer-
+// error-message reason as fetch_friend_recipe_ids checks `unlocks`. This is
+// intentionally a separate, independently-failable fetch from recipe ids —
+// a friend's key can have `unlocks` without `characters` (or vice versa), and
+// callers (add_friend_key, refresh_friend_key) treat a failure here as
+// non-fatal: the friend is still added/refreshed with whatever recipe data
+// succeeded, they just won't get discipline-eligible ("could craft this via
+// their own rating, even if not formally discovered") matching until the key
+// is regenerated with both permissions.
+fn fetch_friend_discipline_levels(api_key: &str) -> Result<std::collections::HashMap<String, i64>, String> {
+    let token_info = gw2_get("/tokeninfo", api_key)
+        .map_err(|_| "Couldn't verify that API key — check it was copied correctly.".to_string())?;
+    let permissions: Vec<String> = token_info["permissions"]
+        .as_array()
+        .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+        .unwrap_or_default();
+    if !permissions.iter().any(|p| p == "characters") {
+        return Err("This API key is missing the 'Characters' permission, which is required to read crafting discipline levels. Ask your friend to generate a key with 'Characters' checked (in addition to 'Unlocks').".to_string());
+    }
+
+    let characters = gw2_get("/characters?ids=all", api_key)
+        .map_err(|_| "Couldn't fetch characters with that key — it may be invalid or revoked.".to_string())?;
+    let chars_arr = characters.as_array()
+        .ok_or_else(|| "Unexpected response from GW2 API (expected a list of characters).".to_string())?;
+
+    let mut max_levels: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
+    for ch in chars_arr {
+        let crafting = match ch["crafting"].as_array() { Some(c) => c, None => continue };
+        for c in crafting {
+            let discipline = match c["discipline"].as_str() { Some(d) if !d.is_empty() => d, _ => continue };
+            let rating = c["rating"].as_i64().unwrap_or(0);
+            let entry = max_levels.entry(discipline.to_string()).or_insert(0);
+            if rating > *entry { *entry = rating; }
+        }
+    }
+    Ok(max_levels)
+}
+
 #[tauri::command]
 pub fn add_friend_key(personal: State<'_, PersonalDbState>, name: String, api_key: String) -> Result<FriendSummary, String> {
     let name = name.trim().to_string();
@@ -645,6 +697,9 @@ pub fn add_friend_key(personal: State<'_, PersonalDbState>, name: String, api_ke
     if api_key.is_empty() { return Err("API key is required.".to_string()); }
 
     let recipe_ids = fetch_friend_recipe_ids(&api_key)?;
+    // Best-effort: a friend's key missing the "Characters" permission shouldn't
+    // block adding them at all — see fetch_friend_discipline_levels for why.
+    let discipline_levels = fetch_friend_discipline_levels(&api_key).unwrap_or_default();
     let now = chrono::Utc::now().timestamp_millis();
 
     let mut conn = personal.0.lock().map_err(|e| e.to_string())?;
@@ -660,6 +715,14 @@ pub fn add_friend_key(personal: State<'_, PersonalDbState>, name: String, api_ke
         ).map_err(|e| e.to_string())?;
         for rid in &recipe_ids {
             stmt.execute(params![friend_id, rid]).map_err(|e| e.to_string())?;
+        }
+    }
+    {
+        let mut stmt = tx.prepare(
+            "INSERT OR REPLACE INTO friend_discipline_levels (friend_id, discipline, rating) VALUES (?,?,?)"
+        ).map_err(|e| e.to_string())?;
+        for (discipline, rating) in &discipline_levels {
+            stmt.execute(params![friend_id, discipline, rating]).map_err(|e| e.to_string())?;
         }
     }
     tx.commit().map_err(|e| e.to_string())?;
@@ -682,6 +745,12 @@ pub fn refresh_friend_key(personal: State<'_, PersonalDbState>, id: i64) -> Resu
 
     match fetch_friend_recipe_ids(&api_key) {
         Ok(recipe_ids) => {
+            // Best-effort, independent of the recipe fetch above — a friend's key can lose/
+            // gain the "Characters" permission separately from "Unlocks". On failure, existing
+            // friend_discipline_levels rows are left untouched (last-known-good), same
+            // philosophy as the outer Err(e) branch below preserving last-known recipes.
+            let discipline_levels = fetch_friend_discipline_levels(&api_key).ok();
+
             let mut conn = personal.0.lock().map_err(|e| e.to_string())?;
             let tx = conn.transaction().map_err(|e| e.to_string())?;
             tx.execute("DELETE FROM friend_recipes_known WHERE friend_id=?", params![id]).map_err(|e| e.to_string())?;
@@ -691,6 +760,15 @@ pub fn refresh_friend_key(personal: State<'_, PersonalDbState>, id: i64) -> Resu
                 ).map_err(|e| e.to_string())?;
                 for rid in &recipe_ids {
                     stmt.execute(params![id, rid]).map_err(|e| e.to_string())?;
+                }
+            }
+            if let Some(levels) = &discipline_levels {
+                tx.execute("DELETE FROM friend_discipline_levels WHERE friend_id=?", params![id]).map_err(|e| e.to_string())?;
+                let mut stmt = tx.prepare(
+                    "INSERT OR REPLACE INTO friend_discipline_levels (friend_id, discipline, rating) VALUES (?,?,?)"
+                ).map_err(|e| e.to_string())?;
+                for (discipline, rating) in levels {
+                    stmt.execute(params![id, discipline, rating]).map_err(|e| e.to_string())?;
                 }
             }
             tx.execute("UPDATE friend_keys SET last_refresh_ts=?, last_refresh_ok=1 WHERE id=?", params![now, id]).map_err(|e| e.to_string())?;
@@ -714,6 +792,7 @@ pub fn delete_friend_key(personal: State<'_, PersonalDbState>, id: i64) -> Resul
     // Explicit delete of the child rows even though the FK has ON DELETE CASCADE —
     // belt-and-suspenders in case PRAGMA foreign_keys wasn't honored on this connection.
     conn.execute("DELETE FROM friend_recipes_known WHERE friend_id=?", params![id]).map_err(|e| e.to_string())?;
+    conn.execute("DELETE FROM friend_discipline_levels WHERE friend_id=?", params![id]).map_err(|e| e.to_string())?;
     conn.execute("DELETE FROM friend_keys WHERE id=?", params![id]).map_err(|e| e.to_string())?;
     Ok(())
 }
@@ -747,6 +826,32 @@ pub fn get_friend_recipes_known(personal: State<'_, PersonalDbState>) -> Result<
         let recipe_ids: Vec<i64> = rstmt.query_map(params![friend_id], |r| r.get(0))
             .map_err(|e| e.to_string())?.filter_map(|r| r.ok()).collect();
         result.push(FriendRecipesEntry { friend_id, friend_name, recipe_ids });
+    }
+    Ok(result)
+}
+
+// Powers App.jsx's friendDisciplineEligibleMap — per-friend max crafting discipline
+// ratings, same shape/pattern as get_friend_recipes_known above. A friend with no
+// friend_discipline_levels rows yet (key added before "Characters" was required, or
+// their key is missing that permission) simply comes back with an empty map; the
+// front end treats that as "no discipline-eligible matching for this friend" rather
+// than an error, so it degrades gracefully instead of blocking anything.
+#[tauri::command]
+pub fn get_friend_discipline_levels(personal: State<'_, PersonalDbState>) -> Result<Vec<FriendDisciplineEntry>, String> {
+    let conn = personal.0.lock().map_err(|e| e.to_string())?;
+    let mut stmt = conn.prepare("SELECT id, name FROM friend_keys ORDER BY added_ts ASC").map_err(|e| e.to_string())?;
+    let friends: Vec<(i64, String)> = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
+        .map_err(|e| e.to_string())?.filter_map(|r| r.ok()).collect();
+
+    let mut result = Vec::new();
+    for (friend_id, friend_name) in friends {
+        let mut rstmt = conn.prepare("SELECT discipline, rating FROM friend_discipline_levels WHERE friend_id=?").map_err(|e| e.to_string())?;
+        let discipline_levels: std::collections::HashMap<String, i64> = rstmt
+            .query_map(params![friend_id], |r| Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?)))
+            .map_err(|e| e.to_string())?
+            .filter_map(|r| r.ok())
+            .collect();
+        result.push(FriendDisciplineEntry { friend_id, friend_name, discipline_levels });
     }
     Ok(result)
 }

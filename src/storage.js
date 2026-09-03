@@ -404,9 +404,13 @@ export function computeLockedCraftItems(lockedRecipes, resolvedRecipes, itemMap,
 }
 
 // ── Friend Recipe Lookup ──────────────────────────────────────────────────────
-// Read-only: a friend's API key is used ONLY to fetch which recipes they know.
-// We never fetch their materials, wallet, or characters. See commands.rs for the
-// full design rationale (single-purpose, not multi-account support).
+// Read-only: a friend's API key is used ONLY to fetch which recipes they know
+// and their crafting discipline levels (needed to mirror the account owner's own
+// autoUnlocked/discipline-eligible heuristic on a per-friend basis — see
+// friendDisciplineEligibleMap in App.jsx). We never fetch their materials, wallet,
+// inventory, or bank. See commands.rs for the full design rationale (single-purpose,
+// not multi-account support). Discipline levels require the "Characters" permission
+// on the friend's API key, in addition to "Unlocks" for known recipes.
 
 export async function addFriendKey(name, apiKey) {
   return invoke("add_friend_key", { name, apiKey });
@@ -426,6 +430,18 @@ export async function getFriends() {
 
 export async function getFriendRecipesKnown() {
   return invoke("get_friend_recipes_known");
+}
+
+// Per-friend crafting discipline levels — e.g. [{ friend_id, friend_name,
+// discipline_levels: { Weaponsmith: 500, Tailor: 400, ... } }]. Powers the
+// discipline-eligible ("could make this via Discovery / auto-unlock right now,
+// even if not formally known") matching in App.jsx's friendDisciplineEligibleMap,
+// mirroring the same three-way eligibility the account owner's own Crafting
+// Profits/Recommended tabs already get (known / auto-learned / discoverable-now).
+// Requires the friend's key to have the "Characters" permission — refreshFriendKey
+// re-fetches both this and known-recipe IDs together, same cadence, same key.
+export async function getFriendDisciplineLevels() {
+  return invoke("get_friend_discipline_levels");
 }
 
 // Process startup cache data off the main thread (resolvedRecipes, matRows, totalMatValue)

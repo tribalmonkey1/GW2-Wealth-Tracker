@@ -553,6 +553,7 @@ import {
   pruneOldData as pruneOldSnapshots,
   getDbStats, importFromBrowser, exportAllData,
   addFriendKey, refreshFriendKey, deleteFriendKey, getFriends, getFriendRecipesKnown,
+  getFriendDisciplineLevels,
 } from "./storage.js";
 import { getCurrentVersion, checkForUpdate, getChangelog } from "./updater.js";
 import { DEFAULT_RARITY_FILTER, passesRarityFilter, RarityDropdown } from "./RarityFilter.jsx";
@@ -569,6 +570,42 @@ function buildFriendRecipeMap(entries) {
     }
   }
   return map;
+}
+
+// friendId -> { [discipline]: rating } — used by friendDisciplineEligibleMap to
+// mirror the account owner's own autoUnlocked heuristic on a per-friend basis.
+function buildFriendDisciplineMap(entries) {
+  const map = {};
+  for (const { friend_id, discipline_levels } of (entries || [])) {
+    map[friend_id] = discipline_levels || {};
+  }
+  return map;
+}
+
+// Friend badge tooltip + icon for the three cases a badge can represent:
+//  A. isFriendOnly: the user doesn't know this recipe at all — only a friend does
+//     (genuinely, or because the friend's own discipline rating qualifies them).
+//  B. !isFriendOnly, !viaDiscipline: the card already shows as "known" for the
+//     user because their OWN rating qualifies, but a friend has genuinely
+//     discovered it themselves.
+//  C. viaDiscipline: the friend hasn't necessarily discovered this recipe
+//     either — their crafting discipline rating simply meets the requirement,
+//     same three-way (known ∪ auto-learned ∪ discoverable-now) generosity the
+//     account owner's own tabs already extend to themselves.
+function friendBadgeInfo(b, ci) {
+  if (b.viaDiscipline) {
+    return {
+      icon: "⚙",
+      title: `${b.friendName}'s crafting discipline rating is high enough to make this themselves — even if it's not in their own formally known/discovered recipe list.`,
+    };
+  }
+  if (ci.isFriendOnly) {
+    return { icon: "🛠", title: `${b.friendName} knows this recipe — you don't. Materials shown are yours.` };
+  }
+  return {
+    icon: "🛠",
+    title: `${b.friendName} has genuinely discovered this recipe. You're shown as able to craft it because your discipline rating qualifies, but you haven't actually discovered it yourself yet.`,
+  };
 }
 
 function TrendBadge({ trend }) {
@@ -1968,6 +2005,7 @@ export default function App() {
   // ── Friend Recipe Lookup — read-only. See FriendFilter.jsx / commands.rs for design notes. ──
   const [friends, setFriends] = useState([]); // [{id, name, added_ts, last_refresh_ts, last_refresh_ok, recipe_count}]
   const [friendRecipeMap, setFriendRecipeMap] = useState({}); // recipeId -> [{friendId, friendName}]
+  const [friendDisciplineLevels, setFriendDisciplineLevels] = useState({}); // friendId -> { [discipline]: rating }
   const [friendFilter, setFriendFilter] = useState(DEFAULT_FRIEND_FILTER);
   const [friendNameInput, setFriendNameInput] = useState("");
   const [recipeLookupId, setRecipeLookupId] = useState("");
@@ -2607,6 +2645,7 @@ export default function App() {
     // Load friend recipe lookup data from personal.db
     getFriends().then(setFriends).catch(() => {});
     getFriendRecipesKnown().then(entries => setFriendRecipeMap(buildFriendRecipeMap(entries))).catch(() => {});
+    getFriendDisciplineLevels().then(entries => setFriendDisciplineLevels(buildFriendDisciplineMap(entries))).catch(() => {});
     invoke("cache_get", { key: "friendFilter" }).then(e => {
       if (e?.value) { try { setFriendFilter(JSON.parse(e.value)); } catch {} }
     }).catch(() => {});
@@ -2952,20 +2991,81 @@ export default function App() {
     setLockedCraftItems(enriched);
   }, []);
 
+  // ── Friend discipline-eligible matching ──────────────────────────────────────
+  // Mirrors the account owner's own `autoUnlocked` heuristic (fullLoad /
+  // rescanAutoUnlockedRecipes), but computed per-friend against that friend's
+  // crafting discipline levels instead of the owner's. A recipe qualifies for a
+  // friend here if: it has at least one discipline, it isn't LearnedFromItem
+  // (those need a consumable recipe sheet — a rating alone never grants them),
+  // and the friend's rating in at least one of those disciplines meets the
+  // recipe's min_rating — regardless of whether that friend's own
+  // /account/recipes actually lists it as formally known/discovered. This is
+  // the same "known ∪ auto-learned ∪ discoverable-now" three-way union the
+  // owner's own Crafting Profits/Recommended tabs already get, just re-run
+  // against friendDisciplineLevels. Requires the friend's key to include the
+  // "Characters" permission (see Settings → Friend Crafters).
+  const friendDisciplineEligibleMap = useMemo(() => {
+    const map = {};
+    const friendIds = Object.keys(friendDisciplineLevels);
+    if (friendIds.length === 0) return map;
+    const rawRecipes = [
+      ...(cacheRef.current.recipes || []),
+      ...(cacheRef.current.lockedRecipes || []),
+    ];
+    const seenIds = new Set();
+    for (const r of rawRecipes) {
+      if (seenIds.has(r.id)) continue;
+      seenIds.add(r.id);
+      if (!r.disciplines?.length) continue;
+      if ((r.flags || []).includes("LearnedFromItem")) continue;
+      for (const fid of friendIds) {
+        const levels = friendDisciplineLevels[fid];
+        const qualifies = r.disciplines.some(d => (levels[d] || 0) >= (r.min_rating || 0));
+        if (!qualifies) continue;
+        const friend = friends.find(f => f.id === fid);
+        if (!friend) continue;
+        if (!map[r.id]) map[r.id] = [];
+        map[r.id].push({ friendId: fid, friendName: friend.name, viaDiscipline: true });
+      }
+    }
+    return map;
+  }, [friendDisciplineLevels, friends, data, unlearnedRecipeCount, lockedCraftItems]);
+
+  // Union of genuinely-known-by-friend (friendRecipeMap) and discipline-eligible-
+  // for-friend (friendDisciplineEligibleMap) badges per recipe. Genuine knowledge
+  // wins when both apply for the same friend, since it's the stronger claim —
+  // viaDiscipline is only kept when that friend has no genuine match.
+  const combinedFriendRecipeMap = useMemo(() => {
+    const map = {};
+    const allIds = new Set([
+      ...Object.keys(friendRecipeMap),
+      ...Object.keys(friendDisciplineEligibleMap),
+    ]);
+    for (const ridStr of allIds) {
+      const rid = Number(ridStr);
+      const byFriend = {};
+      for (const b of (friendRecipeMap[rid] || [])) byFriend[b.friendId] = { ...b, viaDiscipline: false };
+      for (const b of (friendDisciplineEligibleMap[rid] || [])) if (!byFriend[b.friendId]) byFriend[b.friendId] = b;
+      map[rid] = Object.values(byFriend);
+    }
+    return map;
+  }, [friendRecipeMap, friendDisciplineEligibleMap]);
+
   // ── Friend Recipe Lookup: friend-only craft candidates ──────────────────────
-  // Recipes the user does NOT know, but at least one added friend does. Reuses
-  // the exact lockedCraftItems pipeline above (full-catalog recipe details ×
-  // the user's own materials/prices) rather than any friend-side data, so
+  // Recipes the user does NOT know, but at least one added friend either
+  // genuinely knows OR is discipline-eligible for. Reuses the exact
+  // lockedCraftItems pipeline above (full-catalog recipe details × the user's
+  // own materials/prices) rather than any friend-side data, so
   // craftAdvantage/canCraft/sellFillsPerHr scoring is identical to the user's
   // own recipes and always reflects the LOCAL user's inventory only — the
   // "still only show your materials" requirement falls out of this for free,
   // since lockedCraftItems was already built against cacheRef.current.ownedMap.
   const friendOnlyCraftItems = useMemo(() => {
-    if (!lockedCraftItems.length || Object.keys(friendRecipeMap).length === 0) return [];
+    if (!lockedCraftItems.length || Object.keys(combinedFriendRecipeMap).length === 0) return [];
     return lockedCraftItems
-      .filter(ci => friendRecipeMap[ci.recipeId])
-      .map(ci => ({ ...ci, friendBadges: friendRecipeMap[ci.recipeId], isFriendOnly: true }));
-  }, [lockedCraftItems, friendRecipeMap]);
+      .filter(ci => combinedFriendRecipeMap[ci.recipeId]?.length)
+      .map(ci => ({ ...ci, friendBadges: combinedFriendRecipeMap[ci.recipeId], isFriendOnly: true }));
+  }, [lockedCraftItems, combinedFriendRecipeMap]);
 
   // Discovery-eligible recipes that already show as a normal "known" card in Crafting Profits
   // purely because the discipline rating is met (see the autoUnlocked heuristic in fullLoad),
@@ -2977,20 +3077,20 @@ export default function App() {
   // Unlearned Recipes catalog at all — these recipes must keep NOT appearing there, per design.
   const friendKnownEligibleBadges = useMemo(() => {
     const map = {};
-    if (!data?.byDisc || Object.keys(friendRecipeMap).length === 0) return map;
+    if (!data?.byDisc || Object.keys(combinedFriendRecipeMap).length === 0) return map;
     const trulyKnownIds = new Set(cacheRef.current.knownRecipeIds || []);
     const seen = new Set();
     for (const disc of Object.keys(data.byDisc)) {
       for (const ci of (data.byDisc[disc] || [])) {
         if (seen.has(ci.recipeId) || trulyKnownIds.has(ci.recipeId)) continue;
-        const badges = friendRecipeMap[ci.recipeId];
-        if (!badges) continue;
+        const badges = combinedFriendRecipeMap[ci.recipeId];
+        if (!badges?.length) continue;
         seen.add(ci.recipeId);
         map[ci.recipeId] = badges;
       }
     }
     return map;
-  }, [data, friendRecipeMap]);
+  }, [data, combinedFriendRecipeMap]);
 
   // ── Friend key management ────────────────────────────────────────────────────
   const handleAddFriend = useCallback(async () => {
@@ -3001,8 +3101,9 @@ export default function App() {
     try {
       const summary = await addFriendKey(name, key);
       setFriends(prev => [...prev, summary]);
-      const entries = await getFriendRecipesKnown();
+      const [entries, discEntries] = await Promise.all([getFriendRecipesKnown(), getFriendDisciplineLevels()]);
       setFriendRecipeMap(buildFriendRecipeMap(entries));
+      setFriendDisciplineLevels(buildFriendDisciplineMap(discEntries));
       setFriendNameInput(""); setFriendKeyInput("");
       setFriendActionMsg({ ok: true, text: `✓ Added ${summary.name} — ${summary.recipe_count} recipes known.` });
     } catch (e) {
@@ -3017,8 +3118,9 @@ export default function App() {
     try {
       const summary = await refreshFriendKey(id);
       setFriends(prev => prev.map(f => f.id === id ? summary : f));
-      const entries = await getFriendRecipesKnown();
+      const [entries, discEntries] = await Promise.all([getFriendRecipesKnown(), getFriendDisciplineLevels()]);
       setFriendRecipeMap(buildFriendRecipeMap(entries));
+      setFriendDisciplineLevels(buildFriendDisciplineMap(discEntries));
       setFriendActionMsg({ ok: true, text: `✓ Refreshed ${summary.name} — ${summary.recipe_count} recipes known.` });
     } catch (e) {
       // Keep showing last-known recipes — just flag the failure (matches backend,
@@ -3046,6 +3148,10 @@ export default function App() {
       setFriendFilter(prev => {
         const { [id]: _removed, ...rest } = prev.byFriend;
         return { ...prev, byFriend: rest };
+      });
+      setFriendDisciplineLevels(prev => {
+        const { [id]: _removed, ...rest } = prev;
+        return rest;
       });
       setShowDeleteFriendConfirm(null);
     } catch (e) {
@@ -3201,12 +3307,14 @@ export default function App() {
       for (const f of list) {
         await refreshFriendKey(f.id).catch(() => {}); // per-friend failure shouldn't block the others
       }
-      const [refreshed, entries] = await Promise.all([
+      const [refreshed, entries, discEntries] = await Promise.all([
         getFriends().catch(() => list),
         getFriendRecipesKnown().catch(() => []),
+        getFriendDisciplineLevels().catch(() => []),
       ]);
       setFriends(refreshed);
       setFriendRecipeMap(buildFriendRecipeMap(entries));
+      setFriendDisciplineLevels(buildFriendDisciplineMap(discEntries));
       cacheSet("lastFriendRefresh", Date.now());
     };
     const waitForData = setInterval(() => {
@@ -3947,18 +4055,18 @@ export default function App() {
               ? <span className="bhave" style={{ background: "rgba(80,120,200,0.15)", borderColor: "rgba(80,120,200,0.4)", color: "#9bbcf5" }}>📦 Raw</span>
               : ci.canCraft ? <span className="bhave">✓ Can Craft</span> : <span className="bmiss">✗ Missing</span>
             }
-            {/* Friend badge: Case A (isFriendOnly) = user doesn't know this at all, only a friend
-                does. Case B (friendBadges present without isFriendOnly) = this card already shows
-                as "known" because the user's discipline rating qualifies, but they haven't actually
-                discovered it — a friend genuinely has. Different tooltip explains which applies. */}
-            {ci.friendBadges?.map(b => (
-              <span key={b.friendId} title={ci.isFriendOnly
-                ? `${b.friendName} knows this recipe — you don't. Materials shown are yours.`
-                : `${b.friendName} has genuinely discovered this recipe. You're shown as able to craft it because your discipline rating qualifies, but you haven't actually discovered it yourself yet.`}
-                style={{ fontSize: 10, fontFamily: "Cinzel,serif", letterSpacing: 1, padding: "2px 7px", borderRadius: 3, background: "rgba(159,77,255,.12)", border: "1px solid rgba(159,77,255,.4)", color: "#c9a0ff", whiteSpace: "nowrap" }}>
-                🛠 {b.friendName}
-              </span>
-            ))}
+            {/* Friend badge: see friendBadgeInfo() for the three cases (genuinely-unknown-
+                to-user, known-by-rating-but-undiscovered-by-user, discipline-eligible-for-
+                friend). Different tooltip + icon explains which applies. */}
+            {ci.friendBadges?.map(b => {
+              const { icon, title } = friendBadgeInfo(b, ci);
+              return (
+                <span key={b.friendId} title={title}
+                  style={{ fontSize: 10, fontFamily: "Cinzel,serif", letterSpacing: 1, padding: "2px 7px", borderRadius: 3, background: "rgba(159,77,255,.12)", border: "1px solid rgba(159,77,255,.4)", color: "#c9a0ff", whiteSpace: "nowrap" }}>
+                  {icon} {b.friendName}
+                </span>
+              );
+            })}
             {/* Better-use hint: crafting downstream recipe beats selling this ingredient raw */}
             {betterUseMap[ci.outputId]?.length > 0 && (() => {
               const best = betterUseMap[ci.outputId][0];
@@ -4591,14 +4699,15 @@ export default function App() {
             )}
             {ci.outputCount > 1 && <span style={{ color: "var(--text3)", fontSize: 13 }}>×{ci.outputCount}</span>}
             {ci.canCraft ? <span className="bhave">✓ Can Craft</span> : <span className="bmiss">✗ Missing</span>}
-            {ci.friendBadges?.map(b => (
-              <span key={b.friendId} title={ci.isFriendOnly
-                ? `${b.friendName} knows this recipe — you don't. Materials shown are yours.`
-                : `${b.friendName} has genuinely discovered this recipe. You're shown as able to craft it because your discipline rating qualifies, but you haven't actually discovered it yourself yet.`}
-                style={{ fontSize: 10, fontFamily: "Cinzel,serif", letterSpacing: 1, padding: "2px 7px", borderRadius: 3, background: "rgba(159,77,255,.12)", border: "1px solid rgba(159,77,255,.4)", color: "#c9a0ff", whiteSpace: "nowrap" }}>
-                🛠 {b.friendName}
-              </span>
-            ))}
+            {ci.friendBadges?.map(b => {
+              const { icon, title } = friendBadgeInfo(b, ci);
+              return (
+                <span key={b.friendId} title={title}
+                  style={{ fontSize: 10, fontFamily: "Cinzel,serif", letterSpacing: 1, padding: "2px 7px", borderRadius: 3, background: "rgba(159,77,255,.12)", border: "1px solid rgba(159,77,255,.4)", color: "#c9a0ff", whiteSpace: "nowrap" }}>
+                  {icon} {b.friendName}
+                </span>
+              );
+            })}
             {DAILY_CRAFT_IDS.has(ci.outputId) && (
               dailyCrafted.has(ci.outputId)
               ? <span className="bdaily-done" title={`Resets in ${resetCountdown}`}>⏳ Crafted Today · resets {resetCountdown}</span>
@@ -4947,11 +5056,14 @@ export default function App() {
       <div style={{ fontSize: 12, color: "var(--text2)", marginTop: 8, paddingTop: 14, borderTop: "1px solid var(--border)" }}>
       <strong style={{ color: "var(--gold1)" }}>👥 Friend Crafters</strong>
       <div style={{ fontSize: 11, color: "var(--text3)", marginBottom: 10, lineHeight: 1.6 }}>
-      Add a friend's GW2 API key to see recipes <em>they</em> know that you don't — Crafting Profits and Recommended will
-      tag those cards with their name. Only their known-recipe list is ever read; your materials, prices, and market
-      data are always what's used to score and craft the item — nothing about your friend's account beyond "does
-      this recipe show up in their unlocks" is fetched or stored.
-      Ask them to generate a key with only the <strong style={{ color: "var(--text2)" }}>Unlocks</strong> permission checked.
+      Add a friend's GW2 API key to see recipes <em>they</em> know — or could make right now via their own crafting
+      discipline levels, even without having formally discovered it — that you don't. Crafting Profits and Recommended
+      will tag those cards with their name. Only their known-recipe list and crafting discipline levels are ever read;
+      your materials, prices, and market data are always what's used to score and craft the item — nothing about your
+      friend's account beyond "does this recipe show up in their unlocks, or does their discipline rating qualify them"
+      is fetched or stored.
+      Ask them to generate a key with the <strong style={{ color: "var(--text2)" }}>Unlocks</strong> and{" "}
+      <strong style={{ color: "var(--text2)" }}>Characters</strong> permissions checked.
       </div>
       <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
       <input value={friendNameInput} onChange={e => setFriendNameInput(e.target.value)} placeholder="Friend's name"
@@ -4975,7 +5087,7 @@ export default function App() {
           <span title="Last refresh failed — the key may be invalid or revoked. Still showing their last-known recipes." style={{ fontSize: 10, color: "var(--red2,#e05555)", border: "1px solid rgba(200,60,60,.4)", borderRadius: 3, padding: "1px 6px", cursor: "help" }}>⚠ refresh failed</span>
         )}
         <span style={{ fontSize: 10, color: "var(--text3)" }}>{f.last_refresh_ts ? `updated ${new Date(f.last_refresh_ts).toLocaleDateString()}` : "never refreshed"}</span>
-        <button onClick={() => handleRefreshFriend(f.id)} disabled={friendBusy} title="Refresh this friend's known recipes now"
+        <button onClick={() => handleRefreshFriend(f.id)} disabled={friendBusy} title="Refresh this friend's known recipes and crafting discipline levels now"
         style={{ fontSize: 11, color: "var(--gold2)", background: "transparent", border: "1px solid var(--border)", borderRadius: 3, padding: "3px 9px", cursor: friendBusy ? "not-allowed" : "pointer" }}>
         🔄
         </button>
@@ -4998,6 +5110,8 @@ export default function App() {
           {recipeLookupId && (() => {
             const rid = Number(recipeLookupId);
             const inFriendMap = friendRecipeMap[rid];
+            const inDisciplineMap = friendDisciplineEligibleMap[rid];
+            const inCombinedMap = combinedFriendRecipeMap[rid];
             const lockedEntry = lockedCraftItems.find(ci => ci.recipeId === rid);
             let knownEntry = null, knownDisc = null;
             for (const d of Object.keys(data?.byDisc || {})) {
@@ -5008,10 +5122,22 @@ export default function App() {
             return (
               <div style={{ marginTop: 10, fontSize: 12, lineHeight: 2, background: "var(--bg3)", border: "1px solid var(--border)", borderRadius: 4, padding: "10px 14px" }}>
                 <div>
-                  <strong style={{ color: "var(--text2)" }}>1. friendRecipeMap</strong> (does a friend actually have this recipe id, per last refresh): {" "}
+                  <strong style={{ color: "var(--text2)" }}>1a. friendRecipeMap</strong> (does a friend genuinely have this recipe id in their /account/recipes, per last refresh): {" "}
                   {inFriendMap
                     ? <span style={{ color: "var(--green2)" }}>✓ yes — {inFriendMap.map(b => b.friendName).join(", ")}</span>
                     : <span style={{ color: "var(--red2,#e05555)" }}>✗ not found for any friend</span>}
+                </div>
+                <div>
+                  <strong style={{ color: "var(--text2)" }}>1b. friendDisciplineEligibleMap</strong> (does a friend's own crafting discipline rating meet this recipe's requirement, regardless of formal discovery): {" "}
+                  {inDisciplineMap
+                    ? <span style={{ color: "var(--green2)" }}>✓ yes — {inDisciplineMap.map(b => b.friendName).join(", ")}</span>
+                    : <span style={{ color: "var(--red2,#e05555)" }}>✗ no friend's discipline rating qualifies (or no friend has discipline data — needs the "Characters" permission)</span>}
+                </div>
+                <div>
+                  <strong style={{ color: "var(--text2)" }}>1c. combinedFriendRecipeMap</strong> (union of 1a + 1b — what everything downstream actually reads): {" "}
+                  {inCombinedMap?.length
+                    ? <span style={{ color: "var(--green2)" }}>✓ yes — {inCombinedMap.map(b => `${b.friendName}${b.viaDiscipline ? " (via rating)" : ""}`).join(", ")}</span>
+                    : <span style={{ color: "var(--red2,#e05555)" }}>✗ not present</span>}
                 </div>
                 <div>
                   <strong style={{ color: "var(--text2)" }}>2. lockedCraftItems</strong> (your own unlearned-recipe catalog): {" "}

@@ -60,8 +60,12 @@ fn open_personal_db(path: &std::path::Path) -> Connection {
             reset_ts INTEGER NOT NULL
         );
         -- Friend Recipe Lookup — read-only, single-purpose. Stores a friend's GW2
-        -- API key ONLY to read which recipes they know (/v2/account/recipes).
-        -- We never fetch their materials, wallet, or characters — this is
+        -- API key to read which recipes they know (/v2/account/recipes) and their
+        -- crafting discipline ratings (/v2/characters, requires the "Characters"
+        -- permission) — the latter powers discipline-eligible matching (could this
+        -- friend make it via their own rating, even if not formally discovered),
+        -- mirroring the account owner's own auto-unlock heuristic. We still never
+        -- fetch a friend's materials, wallet, inventory, or bank — this is
         -- intentionally narrow and is NOT multi-account support. Scoring for
         -- friend-only recipe candidates always uses the LOCAL user's own materials
         -- and NAS market data; the friend's own collector/database is never queried
@@ -79,6 +83,18 @@ fn open_personal_db(path: &std::path::Path) -> Connection {
             friend_id INTEGER NOT NULL REFERENCES friend_keys(id) ON DELETE CASCADE,
             recipe_id INTEGER NOT NULL,
             PRIMARY KEY (friend_id, recipe_id)
+        );
+        -- Max crafting discipline rating per friend, one row per discipline (e.g.
+        -- friend_id=3, discipline='Weaponsmith', rating=500). Populated by
+        -- add_friend_key/refresh_friend_key alongside friend_recipes_known; a
+        -- friend whose key lacks the "Characters" permission simply has no rows
+        -- here, which App.jsx's friendDisciplineEligibleMap treats as "no
+        -- discipline-eligible matching for this friend" rather than an error.
+        CREATE TABLE IF NOT EXISTS friend_discipline_levels (
+            friend_id  INTEGER NOT NULL REFERENCES friend_keys(id) ON DELETE CASCADE,
+            discipline TEXT NOT NULL,
+            rating     INTEGER NOT NULL,
+            PRIMARY KEY (friend_id, discipline)
         );
     ").expect("Failed to create personal tables");
     conn
@@ -128,6 +144,7 @@ pub fn run() {
             commands::delete_friend_key,
             commands::get_friends,
             commands::get_friend_recipes_known,
+            commands::get_friend_discipline_levels,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
