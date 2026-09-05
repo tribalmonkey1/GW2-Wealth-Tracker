@@ -27,7 +27,7 @@ fn open_personal_db(path: &std::path::Path) -> Connection {
         PRAGMA temp_store=MEMORY;
         PRAGMA foreign_keys=ON;
     ").expect("Failed to set pragmas");
-    conn.execute_batch("
+    conn.execute_batch(r#"
         CREATE TABLE IF NOT EXISTS app_cache (
             key TEXT PRIMARY KEY,
             value TEXT NOT NULL,
@@ -96,7 +96,7 @@ fn open_personal_db(path: &std::path::Path) -> Connection {
             rating     INTEGER NOT NULL,
             PRIMARY KEY (friend_id, discipline)
         );
-    ").expect("Failed to create personal tables");
+    "#).expect("Failed to create personal tables");
     conn
 }
 

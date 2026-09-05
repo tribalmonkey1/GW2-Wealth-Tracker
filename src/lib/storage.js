@@ -144,7 +144,7 @@ const _workerCallbacks = {};
 function getWorker() {
   if (_worker === undefined) {
     try {
-      _worker = new Worker(new URL('./market-worker.js', import.meta.url), { type: 'module' });
+      _worker = new Worker(new URL('../market-worker.js', import.meta.url), { type: 'module' });
       _worker.onmessage = (e) => {
         const { type, id, result, error } = e.data;
         const cb = _workerCallbacks[id];
