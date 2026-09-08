@@ -1,20 +1,30 @@
 /**
- * Time Gated tab — daily/weekly time-gated crafting checklist (API-tracked
- * + manual count-tracked items) with discipline-eligibility badges.
- * Was an inline IIFE in App.jsx's render; unwrapped into a real component.
- * Caller is responsible for the `activeTab === "daily" && data` gate
- * (see App.jsx).
+ * Time Gated tab — now three sub-tabs: the original Daily/weekly
+ * time-gated crafting checklist, plus the new Boss Timers (countdown grid)
+ * and Event Timeline (Gantt strip) views. Sub-tab pattern matches
+ * MysticForgeTab.jsx's existing subTab state — nothing new invented here.
  * (Split out of App.jsx.)
  */
-import React from "react";
+import React, { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Gold } from "../components/Gold.jsx";
 import { getDailyResetTs, getWeeklyResetTs } from "../lib/dailyCrafting.js";
+import BossTimersTab from "./BossTimersTab.jsx";
+import EventTimelineTab from "./EventTimelineTab.jsx";
+
+const TIME_GATED_SUB_TABS = [
+  { key: "daily", label: "Daily Crafting" },
+  { key: "bosses", label: "⏱ Boss Timers" },
+  { key: "timeline", label: "📅 Event Timeline" },
+];
 
 export function TimeGatedTab({
   data, cacheRef, dailyCrafted, manualDailyCrafted, mySoldHistory,
   resetCountdown, weeklyKeyDone, setWeeklyKeyDone, extraDailyItems,
+  bossAlerts,
 }) {
+        const [subTab, setSubTab] = useState("daily");
+
         const discLevels = cacheRef.current.disciplineLevels || {};
         const eligible = data.timegatedList || [];
         // Combine API-tracked completions and manual count-delta completions
@@ -35,6 +45,19 @@ export function TimeGatedTab({
         const weeklyCountdown = weeklyMsLeft > 0 ? `${weeklyDays}d ${weeklyHrs}h` : "now";
         return (
           <div>
+          {/* Sub-tab nav */}
+          <div className="disc-tabs" style={{ marginBottom: 18 }}>
+          {TIME_GATED_SUB_TABS.map(({ key, label }) => (
+            <button key={key} className={`dtab${subTab === key ? " on" : ""}`} onClick={() => setSubTab(key)}>
+            {label}
+            </button>
+          ))}
+          </div>
+
+          {subTab === "bosses" && <BossTimersTab bossAlerts={bossAlerts} />}
+          {subTab === "timeline" && <EventTimelineTab />}
+
+          {subTab === "daily" && (<>
           {/* Header bar */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
           <div>
@@ -180,6 +203,7 @@ export function TimeGatedTab({
             Only recipes you can craft at your current discipline levels are shown. Time-gated items reset daily at 4:00 PM Pacific (00:00 UTC).
             </div>
           )}
+          </>)}
           </div>
         );
 }

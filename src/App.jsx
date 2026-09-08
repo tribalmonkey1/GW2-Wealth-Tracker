@@ -46,6 +46,7 @@ import {
 } from "./lib/storage.js";
 import { DEFAULT_RARITY_FILTER, passesRarityFilter, RarityDropdown } from "./RarityFilter.jsx";
 import { DEFAULT_FRIEND_FILTER, passesFriendFilter, FriendFilterDropdown } from "./FriendFilter.jsx";
+import { useBossAlerts } from "./lib/useBossAlerts.js";
 
 // ── Timing / config constants ───────────────────────────────────────────────
 const PRICE_REFRESH_MS = 60_000;
@@ -149,6 +150,8 @@ export default function App() {
   const [friendBusy, setFriendBusy] = useState(false);
   const [friendActionMsg, setFriendActionMsg] = useState(null); // {ok, text}
   const [showDeleteFriendConfirm, setShowDeleteFriendConfirm] = useState(null); // friend id pending delete confirmation
+
+  const bossAlerts = useBossAlerts(); // global — fires boss/event alerts regardless of active tab
 
   const prog = (pct, msg) => setLoadState({ phase: "loading", pct, msg });
   const fullLoadInProgressRef = useRef(false);
@@ -1803,7 +1806,8 @@ export default function App() {
   const timeGatedTabProps = useMemo(() => ({
     data, cacheRef, dailyCrafted, manualDailyCrafted, mySoldHistory,
     resetCountdown, weeklyKeyDone, setWeeklyKeyDone, extraDailyItems,
-  }), [data, dailyCrafted, manualDailyCrafted, mySoldHistory, resetCountdown, weeklyKeyDone, extraDailyItems]);
+    bossAlerts,
+  }), [data, dailyCrafted, manualDailyCrafted, mySoldHistory, resetCountdown, weeklyKeyDone, extraDailyItems, bossAlerts]);
 
 
   // ── Render ───────────────────────────────────────────────────────────────────

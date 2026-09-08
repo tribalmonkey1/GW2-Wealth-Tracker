@@ -1342,7 +1342,7 @@ dependencies = [
 
 [[package]]
 name = "gw2-analyzer"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "chrono",
  "dirs 5.0.1",
