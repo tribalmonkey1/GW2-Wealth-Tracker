@@ -12,6 +12,7 @@
  * autoplay-blocked AudioContext, or a bad custom file path should degrade
  * to silence, never crash the alert-checking tick that called this.
  */
+import { convertFileSrc } from "@tauri-apps/api/core";
 
 let audioCtx = null;
 function getAudioCtx() {
@@ -61,9 +62,19 @@ function playTextToSpeech(bossName) {
   } catch { playBeep(); }
 }
 
+// Custom sound file — path comes from Settings → Alert Sound (see
+// SettingsPanel.jsx / App.jsx's customSoundPath). Absolute local paths need
+// to go through Tauri's asset protocol (convertFileSrc) before a plain
+// <audio> element can load them; http(s)/asset URLs are used as-is.
 function playCustomAudioFile(path) {
   try {
-    const audio = new Audio(path);
+    if (!path) { playBeep(); return; }
+    const isUrl = /^(https?|asset):\/\//i.test(path);
+    let src = path;
+    if (!isUrl) {
+      try { src = convertFileSrc(path); } catch { src = path; }
+    }
+    const audio = new Audio(src);
     audio.play().catch(() => playBeep()); // e.g. file missing/unsupported — fall back
   } catch { playBeep(); }
 }
@@ -74,7 +85,7 @@ function playCustomAudioFile(path) {
 export function playAlert(bossName, settings) {
   const mode = settings?.mode || "beep";
   if (mode === "tts") return playTextToSpeech(bossName);
-  if (mode === "custom" && settings?.customPath) return playCustomAudioFile(settings.customPath);
+  if (mode === "custom") return playCustomAudioFile(settings?.customPath);
   return playBeep();
 }
 

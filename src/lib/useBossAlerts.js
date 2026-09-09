@@ -9,6 +9,12 @@
  * Each alerted identity carries its OWN lead time (10/15/20 min — the bell
  * popover's choice) rather than a single global lead time, stored as
  * { "name|location": leadMinutes } via bossTimerStorage.
+ *
+ * customSoundPath: the CURRENT value of Settings → Alert Sound → custom
+ * sound path (owned by App.jsx, not by this hook). Passed in fresh on every
+ * render rather than baked into soundSettings.customPath at save-time, so
+ * changing the path in Settings takes effect immediately without needing
+ * to re-pick "Custom Sound" in the bell/sound popover.
  */
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { getNextOccurrenceForIdentity } from "./bossTimerCalc.js";
@@ -19,12 +25,13 @@ import {
 
 const TICK_MS = 1000;
 
-export function useBossAlerts() {
+export function useBossAlerts(customSoundPath) {
   const [alerts, setAlerts] = useState({}); // "name|location" -> leadMinutes
   const [soundSettings, setSoundSettingsState] = useState(DEFAULT_SOUND_SETTINGS);
   const [loaded, setLoaded] = useState(false);
   const alertsRef = useRef(alerts);
   const soundRef = useRef(soundSettings);
+  const customSoundPathRef = useRef(customSoundPath);
   // Dedup: "name|location" -> spawnMs already alerted for. Stamped the
   // moment an occurrence first enters the lead window, regardless of
   // whether sound actually plays that tick — prevents re-alerting every
@@ -34,6 +41,7 @@ export function useBossAlerts() {
 
   useEffect(() => { alertsRef.current = alerts; }, [alerts]);
   useEffect(() => { soundRef.current = soundSettings; }, [soundSettings]);
+  useEffect(() => { customSoundPathRef.current = customSoundPath; }, [customSoundPath]);
 
   useEffect(() => {
     let cancelled = false;
@@ -67,7 +75,15 @@ export function useBossAlerts() {
         toFire.push(name);
       }
 
-      if (toFire.length > 0) playAlertsSequentially(toFire, soundRef.current);
+      if (toFire.length > 0) {
+        const settings = soundRef.current;
+        // Merge in the live custom sound path only when custom mode is active —
+        // avoids ever needing to re-save soundSettings just because the path changed.
+        const effective = settings.mode === "custom"
+          ? { ...settings, customPath: customSoundPathRef.current || settings.customPath }
+          : settings;
+        playAlertsSequentially(toFire, effective);
+      }
     }, TICK_MS);
     return () => clearInterval(interval);
   }, []);

@@ -12,7 +12,8 @@ import { renderMarkdown } from "../lib/markdown.jsx";
 export function SettingsPanel({
   settingsApiKey, setSettingsApiKey, settingsNasSsh, setSettingsNasSsh,
   settingsAlertThreshold, setSettingsAlertThreshold, settingsGemAlertThresholdGold,
-  setSettingsGemAlertThresholdGold, rescanningRecipes, rescanAutoUnlockedRecipes,
+  setSettingsGemAlertThresholdGold, settingsCustomSoundPath, setSettingsCustomSoundPath,
+  setCustomSoundPath, rescanningRecipes, rescanAutoUnlockedRecipes,
   friends, friendNameInput, setFriendNameInput, friendKeyInput, setFriendKeyInput,
   friendBusy, handleAddFriend, friendActionMsg, handleRefreshFriend,
   setShowDeleteFriendConfirm, recipeLookupId, setRecipeLookupId, friendRecipeMap,
@@ -65,6 +66,17 @@ export function SettingsPanel({
       style={{ width: 100, background: "var(--bg3)", border: "1px solid var(--border)", borderRadius: 4, padding: "5px 10px", color: "var(--text1)", fontSize: 13 }} />
       <span style={{ color: "var(--text3)", fontSize: 12 }}>gold</span>
       </div>
+      </div>
+      <div style={{ fontSize: 12, color: "var(--text2)", marginTop: 8, paddingTop: 14, borderTop: "1px solid var(--border)" }}>
+      <strong style={{ color: "var(--gold1)" }}>Alert Sound — Custom Sound File</strong>
+      <div style={{ fontSize: 11, color: "var(--text3)", marginBottom: 6, lineHeight: 1.6 }}>
+      Used when Boss Timers → Sound is set to "Custom Sound". Enter an absolute local file path
+      (e.g. C:\Sounds\alert.mp3 or /home/derrick/sounds/alert.mp3) or a direct https:// URL to an
+      audio file. Leave blank to fall back to the beep.
+      </div>
+      <input value={settingsCustomSoundPath} onChange={e => setSettingsCustomSoundPath(e.target.value)}
+      placeholder="/path/to/alert.mp3 or https://.../alert.mp3"
+      style={{ width: "100%", background: "var(--bg3)", border: "1px solid var(--border)", borderRadius: 4, padding: "5px 10px", color: "var(--text1)", fontSize: 12, fontFamily: "monospace" }} />
       </div>
       <div style={{ fontSize: 12, color: "var(--text2)", marginTop: 8, paddingTop: 14, borderTop: "1px solid var(--border)" }}>
       <strong style={{ color: "var(--gold1)" }}>Rescan Auto-Unlocked Recipes</strong>
@@ -249,8 +261,10 @@ export function SettingsPanel({
           await invoke("cache_set", { key: "alert_threshold", value: String(settingsAlertThreshold) });
           await invoke("cache_set", { key: "gem_alert_threshold_gold", value: String(settingsGemAlertThresholdGold) });
           await invoke("cache_set", { key: "api_key", value: settingsApiKey.trim() });
+          await invoke("cache_set", { key: "customSoundPath", value: settingsCustomSoundPath });
           setAlertThreshold(settingsAlertThreshold);
           setGemAlertThresholdGold(settingsGemAlertThresholdGold);
+          setCustomSoundPath(settingsCustomSoundPath);
           if (settingsApiKey.trim()) { setApiKey(settingsApiKey.trim()); window.__gw2ApiKey = settingsApiKey.trim(); }
           setSettingsMsg({ ok: true, text: msg });
         } catch(e) { setSettingsMsg({ ok: false, text: String(e) }); }

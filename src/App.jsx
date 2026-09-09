@@ -136,6 +136,8 @@ export default function App() {
   const [settingsMsg, setSettingsMsg] = useState(null);
   const [alertThreshold, setAlertThreshold] = useState(85); // % of 7-day high to trigger price alert
   const [settingsAlertThreshold, setSettingsAlertThreshold] = useState(85);
+  const [customSoundPath, setCustomSoundPath] = useState(""); // live/committed value, fed to useBossAlerts
+  const [settingsCustomSoundPath, setSettingsCustomSoundPath] = useState(""); // Settings-panel draft value
   const [rarityFilter, setRarityFilter] = useState(DEFAULT_RARITY_FILTER); // rarity -> boolean, filters Crafting/Recommended/Unlearned/Mystic Forge material promotion
   const rarityFilterLoadedRef = useRef(false); // guards against persisting the default before the cached value has loaded
   const [extraDailyItems, setExtraDailyItems] = useState({}); // itemId -> {name, icon} for non-TP items
@@ -151,7 +153,7 @@ export default function App() {
   const [friendActionMsg, setFriendActionMsg] = useState(null); // {ok, text}
   const [showDeleteFriendConfirm, setShowDeleteFriendConfirm] = useState(null); // friend id pending delete confirmation
 
-  const bossAlerts = useBossAlerts(); // global — fires boss/event alerts regardless of active tab
+  const bossAlerts = useBossAlerts(customSoundPath); // global — fires boss/event alerts regardless of active tab
 
   const prog = (pct, msg) => setLoadState({ phase: "loading", pct, msg });
   const fullLoadInProgressRef = useRef(false);
@@ -767,6 +769,9 @@ export default function App() {
       if (e?.value) { try { setRarityFilter(JSON.parse(e.value)); } catch {} }
       rarityFilterLoadedRef.current = true;
     }).catch(() => { rarityFilterLoadedRef.current = true; });
+    invoke("cache_get", { key: "customSoundPath" }).then(e => {
+      if (e?.value) { setCustomSoundPath(e.value); setSettingsCustomSoundPath(e.value); }
+    }).catch(() => {});
     invoke("cache_get", { key: "weekly_key_done" }).then(e => {
       if (e?.value) {
         const { done, weeklyResetTs } = JSON.parse(e.value);
@@ -1882,6 +1887,8 @@ export default function App() {
         settingsNasSsh={settingsNasSsh} setSettingsNasSsh={setSettingsNasSsh}
         settingsAlertThreshold={settingsAlertThreshold} setSettingsAlertThreshold={setSettingsAlertThreshold}
         settingsGemAlertThresholdGold={settingsGemAlertThresholdGold} setSettingsGemAlertThresholdGold={setSettingsGemAlertThresholdGold}
+        settingsCustomSoundPath={settingsCustomSoundPath} setSettingsCustomSoundPath={setSettingsCustomSoundPath}
+        setCustomSoundPath={setCustomSoundPath}
         rescanningRecipes={rescanningRecipes} rescanAutoUnlockedRecipes={rescanAutoUnlockedRecipes}
         friends={friends} friendNameInput={friendNameInput} setFriendNameInput={setFriendNameInput}
         friendKeyInput={friendKeyInput} setFriendKeyInput={setFriendKeyInput}

@@ -1,8 +1,8 @@
 /**
- * Time Gated tab — now three sub-tabs: the original Daily/weekly
- * time-gated crafting checklist, plus the new Boss Timers (countdown grid)
- * and Event Timeline (Gantt strip) views. Sub-tab pattern matches
- * MysticForgeTab.jsx's existing subTab state — nothing new invented here.
+ * Time Gated tab — Daily/weekly time-gated crafting checklist, plus the
+ * Boss Timers sub-tab (which now contains BOTH the countdown grid and the
+ * Gantt timeline as an internal "View" toggle — see BossTimersTab.jsx).
+ * Event Timeline is no longer a separate sub-tab.
  * (Split out of App.jsx.)
  */
 import React, { useState } from "react";
@@ -10,12 +10,10 @@ import { invoke } from "@tauri-apps/api/core";
 import { Gold } from "../components/Gold.jsx";
 import { getDailyResetTs, getWeeklyResetTs } from "../lib/dailyCrafting.js";
 import BossTimersTab from "./BossTimersTab.jsx";
-import EventTimelineTab from "./EventTimelineTab.jsx";
 
 const TIME_GATED_SUB_TABS = [
   { key: "daily", label: "Daily Crafting" },
   { key: "bosses", label: "⏱ Boss Timers" },
-  { key: "timeline", label: "📅 Event Timeline" },
 ];
 
 export function TimeGatedTab({
@@ -55,7 +53,6 @@ export function TimeGatedTab({
           </div>
 
           {subTab === "bosses" && <BossTimersTab bossAlerts={bossAlerts} />}
-          {subTab === "timeline" && <EventTimelineTab />}
 
           {subTab === "daily" && (<>
           {/* Header bar */}
