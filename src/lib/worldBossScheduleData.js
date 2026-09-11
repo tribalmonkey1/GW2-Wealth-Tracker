@@ -8,47 +8,55 @@
  * dailySpawnTimesUtc entries are "HH:MM" 24h UTC strings. If GW2's schedule
  * ever changes, this is the one place to correct it — bossTimerCalc.js
  * derives everything else from this table.
+ *
+ * durationMin: how long the event actually runs once it starts, used by the
+ * Timeline view to size each block proportionally instead of every event
+ * getting the same fixed-width block. Entries without a confirmed duration
+ * omit the field — bossTimerCalc.js falls back to DEFAULT_DURATION_MIN (15)
+ * for those, matching the old fixed-width behavior. See that fallback for
+ * the current list of entries still needing a real number.
  */
 
 export const WORLD_BOSS_SCHEDULE = [
   { bossName: 'Admiral Taidha Covington', location: 'Bloodtide Coast', bossType: 'World Boss', expansion: 'Core Tyria',
-    dailySpawnTimesUtc: ['00:00','03:00','06:00','09:00','12:00','15:00','18:00','21:00'], chatLink: '[&BKgBAAA=]' },
+    dailySpawnTimesUtc: ['00:00','03:00','06:00','09:00','12:00','15:00','18:00','21:00'], chatLink: '[&BKgBAAA=]', durationMin: 15 },
 
   { bossName: 'Svanir Shaman Chief', location: 'Wayfarer Foothills', bossType: 'World Boss', expansion: 'Core Tyria',
-    dailySpawnTimesUtc: ['00:15','02:15','04:15','06:15','08:15','10:15','12:15','14:15','16:15','18:15','20:15','22:15'], chatLink: '[&BMIDAAA=]' },
+    dailySpawnTimesUtc: ['00:15','02:15','04:15','06:15','08:15','10:15','12:15','14:15','16:15','18:15','20:15','22:15'], chatLink: '[&BMIDAAA=]', durationMin: 15 },
 
   { bossName: 'Megadestroyer', location: 'Mount Maelstrom', bossType: 'World Boss', expansion: 'Core Tyria',
-    dailySpawnTimesUtc: ['00:30','03:30','06:30','09:30','12:30','15:30','18:30','21:30'], chatLink: '[&BM0CAAA=]' },
+    dailySpawnTimesUtc: ['00:30','03:30','06:30','09:30','12:30','15:30','18:30','21:30'], chatLink: '[&BM0CAAA=]', durationMin: 15 },
 
   { bossName: 'Fire Elemental', location: 'Metrica Province', bossType: 'World Boss', expansion: 'Core Tyria',
-    dailySpawnTimesUtc: ['00:45','02:45','04:45','06:45','08:45','10:45','12:45','14:45','16:45','18:45','20:45','22:45'], chatLink: '[&BEcAAAA=]' },
+    dailySpawnTimesUtc: ['00:45','02:45','04:45','06:45','08:45','10:45','12:45','14:45','16:45','18:45','20:45','22:45'], chatLink: '[&BEcAAAA=]', durationMin: 15 },
 
   { bossName: 'The Shatterer', location: 'Blazeridge Steppes', bossType: 'World Boss', expansion: 'Core Tyria',
-    dailySpawnTimesUtc: ['01:00','04:00','07:00','10:00','13:00','16:00','19:00','22:00'], chatLink: '[&BE4DAAA=]' },
+    dailySpawnTimesUtc: ['01:00','04:00','07:00','10:00','13:00','16:00','19:00','22:00'], chatLink: '[&BE4DAAA=]', durationMin: 15 },
 
   { bossName: 'Great Jungle Wurm', location: 'Caledon Forest', bossType: 'World Boss', expansion: 'Core Tyria',
-    dailySpawnTimesUtc: ['01:15','03:15','05:15','07:15','09:15','11:15','13:15','15:15','17:15','19:15','21:15','23:15'], chatLink: '[&BEEFAAA=]' },
+    dailySpawnTimesUtc: ['01:15','03:15','05:15','07:15','09:15','11:15','13:15','15:15','17:15','19:15','21:15','23:15'], chatLink: '[&BEEFAAA=]', durationMin: 15 },
 
   { bossName: 'Modniir Ulgoth', location: 'Harathi Hinterlands', bossType: 'World Boss', expansion: 'Core Tyria',
-    dailySpawnTimesUtc: ['01:30','04:30','07:30','10:30','13:30','16:30','19:30','22:30'], chatLink: '[&BLAAAAA=]' },
+    dailySpawnTimesUtc: ['01:30','04:30','07:30','10:30','13:30','16:30','19:30','22:30'], chatLink: '[&BLAAAAA=]', durationMin: 15 },
 
   { bossName: 'Shadow Behemoth', location: 'Queensdale', bossType: 'World Boss', expansion: 'Core Tyria',
-    dailySpawnTimesUtc: ['01:45','03:45','05:45','07:45','09:45','11:45','13:45','15:45','17:45','19:45','21:45','23:45'], chatLink: '[&BPcAAAA=]' },
+    dailySpawnTimesUtc: ['01:45','03:45','05:45','07:45','09:45','11:45','13:45','15:45','17:45','19:45','21:45','23:45'], chatLink: '[&BPcAAAA=]', durationMin: 15 },
 
   { bossName: 'Golem Mark II', location: 'Mount Maelstrom', bossType: 'World Boss', expansion: 'Core Tyria',
-    dailySpawnTimesUtc: ['02:00','05:00','08:00','11:00','14:00','17:00','20:00','23:00'], chatLink: '[&BNQCAAA=]' },
+    dailySpawnTimesUtc: ['02:00','05:00','08:00','11:00','14:00','17:00','20:00','23:00'], chatLink: '[&BNQCAAA=]', durationMin: 15 },
 
   { bossName: 'Claw of Jormag', location: 'Frostgorge Sound', bossType: 'World Boss', expansion: 'Core Tyria',
-    dailySpawnTimesUtc: ['02:30','05:30','08:30','11:30','14:30','17:30','20:30','23:30'], chatLink: '[&BHoCAAA=]' },
+    dailySpawnTimesUtc: ['02:30','05:30','08:30','11:30','14:30','17:30','20:30','23:30'], chatLink: '[&BHoCAAA=]', durationMin: 15 },
 
+  // ── Hard world bosses — 30 min duration (vs. 15 min for the standard world bosses above) ──
   { bossName: 'Tequatl the Sunless', location: 'Sparkfly Fen', bossType: 'Hardcore Meta', expansion: 'Core Tyria',
-    dailySpawnTimesUtc: ['00:00','03:00','07:00','11:30','16:00','19:00'], chatLink: '[&BNABAAA=]' },
+    dailySpawnTimesUtc: ['00:00','03:00','07:00','11:30','16:00','19:00'], chatLink: '[&BNABAAA=]', durationMin: 30 },
 
   { bossName: 'Evolved Jungle Wurm (Triple Trouble)', location: 'Bloodtide Coast', bossType: 'Hardcore Meta', expansion: 'Core Tyria',
-    dailySpawnTimesUtc: ['01:00','04:00','08:00','12:30','17:00','20:00'], chatLink: '[&BKoBAAA=]' },
+    dailySpawnTimesUtc: ['01:00','04:00','08:00','12:30','17:00','20:00'], chatLink: '[&BKoBAAA=]', durationMin: 30 },
 
   { bossName: 'Karka Queen', location: 'Southsun Cove', bossType: 'Hardcore Meta', expansion: 'Core Tyria',
-    dailySpawnTimesUtc: ['02:00','06:00','10:30','15:00','18:00','23:00'], chatLink: '[&BNUGAAA=]' },
+    dailySpawnTimesUtc: ['02:00','06:00','10:30','15:00','18:00','23:00'], chatLink: '[&BNUGAAA=]', durationMin: 30 },
 
   // Not in events.json — sourced from the wiki's own stated schedule directly
   // ("Defeat the invading Awakened" runs hourly at :30 since an April 2018
@@ -57,7 +65,7 @@ export const WORLD_BOSS_SCHEDULE = [
   // no single fixed waypoint for a rotating zone.
   { bossName: 'Awakened Invasion', location: 'Elona (rotating zone)', bossType: 'Invasion', expansion: 'Living World Season 4',
     dailySpawnTimesUtc: ['00:30','01:30','02:30','03:30','04:30','05:30','06:30','07:30','08:30','09:30','10:30','11:30',
-      '12:30','13:30','14:30','15:30','16:30','17:30','18:30','19:30','20:30','21:30','22:30','23:30'], chatLink: null },
+      '12:30','13:30','14:30','15:30','16:30','17:30','18:30','19:30','20:30','21:30','22:30','23:30'], chatLink: null, durationMin: 15 },
 ];
 
 // Fixed display order for the Areas filter / section grouping — NOT derived

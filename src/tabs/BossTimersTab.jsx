@@ -23,17 +23,28 @@
  * rest of the schedule (meta events, Ley-Line Anomaly, HoT/PoF/EoD/SotO
  * metas, etc.) has no API-exposed completion signal and stays manual-only.
  *
+ * Timeline blocks are sized proportionally to each event's real duration
+ * (durationMin on the schedule entry — see worldBossScheduleData.js /
+ * metaEventScheduleData.js — falling back to DEFAULT_DURATION_MIN for
+ * anything not yet confirmed) rather than always taking up one fixed-width
+ * column. A slot can stack multiple occurrences that start at the same
+ * time; the block is sized to the LONGEST of those so every stacked line
+ * fits inside it.
+ *
  * Timeline blocks are laid out with simple greedy lane-packing: two blocks
  * that would visually overlap (their real spawn times are close together,
- * not aligned to the 15-minute column grid) get pushed into separate lanes
- * instead of drawing on top of each other. This doesn't need event duration/
- * end-time data — GW2's API doesn't expose that anyway — it just treats each
- * block's fixed on-screen width as the thing that must not collide.
+ * not aligned to the 15-minute column grid, or one simply runs long enough
+ * to reach into the next block's start) get pushed into separate lanes
+ * instead of drawing on top of each other.
+ *
+ * Vertical gridlines mark every 15-minute column boundary, both in the
+ * header (so it's clear exactly where e.g. "3:00 PM" begins) and behind the
+ * blocks in each zone's track.
  */
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
   getUpcomingRowSeries, getUpcomingOccurrencesFor, getAllPossibleExpansions,
-  formatCountdown, urgencyColor, ALERT_LEAD_OPTIONS_MIN,
+  formatCountdown, urgencyColor, ALERT_LEAD_OPTIONS_MIN, DEFAULT_DURATION_MIN,
 } from "../lib/bossTimerCalc.js";
 import {
   bossKey, loadFavoriteLists, saveFavoriteLists, nextDefaultFavoriteListName,
@@ -57,6 +68,7 @@ const SLOT_COUNT = (HOURS_AHEAD * 60) / INTERVAL_MIN + 1;
 const COL_WIDTH = 150;
 const ROW_LABEL_WIDTH = 150;
 const FETCH_CYCLES = 8; // generous buffer, filtered down to the visible window
+const MIN_BLOCK_WIDTH = 40; // floor so very short events (5-9 min) still fit their checkbox/name
 
 const URGENCY_STYLE = {
   default: { color: "var(--text2)" },
@@ -89,6 +101,19 @@ function assignLanes(items) {
     placed.push({ ...item, lane });
   }
   return placed;
+}
+
+// Renders the repeating vertical column-boundary lines behind a timeline
+// track. `leftOffset` is where column 0 begins in the parent's coordinate
+// space (matches whatever the nowline in that same parent uses).
+function TimelineGridLines({ leftOffset, count = SLOT_COUNT }) {
+  return (
+    <>
+      {Array.from({ length: count }, (_, i) => (
+        <div key={i} className="tl-gridline" style={{ left: leftOffset + i * COL_WIDTH }} />
+      ))}
+    </>
+  );
 }
 
 // ── Shared alert/collection popovers — identical content in both views ──
@@ -252,6 +277,7 @@ function TimelineOccLine({ occ, alerts, setAlertLead, collections, onToggleMembe
       <input type="checkbox" checked={done} title={done ? "Marked done for today" : "Mark done for today"}
         onChange={() => onToggleComplete(occ.name)} style={{ cursor: "pointer", flexShrink: 0 }} />
       <span className="tl-occ-name" onClick={() => onToggleComplete(occ.name)}
+        title={`${occ.name} · ${occ.durationMin || DEFAULT_DURATION_MIN} min`}
         style={{ textDecoration: done ? "line-through" : "none", cursor: "pointer" }}>{occ.name}</span>
       <AutoTrackedBadge name={occ.name} />
       <div style={{ display: "flex", gap: 2, marginLeft: "auto", flexShrink: 0 }}>
@@ -269,17 +295,19 @@ function TimelineOccLine({ occ, alerts, setAlertLead, collections, onToggleMembe
 }
 
 function TimelineRow({ row, origin, windowEnd, ...rest }) {
-  const blockWidth = COL_WIDTH - 4;
   const rawSlots = row.slots.filter(s => s.time >= origin && s.time < windowEnd);
-  const positioned = rawSlots.map(s => ({
-    ...s,
-    left: ((s.time - origin) / INTERVAL_MS) * COL_WIDTH,
-    width: blockWidth,
-  }));
-  // Real spawn times aren't aligned to the 15-minute column grid, so two
-  // blocks close together in time can visually overlap even though they're
-  // in "different columns" — push colliding blocks into separate lanes
-  // instead of letting them draw on top of each other.
+  const positioned = rawSlots.map(s => {
+    // A slot can stack several occurrences that start at the same minute
+    // (e.g. Jade Maw + Preparations) — size the block to whichever of them
+    // runs longest so every stacked line fits inside it.
+    const durationMin = Math.max(...s.occurrences.map(o => o.durationMin || DEFAULT_DURATION_MIN));
+    const width = Math.max(MIN_BLOCK_WIDTH, (durationMin / INTERVAL_MIN) * COL_WIDTH - 4);
+    return { ...s, left: ((s.time - origin) / INTERVAL_MS) * COL_WIDTH, width };
+  });
+  // Real spawn times aren't aligned to the 15-minute column grid, and blocks
+  // now vary in width by duration, so two blocks can visually overlap even
+  // though they look like they're in "different columns" — push colliding
+  // blocks into separate lanes instead of letting them draw on top of each other.
   const laned = assignLanes(positioned);
   const numLanes = laned.reduce((m, s) => Math.max(m, s.lane + 1), 1);
   const maxStack = laned.reduce((m, s) => Math.max(m, s.occurrences.length), 1);
@@ -311,6 +339,7 @@ function TimelineSection({ expansion, rows, origin, windowEnd, nowLineLeft, coll
       </div>
       {!collapsed && (
         <div style={{ position: "relative", borderTop: "1px solid var(--border)", background: "var(--bg2)", overflowX: "auto" }}>
+          <TimelineGridLines leftOffset={ROW_LABEL_WIDTH} />
           <div className="tl-nowline" style={{ left: nowLineLeft }} />
           {rows.map(row => (
             <TimelineRow key={row.rowLabel} row={row} origin={origin} windowEnd={windowEnd} {...rest} />
@@ -628,7 +657,10 @@ export default function BossTimersTab({ bossAlerts }) {
         <>
           <div style={{ display: "flex", marginBottom: 8, paddingLeft: ROW_LABEL_WIDTH, position: "relative" }}>
             {headerCols.map((label, i) => (
-              <div key={i} style={{ width: COL_WIDTH, flexShrink: 0, fontSize: 11, color: "var(--text3)", fontFamily: "Cinzel,serif", letterSpacing: 1, textAlign: "center" }}>
+              <div key={i} style={{
+                width: COL_WIDTH, flexShrink: 0, fontSize: 11, color: "var(--text3)", fontFamily: "Cinzel,serif",
+                letterSpacing: 1, textAlign: "center", borderLeft: "1px solid rgba(200,150,42,.18)",
+              }}>
                 {label}
               </div>
             ))}
@@ -650,6 +682,7 @@ export default function BossTimersTab({ bossAlerts }) {
           ) : (
             <div className="ci" style={{ marginBottom: 10 }}>
               <div style={{ position: "relative", padding: "6px 0", background: "var(--bg2)", overflowX: "auto" }}>
+                <TimelineGridLines leftOffset={ROW_LABEL_WIDTH} />
                 <div className="tl-nowline" style={{ left: nowLineLeft + ROW_LABEL_WIDTH }} />
                 {timelineCollectionSlots.length === 0
                   ? <div className="empty">Nothing in this collection is scheduled in the next {HOURS_AHEAD} hours.</div>

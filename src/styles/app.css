@@ -236,3 +236,8 @@ tbody td { padding:11px 14px; color:var(--text2); vertical-align:middle; }
 .tl-occ-line { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text1); white-space: nowrap; padding: 1px 0; }
 .tl-occ-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .tl-nowline { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--red2,#e05555); z-index: 5; box-shadow: 0 0 6px var(--red2,#e05555); pointer-events: none; }
+/* Vertical gridlines marking each 15-minute column boundary — rendered behind
+   the nowline/blocks (z-index 1 vs. the nowline's 5) in both the section
+   tracks and, via inline borderLeft on each header cell in BossTimersTab.jsx,
+   the header row above them. */
+.tl-gridline { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(200,150,42,.14); pointer-events: none; z-index: 1; }

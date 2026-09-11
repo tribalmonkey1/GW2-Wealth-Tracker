@@ -15,6 +15,12 @@ import { META_EVENT_SCHEDULE } from "./metaEventScheduleData.js";
 const ONE_MIN_MS = 60_000;
 const ONE_HOUR_MS = 3_600_000;
 
+// Fallback duration (minutes) for any schedule entry that doesn't yet carry
+// a confirmed durationMin — matches the old fixed-one-column-wide behavior
+// the Timeline view used before per-event durations existed, so an
+// unconfirmed event doesn't shrink to something misleadingly tiny.
+export const DEFAULT_DURATION_MIN = 15;
+
 // Any timestamp that itself falls exactly on an even UTC hour works as the
 // epoch here — GW2's meta cycles are synced to 00:00/02:00/...  UTC daily,
 // so this specific date is arbitrary; only its alignment matters. Matches
@@ -147,6 +153,7 @@ export function getUpcomingRowSeries(nowMs, cyclesAhead) {
     const occurrences = members.flatMap(boss =>
       getUpcomingSpawns(boss.dailySpawnTimesUtc, nowMs, fetchCount).map(spawnMs => ({
         name: boss.bossName, location: boss.location, chatLink: boss.chatLink, spawnMs,
+        durationMin: boss.durationMin || DEFAULT_DURATION_MIN,
       }))
     );
     const slots = buildStackedSlots(occurrences, cyclesAhead);
@@ -166,6 +173,7 @@ export function getUpcomingRowSeries(nowMs, cyclesAhead) {
     const occurrences = members.flatMap(schedule =>
       getUpcomingOccurrences(schedule, nowMs, fetchCount).map(spawnMs => ({
         name: schedule.eventName, location: schedule.zoneName, chatLink: schedule.chatLink, spawnMs,
+        durationMin: schedule.durationMin || DEFAULT_DURATION_MIN,
       }))
     );
     const slots = buildStackedSlots(occurrences, cyclesAhead);
@@ -192,6 +200,7 @@ export function getUpcomingOccurrencesFor(identities, nowMs, cyclesAhead) {
     if (!nameSet.has(boss.bossName)) continue;
     occurrences.push(...getUpcomingSpawns(boss.dailySpawnTimesUtc, nowMs, fetchCount).map(spawnMs => ({
       name: boss.bossName, location: boss.location, chatLink: boss.chatLink, spawnMs,
+      durationMin: boss.durationMin || DEFAULT_DURATION_MIN,
     })));
   }
   for (const schedule of META_EVENT_SCHEDULE) {
@@ -199,6 +208,7 @@ export function getUpcomingOccurrencesFor(identities, nowMs, cyclesAhead) {
     if (!isMetaEventActive(schedule, nowMs)) continue;
     occurrences.push(...getUpcomingOccurrences(schedule, nowMs, fetchCount).map(spawnMs => ({
       name: schedule.eventName, location: schedule.zoneName, chatLink: schedule.chatLink, spawnMs,
+      durationMin: schedule.durationMin || DEFAULT_DURATION_MIN,
     })));
   }
 
