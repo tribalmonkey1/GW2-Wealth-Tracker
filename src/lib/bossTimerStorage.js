@@ -13,14 +13,39 @@
 import { cacheGet, cacheSet, cacheGetBulk } from "./storage.js";
 
 export const CACHE_KEYS = {
-  favoriteLists: "bossTimerFavoriteLists",   // [{ id, name, members: [{name, location}] }]
-  alerts: "bossTimerAlerts",                 // { "name|location": leadMinutes }
-  completions: "bossTimerCompletions",       // { "name|location": { period } }
+  favoriteLists: "bossTimerFavoriteLists",   // [{ id, name, members: [{name}] }]
+  alerts: "bossTimerAlerts",                 // { name: leadMinutes }
+  completions: "bossTimerCompletions",       // { name: { period } }
   soundSettings: "bossTimerSoundSettings",   // { mode: "beep"|"tts"|"custom", customPath }
+  areasSelection: "bossTimerAreasSelection", // string[] of selected expansion names, or absent = all
+  viewMode: "bossTimerViewMode",             // "countdown" | "timeline"
 };
 
-export function bossKey(name, location) {
-  return `${name}|${location}`;
+// Identity key for alerts/collections/completions — the event NAME alone.
+// Some events (Ley-Line Anomaly being the clearest example) are the same
+// mechanical event rotating through several zones; grouping by name means a
+// bell/star/checkbox set from any one zone's occurrence applies to all of
+// them. Kept as a named function (rather than using `name` directly at every
+// call site) so the identity concept has one place to change later if it
+// ever needs to get smarter than "name alone".
+export function bossKey(name) {
+  return name;
+}
+
+// Migrates alerts/completions maps saved before the name-only identity
+// change, whose keys were "name|location" strings. Safe to run on every
+// load — a no-op for already-migrated data (keys with no "|" pass through
+// unchanged). If two old location-specific entries for the same event name
+// collide, the later one in iteration order wins; for alerts/completions
+// that's harmless (both meant "this event, on"), so no merge logic needed.
+export function migrateLocationKeyedMap(map) {
+  if (!map) return {};
+  const next = {};
+  for (const [key, value] of Object.entries(map)) {
+    const name = key.includes("|") ? key.slice(0, key.indexOf("|")) : key;
+    next[name] = value;
+  }
+  return next;
 }
 
 export const DEFAULT_SOUND_SETTINGS = { mode: "beep", customPath: null };
@@ -68,6 +93,26 @@ export function saveCompletions(completionsMap) {
 
 export function saveSoundSettings(settings) {
   return cacheSet(CACHE_KEYS.soundSettings, settings);
+}
+
+// Areas selection — stored as an array of expansion names, or null if the
+// person has never customized it (defaults to "everything selected").
+export async function loadAreasSelection() {
+  const entry = await cacheGet(CACHE_KEYS.areasSelection);
+  return entry?.value ?? null;
+}
+
+export function saveAreasSelection(namesOrNull) {
+  return cacheSet(CACHE_KEYS.areasSelection, namesOrNull);
+}
+
+export async function loadViewMode() {
+  const entry = await cacheGet(CACHE_KEYS.viewMode);
+  return entry?.value || "countdown";
+}
+
+export function saveViewMode(mode) {
+  return cacheSet(CACHE_KEYS.viewMode, mode);
 }
 
 // "Favorite List N" for the smallest N not already in use — matches the

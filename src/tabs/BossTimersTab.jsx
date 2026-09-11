@@ -2,24 +2,33 @@
  * Boss Timers — combined Countdown + Timeline view for World Bosses, Hardcore
  * Meta bosses, Invasions, and zone meta events.
  *
- * This replaces the old BossTimersTab.jsx / EventTimelineTab.jsx split. A
- * "View" control next to Areas/Sound swaps between the countdown-grid
+ * A "View" control next to Areas/Sound swaps between the countdown-grid
  * presentation and the Gantt-strip timeline presentation of the SAME
- * underlying schedule data — Timeline is just another way to look at Boss
- * Timers now, not a separate feature with its own state.
+ * underlying schedule data. Areas, Sound, and View are all persisted (via
+ * bossTimerStorage) so they survive switching away to another tab and back —
+ * previously only Sound was remembered.
  *
- * Shared across both views:
- *  - alerts (🔔)      — global, from useBossAlerts (mounted in App.jsx)
- *  - collections (⭐)  — per (name, location) identity, persisted via
- *                        bossTimerStorage favoriteLists. Previously
- *                        Countdown-only; now also available from Timeline.
- *  - completions (✓)  — per (name, location) per UTC calendar day, persisted
- *                        via bossTimerStorage completions. Previously
- *                        Timeline-only; now also markable from Countdown.
- *  - Areas filter      — previously Countdown-only; Timeline never filtered
- *                        by area before. Both now respect the same selection.
+ * Identity for alerts (🔔), collections (⭐), and completions (✓) is the
+ * event NAME alone, not name+location — some events (Ley-Line Anomaly being
+ * the clearest example) are mechanically the same event rotating through
+ * several zones, so setting an alert or saving to a collection from any one
+ * zone's occurrence now applies to every zone that event appears in, and all
+ * of them show the same bell/star/checkbox state. See bossTimerCalc's
+ * getNextOccurrenceForName / getUpcomingOccurrencesFor and
+ * bossTimerStorage's bossKey for where this lives.
  *
- * EventTimelineTab.jsx is no longer used anywhere and can be deleted.
+ * Completion (✓) is auto-detected for the 13 Core Tyria world bosses that
+ * GW2's `/v2/account/worldbosses` endpoint tracks (the ones with a Hero's
+ * Choice Chest) — see worldBossApiIds.js for exactly which ones and why the
+ * rest of the schedule (meta events, Ley-Line Anomaly, HoT/PoF/EoD/SotO
+ * metas, etc.) has no API-exposed completion signal and stays manual-only.
+ *
+ * Timeline blocks are laid out with simple greedy lane-packing: two blocks
+ * that would visually overlap (their real spawn times are close together,
+ * not aligned to the 15-minute column grid) get pushed into separate lanes
+ * instead of drawing on top of each other. This doesn't need event duration/
+ * end-time data — GW2's API doesn't expose that anyway — it just treats each
+ * block's fixed on-screen width as the thing that must not collide.
  */
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
@@ -28,15 +37,19 @@ import {
 } from "../lib/bossTimerCalc.js";
 import {
   bossKey, loadFavoriteLists, saveFavoriteLists, nextDefaultFavoriteListName,
-  loadCompletions, saveCompletions,
+  loadCompletions, saveCompletions, migrateLocationKeyedMap,
+  loadAreasSelection, saveAreasSelection, loadViewMode, saveViewMode,
 } from "../lib/bossTimerStorage.js";
 import { EXPANSION_ACCENT_COLORS, EXPANSION_ACCENT_FALLBACK, expansionSortKey } from "../lib/worldBossScheduleData.js";
+import { WORLD_BOSS_API_ID_TO_NAME } from "../lib/worldBossApiIds.js";
+import { apiFetch, BASE } from "../lib/gw2Api.js";
 import { InteractivePopover } from "../components/InteractivePopover.jsx";
 
 const CYCLES_AHEAD = 6;
 const TICK_MS = 1000;
+const WORLD_BOSS_POLL_MS = 2 * 60_000; // /v2/account/worldbosses only changes on kill or daily reset — no need to hammer it
 
-// ── Timeline-view constants (carried over from the old EventTimelineTab) ──
+// ── Timeline-view constants ──
 const INTERVAL_MIN = 15;
 const INTERVAL_MS = INTERVAL_MIN * 60_000;
 const HOURS_AHEAD = 3;
@@ -60,9 +73,27 @@ function currentPeriod(nowMs) {
   return new Date(nowMs).toISOString().slice(0, 10); // UTC calendar day
 }
 
+// Greedy interval-scheduling lane packing: sort by horizontal start position,
+// place each block in the first lane whose last-placed block doesn't
+// horizontally overlap it, otherwise open a new lane. `items` must already
+// carry numeric `left`/`width` in pixels; returns the same items with a
+// `lane` index added.
+function assignLanes(items) {
+  const sorted = [...items].sort((a, b) => a.left - b.left);
+  const laneEnds = []; // right edge (px) of the last block placed in each lane
+  const placed = [];
+  for (const item of sorted) {
+    let lane = laneEnds.findIndex(end => item.left >= end);
+    if (lane === -1) { lane = laneEnds.length; laneEnds.push(0); }
+    laneEnds[lane] = item.left + item.width;
+    placed.push({ ...item, lane });
+  }
+  return placed;
+}
+
 // ── Shared alert/collection popovers — identical content in both views ──
 function AlertPopover({ anchorRef, open, onClose, occ, alerts, setAlertLead, keyPrefix }) {
-  const key = bossKey(occ.name, occ.location);
+  const key = bossKey(occ.name);
   const leadMinutes = alerts[key];
   return (
     <InteractivePopover anchorRef={anchorRef} open={open} onClose={onClose}>
@@ -70,12 +101,12 @@ function AlertPopover({ anchorRef, open, onClose, occ, alerts, setAlertLead, key
       {ALERT_LEAD_OPTIONS_MIN.map(min => (
         <label key={min} className="bt-pop-row">
           <input type="radio" name={`${keyPrefix}-${key}`} checked={leadMinutes === min}
-            onChange={() => setAlertLead(occ.name, occ.location, min)} />
+            onChange={() => setAlertLead(occ.name, min)} />
           {min} minutes before
         </label>
       ))}
       <label className="bt-pop-row">
-        <input type="radio" name={`${keyPrefix}-${key}`} checked={!leadMinutes} onChange={() => setAlertLead(occ.name, occ.location, null)} />
+        <input type="radio" name={`${keyPrefix}-${key}`} checked={!leadMinutes} onChange={() => setAlertLead(occ.name, null)} />
         Off
       </label>
     </InteractivePopover>
@@ -84,7 +115,7 @@ function AlertPopover({ anchorRef, open, onClose, occ, alerts, setAlertLead, key
 
 function CollectionPopover({ anchorRef, open, onClose, occ, collections, onToggleMember, onCreateCollection }) {
   const [newListName, setNewListName] = useState("");
-  const memberListIds = collections.filter(l => l.members.some(m => m.name === occ.name && m.location === occ.location)).map(l => l.id);
+  const memberListIds = collections.filter(l => l.members.some(m => m.name === occ.name)).map(l => l.id);
   return (
     <InteractivePopover anchorRef={anchorRef} open={open} onClose={onClose} minWidth={220}>
       <div className="bt-pop-lbl">SAVE TO COLLECTION</div>
@@ -92,18 +123,18 @@ function CollectionPopover({ anchorRef, open, onClose, occ, collections, onToggl
       {collections.map(list => (
         <label key={list.id} className="bt-pop-row">
           <input type="checkbox" checked={memberListIds.includes(list.id)}
-            onChange={e => onToggleMember(list.id, occ.name, occ.location, e.target.checked)} />
+            onChange={e => onToggleMember(list.id, occ.name, e.target.checked)} />
           {list.name}
         </label>
       ))}
       <div className="bt-pop-newlist">
         <input className="si" style={{ width: 130, fontSize: 12 }} placeholder="New collection…" value={newListName}
           onChange={e => setNewListName(e.target.value)}
-          onKeyDown={e => { if (e.key === "Enter" && newListName.trim()) { onCreateCollection(newListName.trim(), occ.name, occ.location); setNewListName(""); } }} />
+          onKeyDown={e => { if (e.key === "Enter" && newListName.trim()) { onCreateCollection(newListName.trim(), occ.name); setNewListName(""); } }} />
         <button className="rbtn" style={{ fontSize: 11 }} onClick={() => {
           const name = newListName.trim();
           if (!name) return;
-          onCreateCollection(name, occ.name, occ.location);
+          onCreateCollection(name, occ.name);
           setNewListName("");
         }}>+ Add</button>
       </div>
@@ -111,11 +142,16 @@ function CollectionPopover({ anchorRef, open, onClose, occ, collections, onToggl
   );
 }
 
+function AutoTrackedBadge({ name }) {
+  if (!WORLD_BOSS_API_ID_TO_NAME[name]) return null;
+  return <span title="Marked done automatically once GW2's API reports this boss killed for the day" style={{ fontSize: 9, opacity: .6, flexShrink: 0 }}>🔗</span>;
+}
+
 // ── Countdown view: one occurrence line ──
 function CountdownLine({ occ, now, alerts, setAlertLead, collections, onToggleMember, onCreateCollection, completions, currentPeriodStr, onToggleComplete }) {
   const msUntil = occ.spawnMs - now;
   const urgency = urgencyColor(msUntil);
-  const key = bossKey(occ.name, occ.location);
+  const key = bossKey(occ.name);
   const leadMinutes = alerts[key];
   const localTime = new Date(occ.spawnMs).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
   const done = completions[key]?.period === currentPeriodStr;
@@ -125,7 +161,7 @@ function CountdownLine({ occ, now, alerts, setAlertLead, collections, onToggleMe
   const [bellOpen, setBellOpen] = useState(false);
   const [starOpen, setStarOpen] = useState(false);
 
-  const memberListIds = collections.filter(l => l.members.some(m => m.name === occ.name && m.location === occ.location)).map(l => l.id);
+  const memberListIds = collections.filter(l => l.members.some(m => m.name === occ.name)).map(l => l.id);
   const isFavorited = memberListIds.length > 0;
 
   return (
@@ -133,8 +169,9 @@ function CountdownLine({ occ, now, alerts, setAlertLead, collections, onToggleMe
       <div className="bt-occ-top">
         <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
           <input type="checkbox" checked={done} title={done ? "Marked done for today" : "Mark done for today"}
-            onChange={() => onToggleComplete(occ.name, occ.location)} style={{ cursor: "pointer", flexShrink: 0 }} />
+            onChange={() => onToggleComplete(occ.name)} style={{ cursor: "pointer", flexShrink: 0 }} />
           <span className="bt-occ-name" title={occ.location} style={{ textDecoration: done ? "line-through" : "none", flex: 1, minWidth: 0 }}>{occ.name}</span>
+          <AutoTrackedBadge name={occ.name} />
         </div>
         <div className="bt-occ-actions">
           <button ref={bellRef} className={`bt-icon-btn${leadMinutes ? " on" : ""}`}
@@ -199,10 +236,10 @@ function CountdownSection({ expansion, rows, collapsed, onToggle, ...rest }) {
 
 // ── Timeline view: one occurrence line inside a Gantt block ──
 function TimelineOccLine({ occ, alerts, setAlertLead, collections, onToggleMember, onCreateCollection, completions, currentPeriodStr, onToggleComplete }) {
-  const key = bossKey(occ.name, occ.location);
+  const key = bossKey(occ.name);
   const done = completions[key]?.period === currentPeriodStr;
   const leadMinutes = alerts[key];
-  const memberListIds = collections.filter(l => l.members.some(m => m.name === occ.name && m.location === occ.location)).map(l => l.id);
+  const memberListIds = collections.filter(l => l.members.some(m => m.name === occ.name)).map(l => l.id);
   const isFavorited = memberListIds.length > 0;
 
   const bellRef = useRef(null);
@@ -213,9 +250,10 @@ function TimelineOccLine({ occ, alerts, setAlertLead, collections, onToggleMembe
   return (
     <div className="tl-occ-line" style={{ opacity: done ? 0.55 : 1 }}>
       <input type="checkbox" checked={done} title={done ? "Marked done for today" : "Mark done for today"}
-        onChange={() => onToggleComplete(occ.name, occ.location)} style={{ cursor: "pointer", flexShrink: 0 }} />
-      <span className="tl-occ-name" onClick={() => onToggleComplete(occ.name, occ.location)}
+        onChange={() => onToggleComplete(occ.name)} style={{ cursor: "pointer", flexShrink: 0 }} />
+      <span className="tl-occ-name" onClick={() => onToggleComplete(occ.name)}
         style={{ textDecoration: done ? "line-through" : "none", cursor: "pointer" }}>{occ.name}</span>
+      <AutoTrackedBadge name={occ.name} />
       <div style={{ display: "flex", gap: 2, marginLeft: "auto", flexShrink: 0 }}>
         <button ref={bellRef} className={`bt-icon-btn${leadMinutes ? " on" : ""}`} style={{ fontSize: 11 }}
           title={leadMinutes ? `Alerting ${leadMinutes} min before` : "Set an alert"}
@@ -231,22 +269,32 @@ function TimelineOccLine({ occ, alerts, setAlertLead, collections, onToggleMembe
 }
 
 function TimelineRow({ row, origin, windowEnd, ...rest }) {
-  const slots = row.slots.filter(s => s.time >= origin && s.time < windowEnd);
-  const maxStack = slots.reduce((m, s) => Math.max(m, s.occurrences.length), 1);
-  const rowHeight = Math.max(48, maxStack * 26 + 14);
+  const blockWidth = COL_WIDTH - 4;
+  const rawSlots = row.slots.filter(s => s.time >= origin && s.time < windowEnd);
+  const positioned = rawSlots.map(s => ({
+    ...s,
+    left: ((s.time - origin) / INTERVAL_MS) * COL_WIDTH,
+    width: blockWidth,
+  }));
+  // Real spawn times aren't aligned to the 15-minute column grid, so two
+  // blocks close together in time can visually overlap even though they're
+  // in "different columns" — push colliding blocks into separate lanes
+  // instead of letting them draw on top of each other.
+  const laned = assignLanes(positioned);
+  const numLanes = laned.reduce((m, s) => Math.max(m, s.lane + 1), 1);
+  const maxStack = laned.reduce((m, s) => Math.max(m, s.occurrences.length), 1);
+  const laneHeight = Math.max(30, maxStack * 26 + 14);
+  const rowHeight = numLanes * laneHeight;
 
   return (
     <div className="tl-row" style={{ height: rowHeight }}>
       <div className="tl-row-label">{row.rowLabel}</div>
       <div className="tl-track">
-        {slots.map((slot, i) => {
-          const left = ((slot.time - origin) / INTERVAL_MS) * COL_WIDTH;
-          return (
-            <div key={i} className="tl-block" style={{ left, width: COL_WIDTH - 4 }}>
-              {slot.occurrences.map((occ, j) => <TimelineOccLine key={j} occ={occ} {...rest} />)}
-            </div>
-          );
-        })}
+        {laned.map((slot, i) => (
+          <div key={i} className="tl-block" style={{ left: slot.left, top: slot.lane * laneHeight + 6, width: slot.width }}>
+            {slot.occurrences.map((occ, j) => <TimelineOccLine key={j} occ={occ} {...rest} />)}
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -286,14 +334,24 @@ export default function BossTimersTab({ bossAlerts }) {
   const [areasOpen, setAreasOpen] = useState(false);
   const [soundOpen, setSoundOpen] = useState(false);
   const [viewOpen, setViewOpen] = useState(false);
+  const [newCollectionOpen, setNewCollectionOpen] = useState(false);
+  const [newCollectionName, setNewCollectionName] = useState("");
   const areasBtnRef = useRef(null);
   const soundBtnRef = useRef(null);
   const viewBtnRef = useRef(null);
+  const newCollectionBtnRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([loadFavoriteLists(), loadCompletions()])
-      .then(([lists, comps]) => { if (!cancelled) { setCollections(lists); setCompletions(comps); setLoaded(true); } })
+    Promise.all([loadFavoriteLists(), loadCompletions(), loadAreasSelection(), loadViewMode()])
+      .then(([lists, comps, areas, view]) => {
+        if (cancelled) return;
+        setCollections(lists);
+        setCompletions(migrateLocationKeyedMap(comps)); // pre-name-grouping saves used "name|location" keys
+        if (areas) setSelectedAreas(new Set(areas));
+        if (view) setViewMode(view);
+        setLoaded(true);
+      })
       .catch(() => setLoaded(true));
     return () => { cancelled = true; };
   }, []);
@@ -303,33 +361,72 @@ export default function BossTimersTab({ bossAlerts }) {
     return () => clearInterval(t);
   }, []);
 
+  // ── GW2 API auto-completion for the 13 world bosses that expose it ──
+  useEffect(() => {
+    let cancelled = false;
+    const poll = async () => {
+      let killed;
+      try { killed = await apiFetch(`${BASE}/account/worldbosses`); } catch { return; }
+      if (cancelled || !Array.isArray(killed) || killed.length === 0) return;
+      const killedNames = killed.map(id => WORLD_BOSS_API_ID_TO_NAME[id]).filter(Boolean);
+      if (killedNames.length === 0) return;
+      setCompletions(prev => {
+        const period = currentPeriod(Date.now());
+        let changed = false;
+        const next = { ...prev };
+        for (const name of killedNames) {
+          if (next[name]?.period !== period) { next[name] = { period, auto: true }; changed = true; }
+        }
+        if (!changed) return prev;
+        saveCompletions(next);
+        return next;
+      });
+    };
+    poll();
+    const t = setInterval(poll, WORLD_BOSS_POLL_MS);
+    return () => { cancelled = true; clearInterval(t); };
+  }, []);
+
   const allExpansions = useMemo(() => getAllPossibleExpansions(), []);
   const effectiveSelectedAreas = selectedAreas || new Set(allExpansions);
+
+  const handleSetSelectedAreas = useCallback((next) => {
+    setSelectedAreas(next);
+    saveAreasSelection([...next]);
+  }, []);
+
+  const handleSetViewMode = useCallback((mode) => {
+    setViewMode(mode);
+    saveViewMode(mode);
+  }, []);
 
   const persistCollections = useCallback((next) => {
     setCollections(next);
     saveFavoriteLists(next);
   }, []);
 
-  const handleToggleMember = useCallback((listId, name, location, isMember) => {
+  const handleToggleMember = useCallback((listId, name, isMember) => {
     persistCollections(collections.map(list => {
       if (list.id !== listId) return list;
-      const already = list.members.some(m => m.name === name && m.location === location);
-      if (isMember && !already) return { ...list, members: [...list.members, { name, location }] };
-      if (!isMember) return { ...list, members: list.members.filter(m => !(m.name === name && m.location === location)) };
+      const already = list.members.some(m => m.name === name);
+      if (isMember && !already) return { ...list, members: [...list.members, { name }] };
+      if (!isMember) return { ...list, members: list.members.filter(m => m.name !== name) };
       return list;
     }));
   }, [collections, persistCollections]);
 
-  const handleCreateCollection = useCallback((name, bossName, location) => {
+  const handleCreateCollection = useCallback((name, bossName) => {
     const id = collections.reduce((max, l) => Math.max(max, l.id), 0) + 1;
-    persistCollections([...collections, { id, name, members: [{ name: bossName, location }] }]);
+    persistCollections([...collections, { id, name, members: [{ name: bossName }] }]);
   }, [collections, persistCollections]);
 
-  const handleAddBlankCollection = useCallback(() => {
+  // "+" next to All — name the collection right away (like the star's
+  // "New collection…" mini-form) instead of silently creating
+  // "Favorite List N" and requiring a double-click rename afterward.
+  const handleCreateNamedCollection = useCallback((name) => {
+    const finalName = name.trim() || nextDefaultFavoriteListName(collections);
     const id = collections.reduce((max, l) => Math.max(max, l.id), 0) + 1;
-    const name = nextDefaultFavoriteListName(collections);
-    persistCollections([...collections, { id, name, members: [] }]);
+    persistCollections([...collections, { id, name: finalName, members: [] }]);
     setActiveTabId(id);
   }, [collections, persistCollections]);
 
@@ -338,13 +435,13 @@ export default function BossTimersTab({ bossAlerts }) {
     setActiveTabId(prev => (prev === id ? null : prev));
   }, [collections, persistCollections]);
 
-  // Completion is per (name, location) per UTC calendar day — marking any one
-  // occurrence of a boss done marks it done for every occurrence of that same
-  // boss that day, in both views (matches the original Event Timeline semantics).
+  // Completion is per event name per UTC calendar day — marking any one
+  // occurrence done marks it done for every zone that shares the name
+  // (matches alerts/collections' name-only identity).
   const currentPeriodStr = useMemo(() => currentPeriod(now), [now]);
-  const handleToggleComplete = useCallback((name, location) => {
+  const handleToggleComplete = useCallback((name) => {
     setCompletions(prev => {
-      const key = bossKey(name, location);
+      const key = bossKey(name);
       const next = { ...prev };
       if (next[key]?.period === currentPeriod(Date.now())) {
         delete next[key]; // un-check
@@ -420,23 +517,23 @@ export default function BossTimersTab({ bossAlerts }) {
           👁 View: {viewMode === "countdown" ? "Countdown" : "Timeline"} ▾
         </button>
         <div style={{ marginLeft: "auto", fontSize: 11, color: "var(--text3)", fontFamily: "Cinzel,serif", letterSpacing: 1 }}>
-          ✓ marks done for today · 🔔 sets an alert · ⭐ saves to a collection
+          ✓ marks done for today · 🔔 sets an alert · ⭐ saves to a collection · 🔗 auto-tracked via API
         </div>
       </div>
 
       <InteractivePopover anchorRef={areasBtnRef} open={areasOpen} onClose={() => setAreasOpen(false)} minWidth={200}>
         <div className="bt-pop-lbl">AREAS</div>
         <div style={{ display: "flex", gap: 8, marginBottom: 6, fontSize: 11 }}>
-          <span style={{ color: "var(--gold2)", cursor: "pointer" }} onClick={() => setSelectedAreas(new Set(allExpansions))}>All</span>
+          <span style={{ color: "var(--gold2)", cursor: "pointer" }} onClick={() => handleSetSelectedAreas(new Set(allExpansions))}>All</span>
           <span style={{ color: "var(--text3)" }}>·</span>
-          <span style={{ color: "var(--gold2)", cursor: "pointer" }} onClick={() => setSelectedAreas(new Set())}>None</span>
+          <span style={{ color: "var(--gold2)", cursor: "pointer" }} onClick={() => handleSetSelectedAreas(new Set())}>None</span>
         </div>
         {allExpansions.map(exp => (
           <label key={exp} className="bt-pop-row">
             <input type="checkbox" checked={effectiveSelectedAreas.has(exp)} onChange={e => {
               const next = new Set(effectiveSelectedAreas);
               if (e.target.checked) next.add(exp); else next.delete(exp);
-              setSelectedAreas(next);
+              handleSetSelectedAreas(next);
             }} />
             {exp}
           </label>
@@ -462,11 +559,11 @@ export default function BossTimersTab({ bossAlerts }) {
       <InteractivePopover anchorRef={viewBtnRef} open={viewOpen} onClose={() => setViewOpen(false)} minWidth={170}>
         <div className="bt-pop-lbl">VIEW</div>
         <label className="bt-pop-row">
-          <input type="radio" name="view-mode" checked={viewMode === "countdown"} onChange={() => { setViewMode("countdown"); setViewOpen(false); }} />
+          <input type="radio" name="view-mode" checked={viewMode === "countdown"} onChange={() => { handleSetViewMode("countdown"); setViewOpen(false); }} />
           ⏱ Countdown
         </label>
         <label className="bt-pop-row">
-          <input type="radio" name="view-mode" checked={viewMode === "timeline"} onChange={() => { setViewMode("timeline"); setViewOpen(false); }} />
+          <input type="radio" name="view-mode" checked={viewMode === "timeline"} onChange={() => { handleSetViewMode("timeline"); setViewOpen(false); }} />
           📅 Timeline
         </label>
       </InteractivePopover>
@@ -485,8 +582,22 @@ export default function BossTimersTab({ bossAlerts }) {
               onClick={e => { e.stopPropagation(); if (window.confirm(`Delete "${list.name}"?`)) handleDeleteCollection(list.id); }}>✕</span>
           </button>
         ))}
-        <button className="dtab" onClick={handleAddBlankCollection} title="New collection">+</button>
+        <button ref={newCollectionBtnRef} className="dtab" onClick={() => setNewCollectionOpen(o => !o)} title="New collection">+</button>
       </div>
+
+      <InteractivePopover anchorRef={newCollectionBtnRef} open={newCollectionOpen} onClose={() => setNewCollectionOpen(false)} minWidth={210}>
+        <div className="bt-pop-lbl">NEW COLLECTION</div>
+        <div className="bt-pop-newlist">
+          <input className="si" style={{ width: 140, fontSize: 12 }} placeholder="Collection name…" autoFocus value={newCollectionName}
+            onChange={e => setNewCollectionName(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter") { handleCreateNamedCollection(newCollectionName); setNewCollectionName(""); setNewCollectionOpen(false); } }} />
+          <button className="rbtn" style={{ fontSize: 11 }} onClick={() => {
+            handleCreateNamedCollection(newCollectionName);
+            setNewCollectionName("");
+            setNewCollectionOpen(false);
+          }}>+ Create</button>
+        </div>
+      </InteractivePopover>
 
       {viewMode === "countdown" ? (
         activeTabId === null ? (

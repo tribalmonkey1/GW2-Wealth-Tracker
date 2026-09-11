@@ -175,21 +175,27 @@ export function getUpcomingRowSeries(nowMs, cyclesAhead) {
   return rows.sort((a, b) => a.slots[0].time - b.slots[0].time);
 }
 
-// ── Favorites — merged occurrences for an arbitrary set of (name, location) ──
+// ── Favorites — merged occurrences for an arbitrary set of event NAMES ──
+// Identity is the event name alone, not name+location: some events (Ley-Line
+// Anomaly being the clearest example) are the same mechanical event rotating
+// through several zones on its own schedule. Grouping by name means setting
+// an alert or saving to a collection from any one zone's occurrence applies
+// to every zone that event appears in — matches how the player thinks about
+// "the event", not the specific instance they happened to click on.
 export function getUpcomingOccurrencesFor(identities, nowMs, cyclesAhead) {
   if (identities.length === 0) return [];
-  const idSet = new Set(identities.map(i => `${i.name}|${i.location}`));
+  const nameSet = new Set(identities.map(i => i.name));
   const fetchCount = cyclesAhead * OCCURRENCE_FETCH_MULTIPLIER;
   const occurrences = [];
 
   for (const boss of WORLD_BOSS_SCHEDULE) {
-    if (!idSet.has(`${boss.bossName}|${boss.location}`)) continue;
+    if (!nameSet.has(boss.bossName)) continue;
     occurrences.push(...getUpcomingSpawns(boss.dailySpawnTimesUtc, nowMs, fetchCount).map(spawnMs => ({
       name: boss.bossName, location: boss.location, chatLink: boss.chatLink, spawnMs,
     })));
   }
   for (const schedule of META_EVENT_SCHEDULE) {
-    if (!idSet.has(`${schedule.eventName}|${schedule.zoneName}`)) continue;
+    if (!nameSet.has(schedule.eventName)) continue;
     if (!isMetaEventActive(schedule, nowMs)) continue;
     occurrences.push(...getUpcomingOccurrences(schedule, nowMs, fetchCount).map(spawnMs => ({
       name: schedule.eventName, location: schedule.zoneName, chatLink: schedule.chatLink, spawnMs,
@@ -214,15 +220,13 @@ export function getAllBossIdentities() {
   const seen = new Set();
   const result = [];
   for (const b of WORLD_BOSS_SCHEDULE) {
-    const key = `${b.bossName}|${b.location}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
+    if (seen.has(b.bossName)) continue;
+    seen.add(b.bossName);
     result.push({ name: b.bossName, location: b.location, chatLink: b.chatLink });
   }
   for (const s of META_EVENT_SCHEDULE) {
-    const key = `${s.eventName}|${s.zoneName}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
+    if (seen.has(s.eventName)) continue;
+    seen.add(s.eventName);
     result.push({ name: s.eventName, location: s.zoneName, chatLink: s.chatLink });
   }
   return result;
@@ -249,18 +253,26 @@ export function urgencyColor(msUntil) {
 export const ALERT_LEAD_OPTIONS_MIN = [10, 15, 20];
 
 // ── Single-identity lookup (for the global alert hook) ──────────────────────
-// Returns the single soonest upcoming spawn for one specific (name, location)
-// identity, searching both schedule sources — or null if the identity
-// doesn't match anything (e.g. a stale alert left over from schedule data
-// that's since changed). Deliberately not derived from getUpcomingRowSeries'
-// grouped/stacked output — an alert is about one specific boss, not
-// "whichever boss occupies a combined row's soonest slot."
-export function getNextOccurrenceForIdentity(name, location, nowMs) {
-  const boss = WORLD_BOSS_SCHEDULE.find(b => b.bossName === name && b.location === location);
-  if (boss) return getNextSpawn(boss.dailySpawnTimesUtc, nowMs);
-
-  const schedule = META_EVENT_SCHEDULE.find(s => s.eventName === name && s.zoneName === location);
-  if (schedule && isMetaEventActive(schedule, nowMs)) return getNextOccurrence(schedule, nowMs);
-
-  return null;
+// Returns the SOONEST upcoming spawn across every schedule entry sharing this
+// event name, regardless of zone — an alert on "Ley-Line Anomaly" should fire
+// for whichever of its three zones comes up next, not just the one zone the
+// alert happened to be set from. Returns null if the name doesn't match
+// anything (e.g. a stale alert left over from schedule data that's since
+// changed). Deliberately not derived from getUpcomingRowSeries' grouped/
+// stacked output — an alert is about one named event, not "whichever boss
+// occupies a combined row's soonest slot."
+export function getNextOccurrenceForName(name, nowMs) {
+  let best = null;
+  for (const boss of WORLD_BOSS_SCHEDULE) {
+    if (boss.bossName !== name) continue;
+    const spawnMs = getNextSpawn(boss.dailySpawnTimesUtc, nowMs);
+    if (best === null || spawnMs < best) best = spawnMs;
+  }
+  for (const schedule of META_EVENT_SCHEDULE) {
+    if (schedule.eventName !== name) continue;
+    if (!isMetaEventActive(schedule, nowMs)) continue;
+    const spawnMs = getNextOccurrence(schedule, nowMs);
+    if (best === null || spawnMs < best) best = spawnMs;
+  }
+  return best;
 }

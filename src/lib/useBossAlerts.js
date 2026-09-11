@@ -8,35 +8,37 @@
  *
  * Each alerted identity carries its OWN lead time (10/15/20 min — the bell
  * popover's choice) rather than a single global lead time, stored as
- * { "name|location": leadMinutes } via bossTimerStorage.
+ * { eventName: leadMinutes } via bossTimerStorage. Identity is the event
+ * NAME alone (not name+location) — see bossTimerStorage.bossKey.
  *
  * customSoundPath: the CURRENT value of Settings → Alert Sound → custom
- * sound path (owned by App.jsx, not by this hook). Passed in fresh on every
- * render rather than baked into soundSettings.customPath at save-time, so
- * changing the path in Settings takes effect immediately without needing
- * to re-pick "Custom Sound" in the bell/sound popover.
+ * sound path (owned by App.jsx). Passed in fresh on every render rather
+ * than baked into soundSettings.customPath at save-time, so changing the
+ * path in Settings takes effect immediately.
  */
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { getNextOccurrenceForIdentity } from "./bossTimerCalc.js";
+import { getNextOccurrenceForName } from "./bossTimerCalc.js";
 import { playAlertsSequentially } from "./alertSound.js";
 import {
   bossKey, loadBossTimerPrefs, saveAlerts, saveSoundSettings, DEFAULT_SOUND_SETTINGS,
+  migrateLocationKeyedMap,
 } from "./bossTimerStorage.js";
 
 const TICK_MS = 1000;
 
 export function useBossAlerts(customSoundPath) {
-  const [alerts, setAlerts] = useState({}); // "name|location" -> leadMinutes
+  const [alerts, setAlerts] = useState({}); // event name -> leadMinutes
   const [soundSettings, setSoundSettingsState] = useState(DEFAULT_SOUND_SETTINGS);
   const [loaded, setLoaded] = useState(false);
   const alertsRef = useRef(alerts);
   const soundRef = useRef(soundSettings);
   const customSoundPathRef = useRef(customSoundPath);
-  // Dedup: "name|location" -> spawnMs already alerted for. Stamped the
-  // moment an occurrence first enters the lead window, regardless of
-  // whether sound actually plays that tick — prevents re-alerting every
-  // second while still inside the window, same as the reference app's
-  // _lastAlertedSpawnUtc.
+  // Dedup: event name -> spawnMs already alerted for. Stamped the moment an
+  // occurrence first enters the lead window, regardless of whether sound
+  // actually plays that tick — prevents re-alerting every second while
+  // still inside the window, same as the reference app's
+  // _lastAlertedSpawnUtc. Since identity is name-only now, this naturally
+  // covers "already alerted for this spawn, wherever it is" too.
   const lastAlertedRef = useRef({});
 
   useEffect(() => { alertsRef.current = alerts; }, [alerts]);
@@ -47,7 +49,7 @@ export function useBossAlerts(customSoundPath) {
     let cancelled = false;
     loadBossTimerPrefs().then(prefs => {
       if (cancelled) return;
-      setAlerts(prefs.alerts);
+      setAlerts(migrateLocationKeyedMap(prefs.alerts)); // pre-name-grouping saves used "name|location" keys
       setSoundSettingsState(prefs.soundSettings);
       setLoaded(true);
     }).catch(() => setLoaded(true));
@@ -60,18 +62,16 @@ export function useBossAlerts(customSoundPath) {
       const currentAlerts = alertsRef.current;
       const toFire = [];
 
-      for (const [key, leadMinutes] of Object.entries(currentAlerts)) {
+      for (const [name, leadMinutes] of Object.entries(currentAlerts)) {
         if (!leadMinutes) continue;
-        const sepIdx = key.indexOf("|");
-        const name = key.slice(0, sepIdx), location = key.slice(sepIdx + 1);
-        const spawnMs = getNextOccurrenceForIdentity(name, location, now);
+        const spawnMs = getNextOccurrenceForName(name, now);
         if (spawnMs == null) continue;
 
         const msUntil = spawnMs - now;
         if (msUntil > leadMinutes * 60_000) continue;
 
-        if (lastAlertedRef.current[key] === spawnMs) continue; // already handled this occurrence
-        lastAlertedRef.current[key] = spawnMs;
+        if (lastAlertedRef.current[name] === spawnMs) continue; // already handled this occurrence
+        lastAlertedRef.current[name] = spawnMs;
         toFire.push(name);
       }
 
@@ -88,9 +88,9 @@ export function useBossAlerts(customSoundPath) {
     return () => clearInterval(interval);
   }, []);
 
-  const setAlertLead = useCallback((name, location, leadMinutes) => {
+  const setAlertLead = useCallback((name, leadMinutes) => {
     setAlerts(prev => {
-      const key = bossKey(name, location);
+      const key = bossKey(name);
       const next = { ...prev };
       if (leadMinutes) next[key] = leadMinutes; else delete next[key];
       saveAlerts(next);
