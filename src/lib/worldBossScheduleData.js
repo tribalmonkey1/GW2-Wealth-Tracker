@@ -76,7 +76,8 @@ export const EXPANSION_DISPLAY_ORDER = [
   'Core Tyria', 'Living World Season 1', 'Living World Season 2', 'Heart of Thorns',
   'Living World Season 3', 'Path of Fire', 'Living World Season 4', 'The Icebrood Saga',
   'End of Dragons', 'Secrets of the Obscure', 'Janthir Wilds', 'Visions of Eternity',
-  'Special Events',
+  'Public Instance',
+  'Festival of the Four Winds', 'Dragon Bash', 'Shadow of the Mad King',
 ];
 
 export function expansionSortKey(expansionName) {
@@ -97,6 +98,9 @@ export const EXPANSION_ACCENT_COLORS = {
   'Secrets of the Obscure': '#7B6DBE',
   'Janthir Wilds': '#4A7A96',
   'Visions of Eternity': '#9C6B4A',
-  'Special Events': '#D4A72C',
+  'Public Instance': '#6B7B8E',
+  'Festival of the Four Winds': '#D4A72C',
+  'Dragon Bash': '#C74B3C',
+  'Shadow of the Mad King': '#7A4B8E',
 };
 export const EXPANSION_ACCENT_FALLBACK = '#888888';

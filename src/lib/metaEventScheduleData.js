@@ -13,18 +13,27 @@
  *
  * durationMin: how long the event actually runs once it starts, used by the
  * Timeline view to size each block proportionally instead of every event
- * getting the same fixed-width block. Entries without a confirmed duration
- * omit the field — bossTimerCalc.js falls back to DEFAULT_DURATION_MIN (15)
- * for those. Entries still needing a real duration (as of this pass):
- * Maws of Torment, Forged with Fire, Serpents' Ire, and the Special Events
- * festival block (Dolyak Race, Treasure Hunt, Skimmer Race) — deferred for
- * now per Derrick. Also still missing entirely (not just duration): a
- * "Convergence: Outer Nayos" entry — need its zone/cycleLengthMin/offsetMin
- * before it can be added alongside Convergence: Mount Balrior.
+ * getting the same fixed-width block. Every entry in this file now carries a
+ * confirmed duration except the seasonal festivals still pending real-world
+ * dates (see the Special Events section below) — anything without the field
+ * falls back to DEFAULT_DURATION_MIN (15) in bossTimerCalc.js.
  *
  * "Defend Jora's Keep" isn't a separate event in this schedule — it's what
  * this app's data calls "Raven Shrines" (Bjora Marches); its duration was
  * applied there.
+ *
+ * Convergences are grouped under a "Public Instance" expansion / "Convergence"
+ * zone (Mount Balrior, Outer Nayos) rather than filed under whichever
+ * expansion introduced them — see that section below. The original SotO
+ * Convergence ("Convergences (Public)" at Amnytas) hasn't been moved into
+ * that bucket, only these two.
+ *
+ * Special Events (seasonal festivals) still need real-world active windows:
+ * Dragon Bash has no activeFrom/activeTo at all yet (so it currently shows
+ * as always-on rather than seasonal) and Shadow of the Mad King is using a
+ * "safe buffer" estimate rather than confirmed 2026 dates — see those
+ * sections below for specifics. Wintersday, Super Adventure Festival, and
+ * Lunar New Year have no tracked events yet at all.
  *
  * Source: docs/reference/events.json — the same structured data file that
  * powers the wiki's own timer widget — except Awakened Invasion (not
@@ -70,11 +79,13 @@ export const META_EVENT_SCHEDULE = [
   { eventName: 'The Path to Ascension: Augury Rock', zoneName: 'Elon Riverlands', expansion: 'Path of Fire', cycleLengthMin: TWO_HOUR, offsetMin: 90, chatLink: '[&BFMKAAA=]', durationMin: 25 },
   { eventName: 'Doppelganger', zoneName: 'Elon Riverlands', expansion: 'Path of Fire', cycleLengthMin: TWO_HOUR, offsetMin: 115, chatLink: '[&BCgKAAA=]', durationMin: 20 },
   { eventName: 'Junundu Rising', zoneName: 'The Desolation', expansion: 'Path of Fire', cycleLengthMin: TWO_HOUR, offsetMin: 30, chatLink: '[&BMEKAAA=]', durationMin: 20 },
-  { eventName: 'Maws of Torment', zoneName: 'The Desolation', expansion: 'Path of Fire', cycleLengthMin: TWO_HOUR, offsetMin: 60, chatLink: '[&BKMKAAA=]' },
+  { eventName: 'Maws of Torment', zoneName: 'The Desolation', expansion: 'Path of Fire', cycleLengthMin: TWO_HOUR, offsetMin: 60, chatLink: '[&BKMKAAA=]', durationMin: 20 },
   { eventName: 'Junundu Rising', zoneName: 'The Desolation', expansion: 'Path of Fire', cycleLengthMin: TWO_HOUR, offsetMin: 90, chatLink: '[&BMEKAAA=]', durationMin: 20 },
-  { eventName: 'Forged with Fire', zoneName: 'Domain of Vabbi', expansion: 'Path of Fire', cycleLengthMin: TWO_HOUR, offsetMin: 0, chatLink: '[&BO0KAAA=]' },
-  { eventName: "Serpents' Ire", zoneName: 'Domain of Vabbi', expansion: 'Path of Fire', cycleLengthMin: TWO_HOUR, offsetMin: 30, chatLink: '[&BHQKAAA=]' },
-  { eventName: 'Forged with Fire', zoneName: 'Domain of Vabbi', expansion: 'Path of Fire', cycleLengthMin: TWO_HOUR, offsetMin: 60, chatLink: '[&BO0KAAA=]' },
+  { eventName: 'Forged with Fire', zoneName: 'Domain of Vabbi', expansion: 'Path of Fire', cycleLengthMin: TWO_HOUR, offsetMin: 0, chatLink: '[&BO0KAAA=]', durationMin: 30 },
+  // Odd-hour UTC at :30 (e.g. 01:30, 03:30, ...) — offsetMin corrected from 30
+  // to 90 per Derrick's clarification; the old value put this on even hours.
+  { eventName: "Serpents' Ire", zoneName: 'Domain of Vabbi', expansion: 'Path of Fire', cycleLengthMin: TWO_HOUR, offsetMin: 90, chatLink: '[&BHQKAAA=]', durationMin: 30 },
+  { eventName: 'Forged with Fire', zoneName: 'Domain of Vabbi', expansion: 'Path of Fire', cycleLengthMin: TWO_HOUR, offsetMin: 60, chatLink: '[&BO0KAAA=]', durationMin: 30 },
 
   // ── Living World Season 4 ──
   { eventName: 'Palawadan', zoneName: 'Domain of Istan', expansion: 'Living World Season 4', cycleLengthMin: TWO_HOUR, offsetMin: 105, chatLink: '[&BAkLAAA=]', durationMin: 30 },
@@ -120,21 +131,62 @@ export const META_EVENT_SCHEDULE = [
 
   // ── Janthir Wilds ──
   { eventName: 'Of Mists and Monsters', zoneName: 'Janthir Syntri', expansion: 'Janthir Wilds', cycleLengthMin: TWO_HOUR, offsetMin: 40, chatLink: '[&BCoPAAA=]', durationMin: 25 },
-  { eventName: 'Convergence: Mount Balrior', zoneName: 'Mount Balrior', expansion: 'Janthir Wilds', cycleLengthMin: THREE_HOUR, offsetMin: 0, chatLink: '[&BK4OAAA=]', durationMin: 10 },
   { eventName: 'A Titanic Voyage', zoneName: 'Bava Nisos', expansion: 'Janthir Wilds', cycleLengthMin: TWO_HOUR, offsetMin: 80, chatLink: '[&BGEPAAA=]', durationMin: 25 },
-  // Convergence: Outer Nayos (10 min duration, per Derrick) is NOT in this
-  // schedule yet — need its zone/cycleLengthMin/offsetMin before it can be
-  // added the same way Convergence: Mount Balrior was.
 
   // ── Visions of Eternity ──
   { eventName: 'Hammerhart Rumble!', zoneName: 'Shipwreck Strand', expansion: 'Visions of Eternity', cycleLengthMin: TWO_HOUR, offsetMin: 40, chatLink: '[&BJEPAAA=]', durationMin: 20 },
   { eventName: 'Secrets of the Weald', zoneName: 'Starlit Weald', expansion: 'Visions of Eternity', cycleLengthMin: TWO_HOUR, offsetMin: 100, chatLink: '[&BJ4PAAA=]', durationMin: 35 },
 
-  // ── Special Events (seasonal) — Festival of the Four Winds ──
-  // Lower confidence than every permanent zone above — see events.json's own
-  // "active": false flag on this entry. Update these dates each year, or the
-  // section simply stops appearing once activeTo passes (by design).
-  { eventName: 'Dolyak Race', zoneName: 'Labyrinthine Cliffs', expansion: 'Special Events', cycleLengthMin: TWO_HOUR, offsetMin: 0, chatLink: '[&BBwHAAA=]', activeFrom: '2026-08-11', activeTo: '2026-09-01' },
-  { eventName: 'Treasure Hunt', zoneName: 'Labyrinthine Cliffs', expansion: 'Special Events', cycleLengthMin: TWO_HOUR, offsetMin: 30, chatLink: '[&BBwHAAA=]', activeFrom: '2026-08-11', activeTo: '2026-09-01' },
-  { eventName: 'Skimmer Race', zoneName: 'Labyrinthine Cliffs', expansion: 'Special Events', cycleLengthMin: TWO_HOUR, offsetMin: 90, chatLink: '[&BBwHAAA=]', activeFrom: '2026-08-11', activeTo: '2026-09-01' },
+  // ── Public Instance — Convergences ──
+  // Each expansion since Secrets of the Obscure has added its own
+  // Convergence public instance; grouped under one "Public Instance"
+  // expansion / "Convergence" zone bucket rather than filed under whichever
+  // expansion happened to introduce it, since Derrick thinks of them as one
+  // family of content. (The original SotO one, "Convergences (Public)" at
+  // Amnytas above, hasn't been moved into this bucket — only these two.)
+  { eventName: 'Mount Balrior', zoneName: 'Convergence', expansion: 'Public Instance', cycleLengthMin: THREE_HOUR, offsetMin: 0, chatLink: '[&BK4OAAA=]', durationMin: 10 },
+  // Opens every 3 hours at :30, UTC-7 anchor 18:30 (= 01:30 UTC) — offsetMin
+  // 90 puts occurrences at 01:30, 04:30, 07:30, ... UTC.
+  { eventName: 'Outer Nayos', zoneName: 'Convergence', expansion: 'Public Instance', cycleLengthMin: THREE_HOUR, offsetMin: 90, chatLink: null, durationMin: 10 },
+
+  // ── Special Events (seasonal) ──
+  //
+  // expansion here is the FESTIVAL name (not a real expansion) and zoneName
+  // is the map that festival's tracked events occur in — same shape as
+  // everything else in this file, just grouped by festival instead of by
+  // release. activeFrom/activeTo gate these to when the festival is
+  // actually running; outside that window isMetaEventActive() hides them
+  // entirely. Dates are per-year and need updating each time the festival
+  // returns — see the comment above each festival block for what's known
+  // and what's still a guess.
+
+  // ── Festival of the Four Winds — Labyrinthine Cliffs ──
+  // (The Crown Pavilion is the festival's other map, but its events are
+  // player-action-driven rather than clock-driven, so it isn't tracked here.)
+  { eventName: 'Water Balloons', zoneName: 'Labyrinthine Cliffs', expansion: 'Festival of the Four Winds', cycleLengthMin: TWO_HOUR, offsetMin: 15, chatLink: '[&BBwHAAA=]', durationMin: 10, activeFrom: '2026-08-11', activeTo: '2026-09-01' },
+  { eventName: 'Treasure Hunt', zoneName: 'Labyrinthine Cliffs', expansion: 'Festival of the Four Winds', cycleLengthMin: TWO_HOUR, offsetMin: 30, chatLink: '[&BBwHAAA=]', durationMin: 30, activeFrom: '2026-08-11', activeTo: '2026-09-01' },
+  { eventName: 'Skimmer Race', zoneName: 'Labyrinthine Cliffs', expansion: 'Festival of the Four Winds', cycleLengthMin: TWO_HOUR, offsetMin: 75, chatLink: '[&BBwHAAA=]', durationMin: 10, activeFrom: '2026-08-11', activeTo: '2026-09-01' },
+  { eventName: 'Fishing', zoneName: 'Labyrinthine Cliffs', expansion: 'Festival of the Four Winds', cycleLengthMin: TWO_HOUR, offsetMin: 90, chatLink: '[&BBwHAAA=]', durationMin: 10, activeFrom: '2026-08-11', activeTo: '2026-09-01' },
+  { eventName: 'Dolyak Race', zoneName: 'Labyrinthine Cliffs', expansion: 'Festival of the Four Winds', cycleLengthMin: TWO_HOUR, offsetMin: 105, chatLink: '[&BBwHAAA=]', durationMin: 10, activeFrom: '2026-08-11', activeTo: '2026-09-01' },
+  { eventName: 'Skiff Race', zoneName: 'Labyrinthine Cliffs', expansion: 'Festival of the Four Winds', cycleLengthMin: TWO_HOUR, offsetMin: 0, chatLink: '[&BBwHAAA=]', durationMin: 10, activeFrom: '2026-08-11', activeTo: '2026-09-01' },
+
+  // ── Dragon Bash ──
+  // "Hologram Stampede" rotates through 4 zones on an hourly cycle, the same
+  // one-event-many-zones shape as Ley-Line Anomaly (grouped by name, not
+  // name+location — see bossKey/getNextOccurrenceForName). NO activeFrom/
+  // activeTo yet — Derrick didn't have Dragon Bash's real-world date range
+  // (Groc's research only covered Halloween/Wintersday/Super Adventure/Lunar
+  // New Year), so without those two fields this festival will show as
+  // always-on rather than seasonal until dates are supplied.
+  { eventName: 'Hologram Stampede', zoneName: 'Wayfarer Foothills', expansion: 'Dragon Bash', cycleLengthMin: ONE_HOUR, offsetMin: 0, chatLink: null, durationMin: 5 },
+  { eventName: 'Hologram Stampede', zoneName: 'Dredgehaunt Cliffs', expansion: 'Dragon Bash', cycleLengthMin: ONE_HOUR, offsetMin: 15, chatLink: null, durationMin: 5 },
+  { eventName: 'Hologram Stampede', zoneName: "Lornar's Pass", expansion: 'Dragon Bash', cycleLengthMin: ONE_HOUR, offsetMin: 30, chatLink: null, durationMin: 5 },
+  { eventName: 'Hologram Stampede', zoneName: 'Snowden Drifts', expansion: 'Dragon Bash', cycleLengthMin: ONE_HOUR, offsetMin: 45, chatLink: null, durationMin: 5 },
+
+  // ── Shadow of the Mad King (Halloween) ──
+  // activeFrom/activeTo use the "safe buffer" window Derrick's research
+  // recommended (real historical 2026 dates were closer to Oct 13 – Nov 3)
+  // rather than the exact confirmed dates, since exact per-year dates
+  // aren't nailed down — widen/narrow once the actual 2026 dates are known.
+  { eventName: 'Your Mad King Says...', zoneName: "Lion's Arch", expansion: 'Shadow of the Mad King', cycleLengthMin: TWO_HOUR, offsetMin: 0, chatLink: null, durationMin: 10, activeFrom: '2026-10-01', activeTo: '2026-11-15' },
 ];
