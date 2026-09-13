@@ -12,9 +12,12 @@
  * NAME alone (not name+location) — see bossTimerStorage.bossKey.
  *
  * customSoundPath: the CURRENT value of Settings → Alert Sound → custom
- * sound path (owned by App.jsx). Passed in fresh on every render rather
- * than baked into soundSettings.customPath at save-time, so changing the
- * path in Settings takes effect immediately.
+ * sound path (owned by App.jsx). piperVoiceFile / piperSpeakerId: same
+ * live-override pattern, for Settings → Piper Voice (Linux native TTS
+ * fallback — see alertSound.js/commands.rs). All three are passed in fresh
+ * on every render rather than baked into soundSettings at save-time, so
+ * changing them in Settings takes effect immediately without needing to
+ * re-open the Sound popover.
  */
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { getNextOccurrenceForName } from "./bossTimerCalc.js";
@@ -26,13 +29,15 @@ import {
 
 const TICK_MS = 1000;
 
-export function useBossAlerts(customSoundPath) {
+export function useBossAlerts(customSoundPath, piperVoiceFile, piperSpeakerId) {
   const [alerts, setAlerts] = useState({}); // event name -> leadMinutes
   const [soundSettings, setSoundSettingsState] = useState(DEFAULT_SOUND_SETTINGS);
   const [loaded, setLoaded] = useState(false);
   const alertsRef = useRef(alerts);
   const soundRef = useRef(soundSettings);
   const customSoundPathRef = useRef(customSoundPath);
+  const piperVoiceFileRef = useRef(piperVoiceFile);
+  const piperSpeakerIdRef = useRef(piperSpeakerId);
   // Dedup: event name -> spawnMs already alerted for. Stamped the moment an
   // occurrence first enters the lead window, regardless of whether sound
   // actually plays that tick — prevents re-alerting every second while
@@ -44,6 +49,8 @@ export function useBossAlerts(customSoundPath) {
   useEffect(() => { alertsRef.current = alerts; }, [alerts]);
   useEffect(() => { soundRef.current = soundSettings; }, [soundSettings]);
   useEffect(() => { customSoundPathRef.current = customSoundPath; }, [customSoundPath]);
+  useEffect(() => { piperVoiceFileRef.current = piperVoiceFile; }, [piperVoiceFile]);
+  useEffect(() => { piperSpeakerIdRef.current = piperSpeakerId; }, [piperSpeakerId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -77,11 +84,19 @@ export function useBossAlerts(customSoundPath) {
 
       if (toFire.length > 0) {
         const settings = soundRef.current;
-        // Merge in the live custom sound path only when custom mode is active —
-        // avoids ever needing to re-save soundSettings just because the path changed.
-        const effective = settings.mode === "custom"
-          ? { ...settings, customPath: customSoundPathRef.current || settings.customPath }
-          : settings;
+        // Merge in the live custom sound path / Piper voice+speaker only
+        // for the mode that actually uses them — avoids ever needing to
+        // re-save soundSettings just because one of these changed.
+        let effective = settings;
+        if (settings.mode === "custom") {
+          effective = { ...settings, customPath: customSoundPathRef.current || settings.customPath };
+        } else if (settings.mode === "tts") {
+          effective = {
+            ...settings,
+            piperVoiceFile: piperVoiceFileRef.current || settings.piperVoiceFile,
+            piperSpeakerId: piperSpeakerIdRef.current ?? settings.piperSpeakerId,
+          };
+        }
         playAlertsSequentially(toFire, effective);
       }
     }, TICK_MS);

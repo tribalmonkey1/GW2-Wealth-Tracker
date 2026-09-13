@@ -5,15 +5,117 @@
  * Caller is responsible for the `showSettings &&` gate (see App.jsx).
  * (Split out of App.jsx.)
  */
-import React from "react";
+import React, { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { renderMarkdown } from "../lib/markdown.jsx";
+
+// ── Piper Voice picker (Linux native TTS fallback) ─────────────────────────
+// Only meaningful on Linux, where window.speechSynthesis is missing on stock
+// webkit2gtk builds and the app shells out to Piper/espeak-ng instead — see
+// alertSound.js / commands.rs. Harmless everywhere else: on Windows/macOS
+// the voice list from list_piper_voices() will simply come back empty
+// (nothing lives in <local data dir>/piper-voices/ there), so this section
+// still renders but has nothing to show beyond the "drop voice files here"
+// instructions — it never overrides the browser's own working TTS.
+function PiperVoiceSettings({
+  piperVoices, refreshPiperVoices,
+  settingsPiperVoiceFile, setSettingsPiperVoiceFile,
+  settingsPiperSpeakerId, setSettingsPiperSpeakerId,
+}) {
+  const [rescanning, setRescanning] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testMsg, setTestMsg] = useState(null);
+
+  const selectedVoice = piperVoices.find(v => v.file === settingsPiperVoiceFile);
+  const hasSpeakers = selectedVoice?.speakers?.length > 0;
+
+  const handleRescan = async () => {
+    setRescanning(true);
+    try { await refreshPiperVoices(); } finally { setRescanning(false); }
+  };
+
+  const handleTest = async () => {
+    setTesting(true);
+    setTestMsg(null);
+    try {
+      await invoke("speak_text", {
+        text: "This is a test of the selected voice.",
+        voiceFile: settingsPiperVoiceFile || null,
+        speakerId: settingsPiperSpeakerId ?? null,
+      });
+      setTestMsg({ ok: true, text: "▶ Playing — if you hear the beep instead, this voice/speaker combo isn't resolving; check the file names in piper-voices/." });
+    } catch (e) {
+      setTestMsg({ ok: false, text: String(e) });
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  return (
+    <div style={{ fontSize: 12, color: "var(--text2)", marginTop: 8, paddingTop: 14, borderTop: "1px solid var(--border)" }}>
+      <strong style={{ color: "var(--gold1)" }}>Piper Voice (Linux native TTS)</strong>
+      <div style={{ fontSize: 11, color: "var(--text3)", marginBottom: 8, lineHeight: 1.6 }}>
+        Only relevant on Linux — Windows/macOS already have working browser Text-to-Speech and never
+        use this. On Linux, <code>window.speechSynthesis</code> is missing from stock webkit2gtk, so
+        "Text-to-Speech" mode instead shells out to <strong style={{ color: "var(--text2)" }}>Piper</strong> (natural-sounding)
+        if a voice is set up here, falling back to <strong style={{ color: "var(--text2)" }}>espeak-ng</strong> (robotic
+        but always available) otherwise. Drop a voice's two files (<code>.onnx</code> + <code>.onnx.json</code>,
+        from huggingface.co/rhasspy/piper-voices) into <code>~/.local/share/gw2-analyzer/piper-voices/</code>,
+        keeping their original matching names, then rescan below.
+      </div>
+
+      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8, flexWrap: "wrap" }}>
+        <select value={settingsPiperVoiceFile || ""} onChange={e => { setSettingsPiperVoiceFile(e.target.value); setSettingsPiperSpeakerId(null); }}
+          style={{ background: "var(--bg3)", border: "1px solid var(--border)", borderRadius: 4, padding: "5px 10px", color: "var(--text1)", fontSize: 12, minWidth: 220 }}>
+          <option value="">— espeak-ng fallback (no Piper voice) —</option>
+          {piperVoices.map(v => (
+            <option key={v.file} value={v.file}>{v.file}{v.speakers?.length > 0 ? ` (${v.speakers.length} speakers)` : ""}</option>
+          ))}
+        </select>
+        <button onClick={handleRescan} disabled={rescanning}
+          style={{ fontSize: 11, color: "var(--gold2)", background: "transparent", border: "1px solid var(--border)", borderRadius: 3, padding: "5px 12px", cursor: rescanning ? "not-allowed" : "pointer", opacity: rescanning ? 0.5 : 1 }}>
+          {rescanning ? "⏳ Scanning..." : "🔄 Rescan Voices"}
+        </button>
+        {piperVoices.length === 0 && (
+          <span style={{ fontSize: 11, color: "var(--text3)", fontStyle: "italic" }}>No voices found yet — drop files in and rescan.</span>
+        )}
+      </div>
+
+      {hasSpeakers && (
+        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 11, color: "var(--text3)" }}>Speaker (this voice has {selectedVoice.speakers.length}):</span>
+          <select value={settingsPiperSpeakerId ?? ""} onChange={e => setSettingsPiperSpeakerId(e.target.value === "" ? null : Number(e.target.value))}
+            style={{ background: "var(--bg3)", border: "1px solid var(--border)", borderRadius: 4, padding: "5px 10px", color: "var(--text1)", fontSize: 12 }}>
+            <option value="">default (speaker 0)</option>
+            {selectedVoice.speakers.map(s => (
+              <option key={s.id} value={s.id}>{s.name} ({s.id})</option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      <button onClick={handleTest} disabled={testing}
+        style={{ fontSize: 11, color: "#fff", background: "#7a4fb8", border: "none", borderRadius: 3, padding: "5px 14px", cursor: testing ? "not-allowed" : "pointer", opacity: testing ? 0.6 : 1 }}>
+        {testing ? "⏳ Playing..." : "▶ Test Voice"}
+      </button>
+      {testMsg && <div style={{ fontSize: 11, color: testMsg.ok ? "var(--text2)" : "var(--red2,#e05555)", marginTop: 6 }}>{testMsg.text}</div>}
+      <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 6, fontStyle: "italic" }}>
+        Test plays immediately using the selection above — click Save below to make it the one used for real alerts.
+      </div>
+    </div>
+  );
+}
+
 
 export function SettingsPanel({
   settingsApiKey, setSettingsApiKey, settingsNasSsh, setSettingsNasSsh,
   settingsAlertThreshold, setSettingsAlertThreshold, settingsGemAlertThresholdGold,
   setSettingsGemAlertThresholdGold, settingsCustomSoundPath, setSettingsCustomSoundPath,
-  setCustomSoundPath, rescanningRecipes, rescanAutoUnlockedRecipes,
+  setCustomSoundPath, piperVoices, refreshPiperVoices,
+  settingsPiperVoiceFile, setSettingsPiperVoiceFile,
+  settingsPiperSpeakerId, setSettingsPiperSpeakerId,
+  setPiperVoiceFile, setPiperSpeakerId,
+  rescanningRecipes, rescanAutoUnlockedRecipes,
   friends, friendNameInput, setFriendNameInput, friendKeyInput, setFriendKeyInput,
   friendBusy, handleAddFriend, friendActionMsg, handleRefreshFriend,
   setShowDeleteFriendConfirm, recipeLookupId, setRecipeLookupId, friendRecipeMap,
@@ -78,6 +180,11 @@ export function SettingsPanel({
       placeholder="/path/to/alert.mp3 or https://.../alert.mp3"
       style={{ width: "100%", background: "var(--bg3)", border: "1px solid var(--border)", borderRadius: 4, padding: "5px 10px", color: "var(--text1)", fontSize: 12, fontFamily: "monospace" }} />
       </div>
+      <PiperVoiceSettings
+        piperVoices={piperVoices} refreshPiperVoices={refreshPiperVoices}
+        settingsPiperVoiceFile={settingsPiperVoiceFile} setSettingsPiperVoiceFile={setSettingsPiperVoiceFile}
+        settingsPiperSpeakerId={settingsPiperSpeakerId} setSettingsPiperSpeakerId={setSettingsPiperSpeakerId}
+      />
       <div style={{ fontSize: 12, color: "var(--text2)", marginTop: 8, paddingTop: 14, borderTop: "1px solid var(--border)" }}>
       <strong style={{ color: "var(--gold1)" }}>Rescan Auto-Unlocked Recipes</strong>
       <div style={{ fontSize: 11, color: "var(--text3)", marginBottom: 8, lineHeight: 1.6 }}>
@@ -262,9 +369,13 @@ export function SettingsPanel({
           await invoke("cache_set", { key: "gem_alert_threshold_gold", value: String(settingsGemAlertThresholdGold) });
           await invoke("cache_set", { key: "api_key", value: settingsApiKey.trim() });
           await invoke("cache_set", { key: "customSoundPath", value: settingsCustomSoundPath });
+          await invoke("cache_set", { key: "piperVoiceFile", value: settingsPiperVoiceFile || "" });
+          await invoke("cache_set", { key: "piperSpeakerId", value: settingsPiperSpeakerId != null ? String(settingsPiperSpeakerId) : "" });
           setAlertThreshold(settingsAlertThreshold);
           setGemAlertThresholdGold(settingsGemAlertThresholdGold);
           setCustomSoundPath(settingsCustomSoundPath);
+          setPiperVoiceFile(settingsPiperVoiceFile);
+          setPiperSpeakerId(settingsPiperSpeakerId);
           if (settingsApiKey.trim()) { setApiKey(settingsApiKey.trim()); window.__gw2ApiKey = settingsApiKey.trim(); }
           setSettingsMsg({ ok: true, text: msg });
         } catch(e) { setSettingsMsg({ ok: false, text: String(e) }); }

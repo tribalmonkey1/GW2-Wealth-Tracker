@@ -16,7 +16,7 @@ export const CACHE_KEYS = {
   favoriteLists: "bossTimerFavoriteLists",   // [{ id, name, members: [{name}] }]
   alerts: "bossTimerAlerts",                 // { name: leadMinutes }
   completions: "bossTimerCompletions",       // { name: { period } }
-  soundSettings: "bossTimerSoundSettings",   // { mode: "beep"|"tts"|"custom", customPath }
+  soundSettings: "bossTimerSoundSettings",   // { mode: "beep"|"tts"|"custom", customPath, piperVoiceFile, piperSpeakerId }
   areasSelection: "bossTimerAreasSelection", // string[] of selected expansion names, or absent = all
   viewMode: "bossTimerViewMode",             // "countdown" | "timeline"
 };
@@ -48,7 +48,14 @@ export function migrateLocationKeyedMap(map) {
   return next;
 }
 
-export const DEFAULT_SOUND_SETTINGS = { mode: "beep", customPath: null };
+// piperVoiceFile: file stem (no .onnx extension) of a voice detected by the
+// list_piper_voices Tauri command, or null (native TTS falls back to the
+// legacy single piper-voice.onnx convention, and ultimately espeak-ng, if
+// unset). piperSpeakerId: numeric speaker index for multi-speaker voices
+// (e.g. the "semaine" dataset's Prudence/Spike/Obadiah/Poppy), or null for
+// ordinary single-speaker voices / default speaker 0. Both are Linux-only
+// concerns — ignored entirely on the browser-TTS path Windows/macOS use.
+export const DEFAULT_SOUND_SETTINGS = { mode: "beep", customPath: null, piperVoiceFile: null, piperSpeakerId: null };
 
 // Bulk-loads everything Boss Timers needs on startup in one IPC round-trip,
 // same pattern App.jsx's fullLoad already uses via cacheGetBulk. Falls back
@@ -61,7 +68,7 @@ export async function loadBossTimerPrefs() {
     favoriteLists: listsEntry?.value || [],
     alerts: alertsEntry?.value || {},
     completions: completionsEntry?.value || {},
-    soundSettings: soundEntry?.value || DEFAULT_SOUND_SETTINGS,
+    soundSettings: soundEntry?.value ? { ...DEFAULT_SOUND_SETTINGS, ...soundEntry.value } : DEFAULT_SOUND_SETTINGS,
   };
 }
 

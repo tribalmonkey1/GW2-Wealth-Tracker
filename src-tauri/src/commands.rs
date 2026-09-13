@@ -571,6 +571,210 @@ pub fn get_tracked_item_ids() -> Result<Vec<i64>, String> {
 #[tauri::command]
 pub fn append_log(_message: String) -> Result<(), String> { Ok(()) }
 
+// ── Native TTS fallback (Linux/WebKitGTK) ──────────────────────────────────
+// window.speechSynthesis is undefined on stock webkit2gtk builds everywhere
+// (Arch included) — the Web Speech Synthesis API isn't compiled in unless
+// WebKitGTK is built from source with -DUSE_SPIEL=ON, which no distro
+// package does. speech-dispatcher/espeak-ng being installed doesn't help:
+// they're the system TTS backend, but the browser-side API that would talk
+// to them was never present to begin with. So for the boss/event alert
+// "Text-to-Speech" mode, alertSound.js calls this command directly instead
+// of going through the (absent) browser API.
+//
+// Two backends, tried in order:
+//   1. Piper — a small neural (VITS) TTS engine, genuinely natural-sounding
+//      rather than robotic. Opt-in: drop a voice's two files at
+//      <local data dir>/piper-voice.onnx and piper-voice.onnx.json (any
+//      voice from https://huggingface.co/rhasspy/piper-voices — e.g.
+//      en_US-lessac-medium or en_US-ryan-high). Requires the `piper` binary
+//      on PATH — on Arch, AUR package `piper-tts-bin` (the classic prebuilt
+//      binary). Avoid the newer Python `piper-tts` AUR package for this:
+//      it has a known bug that truncates audio mid-sentence when
+//      `--output-raw` is piped directly into a player instead of a seekable
+//      file (github.com/rhasspy/piper/issues/796) — and has also had AUR
+//      build failures reported. `piper-tts-bin` doesn't have either problem.
+//   2. espeak-ng — formant-synthesized and inherently robotic-sounding, but
+//      always available if installed. Used whenever no Piper voice is
+//      configured, or Piper fails for any reason (missing binary, bad
+//      model path, etc.) — this is the safety net, not the default.
+fn piper_voices_dir() -> std::path::PathBuf {
+    crate::get_local_data_dir().join("piper-voices")
+}
+
+// Resolves which voice's (.onnx, .onnx.json) pair to use. `voice_file` is the
+// file stem (no extension) of a voice living in piper-voices/, as reported by
+// list_piper_voices() and chosen in Settings. Falls back to the original
+// single-voice convention (piper-voice.onnx directly in the data dir) when no
+// voice_file is given, so an existing setup from before per-voice selection
+// existed keeps working without needing to move anything.
+fn piper_voice_paths(voice_file: Option<&str>) -> Option<(std::path::PathBuf, std::path::PathBuf)> {
+    if let Some(stem) = voice_file {
+        let dir = piper_voices_dir();
+        let model = dir.join(format!("{stem}.onnx"));
+        let config = dir.join(format!("{stem}.onnx.json"));
+        return if model.exists() && config.exists() { Some((model, config)) } else { None };
+    }
+    let dir = crate::get_local_data_dir();
+    let model = dir.join("piper-voice.onnx");
+    let config = dir.join("piper-voice.onnx.json");
+    if model.exists() && config.exists() { Some((model, config)) } else { None }
+}
+
+// Locates the `piper` binary itself. Not always on PATH: the Arch AUR
+// package `piper-tts-bin` (the one recommended above) installs everything —
+// the binary plus its bundled libespeak-ng/libonnxruntime/libpiper_phonemize
+// .so files — under /opt/piper-tts/ rather than /usr/bin, and the Tauri
+// app's own process environment isn't guaranteed to match the user's
+// interactive shell PATH regardless. Checks known install locations first,
+// falls back to bare "piper" in case it genuinely is on PATH (e.g. a manual
+// install elsewhere, or a different package that did add it to PATH).
+fn piper_binary_path() -> std::path::PathBuf {
+    const KNOWN_LOCATIONS: [&str; 2] = [
+        "/opt/piper-tts/piper", // AUR piper-tts-bin
+        "/usr/local/bin/piper", // manual installs following our earlier instructions
+    ];
+    for candidate in KNOWN_LOCATIONS {
+        if std::path::Path::new(candidate).exists() {
+            return std::path::PathBuf::from(candidate);
+        }
+    }
+    std::path::PathBuf::from("piper")
+}
+
+// Voice quality tiers ship at different sample rates (16kHz "low" vs 22.05kHz
+// "medium"/"high") — reading it from the voice's own config avoids a
+// hardcoded rate producing pitched-up/slowed-down audio for a voice that
+// doesn't match whatever we guessed.
+fn piper_sample_rate(config_path: &std::path::Path) -> i64 {
+    std::fs::read_to_string(config_path)
+        .ok()
+        .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
+        .and_then(|v| v["audio"]["sample_rate"].as_i64())
+        .unwrap_or(22050)
+}
+
+fn try_speak_with_piper(text: &str, voice_file: Option<&str>, speaker_id: Option<i64>) -> Result<(), String> {
+    let (model, config) = piper_voice_paths(voice_file).ok_or_else(|| "no piper voice configured".to_string())?;
+    let sample_rate = piper_sample_rate(&config);
+
+    let mut args: Vec<String> = vec![
+        "--model".into(), model.to_str().unwrap_or_default().into(), "--output-raw".into(),
+    ];
+    if let Some(id) = speaker_id {
+        args.push("--speaker".into());
+        args.push(id.to_string());
+    }
+
+    let mut piper = std::process::Command::new(piper_binary_path())
+        .args(&args)
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("failed to launch piper: {e}"))?;
+
+    let stdin = piper.stdin.take().ok_or_else(|| "no piper stdin".to_string())?;
+    let piper_stdout = piper.stdout.take().ok_or_else(|| "no piper stdout".to_string())?;
+
+    // Pipe piper's raw PCM straight into aplay rather than writing a temp
+    // file — matches piper's own documented streaming usage.
+    std::process::Command::new("aplay")
+        .args(["-q", "-r", &sample_rate.to_string(), "-f", "S16_LE", "-t", "raw", "-"])
+        .stdin(std::process::Stdio::from(piper_stdout))
+        .spawn()
+        .map_err(|e| format!("failed to launch aplay: {e}. Is alsa-utils installed?"))?;
+
+    // Write the text on a background thread and return immediately — fire-
+    // and-forget, matching the espeak-ng fallback below, rather than
+    // blocking this command until playback finishes. Both child processes
+    // keep running after we drop our handles to them (std::process::Child
+    // does not kill its process on drop). Dropping `stdin` at the end of
+    // the closure closes piper's input, which is what tells it the text is
+    // complete and it should start synthesizing.
+    let text_owned = text.to_string();
+    std::thread::spawn(move || {
+        use std::io::Write;
+        let mut stdin = stdin;
+        let _ = stdin.write_all(text_owned.as_bytes());
+    });
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn speak_text(text: String, voice_file: Option<String>, speaker_id: Option<i64>) -> Result<(), String> {
+    if try_speak_with_piper(&text, voice_file.as_deref(), speaker_id).is_ok() {
+        return Ok(());
+    }
+    // No Piper voice configured/found, or Piper failed for some reason —
+    // fall back to espeak-ng. Fire-and-forget: plays straight to the
+    // system's audio output (Pulse/ALSA), no temp file, no waiting on the
+    // synth to finish before returning to the caller.
+    std::process::Command::new("espeak-ng")
+        .arg(&text)
+        .spawn()
+        .map_err(|e| format!("failed to launch espeak-ng: {e}. Is it installed and on PATH?"))?;
+    Ok(())
+}
+
+#[derive(Serialize, Clone)]
+pub struct PiperSpeakerInfo {
+    pub id: i64,
+    pub name: String,
+}
+
+#[derive(Serialize, Clone)]
+pub struct PiperVoiceInfo {
+    // File stem (no .onnx extension) — this is exactly what gets passed
+    // back as `voice_file` to speak_text once the user picks it in Settings.
+    pub file: String,
+    // Populated from the voice's own speaker_id_map when it has one
+    // (multi-speaker voices only, e.g. the "semaine" dataset voices).
+    // Empty for ordinary single-speaker voices.
+    pub speakers: Vec<PiperSpeakerInfo>,
+}
+
+// Scans <local data dir>/piper-voices/ for valid (.onnx + .onnx.json) pairs
+// and reports each one's embedded speaker list, if any, so Settings can
+// build a voice picker (and a speaker sub-picker for multi-speaker voices)
+// without anyone needing to hand-edit a config file. Creates the directory
+// if it doesn't exist yet, so there's always an obvious place to drop voice
+// files even before the first one is added. Incomplete pairs (an .onnx with
+// no matching .onnx.json, or vice versa) are skipped silently rather than
+// erroring the whole scan.
+#[tauri::command]
+pub fn list_piper_voices() -> Result<Vec<PiperVoiceInfo>, String> {
+    let dir = piper_voices_dir();
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+
+    let mut voices = Vec::new();
+    for entry in std::fs::read_dir(&dir).map_err(|e| e.to_string())?.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) != Some("onnx") { continue; }
+        let stem = match path.file_stem().and_then(|s| s.to_str()) {
+            Some(s) => s.to_string(),
+            None => continue,
+        };
+        let config_path = dir.join(format!("{stem}.onnx.json"));
+        if !config_path.exists() { continue; }
+
+        let speakers = std::fs::read_to_string(&config_path).ok()
+            .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
+            .and_then(|v| v["speaker_id_map"].as_object().cloned())
+            .map(|map| {
+                let mut list: Vec<PiperSpeakerInfo> = map.into_iter()
+                    .filter_map(|(name, id)| id.as_i64().map(|id| PiperSpeakerInfo { id, name }))
+                    .collect();
+                list.sort_by_key(|s| s.id);
+                list
+            })
+            .unwrap_or_default();
+
+        voices.push(PiperVoiceInfo { file: stem, speakers });
+    }
+    voices.sort_by(|a, b| a.file.cmp(&b.file));
+    Ok(voices)
+}
+
 // ── Friend Recipe Lookup ────────────────────────────────────────────────────
 // Read-only, single-purpose: a friend's API key is used ONLY to fetch which
 // recipes they know (/v2/account/recipes). We never touch their materials,

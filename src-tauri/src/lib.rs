@@ -6,7 +6,7 @@ pub mod commands;
 // Personal data DB — always local (flips, daily resets, cache)
 pub struct PersonalDbState(pub Mutex<Connection>);
 
-fn get_local_data_dir() -> std::path::PathBuf {
+pub fn get_local_data_dir() -> std::path::PathBuf {
     let data_dir = dirs::data_local_dir()
         .unwrap_or_else(|| std::path::PathBuf::from("."))
         .join("gw2-analyzer");
@@ -136,6 +136,8 @@ pub fn run() {
             commands::restart_collector,
             commands::get_tracked_item_ids,
             commands::append_log,
+            commands::speak_text,
+            commands::list_piper_voices,
             commands::get_market_db_info,
             commands::set_market_db_path,
             commands::get_market_summary,

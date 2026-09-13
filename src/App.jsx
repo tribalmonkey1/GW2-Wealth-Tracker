@@ -138,6 +138,11 @@ export default function App() {
   const [settingsAlertThreshold, setSettingsAlertThreshold] = useState(85);
   const [customSoundPath, setCustomSoundPath] = useState(""); // live/committed value, fed to useBossAlerts
   const [settingsCustomSoundPath, setSettingsCustomSoundPath] = useState(""); // Settings-panel draft value
+  const [piperVoices, setPiperVoices] = useState([]); // [{ file, speakers: [{id, name}] }] — from list_piper_voices
+  const [piperVoiceFile, setPiperVoiceFile] = useState(""); // live/committed value, fed to useBossAlerts
+  const [piperSpeakerId, setPiperSpeakerId] = useState(null);
+  const [settingsPiperVoiceFile, setSettingsPiperVoiceFile] = useState(""); // Settings-panel draft value
+  const [settingsPiperSpeakerId, setSettingsPiperSpeakerId] = useState(null);
   const [rarityFilter, setRarityFilter] = useState(DEFAULT_RARITY_FILTER); // rarity -> boolean, filters Crafting/Recommended/Unlearned/Mystic Forge material promotion
   const rarityFilterLoadedRef = useRef(false); // guards against persisting the default before the cached value has loaded
   const [extraDailyItems, setExtraDailyItems] = useState({}); // itemId -> {name, icon} for non-TP items
@@ -153,7 +158,7 @@ export default function App() {
   const [friendActionMsg, setFriendActionMsg] = useState(null); // {ok, text}
   const [showDeleteFriendConfirm, setShowDeleteFriendConfirm] = useState(null); // friend id pending delete confirmation
 
-  const bossAlerts = useBossAlerts(customSoundPath); // global — fires boss/event alerts regardless of active tab
+  const bossAlerts = useBossAlerts(customSoundPath, piperVoiceFile, piperSpeakerId); // global — fires boss/event alerts regardless of active tab
 
   const prog = (pct, msg) => setLoadState({ phase: "loading", pct, msg });
   const fullLoadInProgressRef = useRef(false);
@@ -772,6 +777,21 @@ export default function App() {
     invoke("cache_get", { key: "customSoundPath" }).then(e => {
       if (e?.value) { setCustomSoundPath(e.value); setSettingsCustomSoundPath(e.value); }
     }).catch(() => {});
+    invoke("cache_get", { key: "piperVoiceFile" }).then(e => {
+      if (e?.value) { setPiperVoiceFile(e.value); setSettingsPiperVoiceFile(e.value); }
+    }).catch(() => {});
+    invoke("cache_get", { key: "piperSpeakerId" }).then(e => {
+      if (e?.value != null && e.value !== "") {
+        const n = Number(e.value);
+        if (!isNaN(n)) { setPiperSpeakerId(n); setSettingsPiperSpeakerId(n); }
+      }
+    }).catch(() => {});
+    // Scans <local data dir>/piper-voices/ for valid voice files — see
+    // commands.rs list_piper_voices. Harmless no-op on Windows/macOS (the
+    // command still runs, just finds nothing there since native TTS is
+    // Linux-only), and refreshVoices is also exposed to SettingsPanel so the
+    // user can rescan after dropping in a new voice without restarting.
+    invoke("list_piper_voices").then(setPiperVoices).catch(() => {});
     invoke("cache_get", { key: "weekly_key_done" }).then(e => {
       if (e?.value) {
         const { done, weeklyResetTs } = JSON.parse(e.value);
@@ -1625,6 +1645,19 @@ export default function App() {
     }
   };
 
+  // Re-scans <local data dir>/piper-voices/ — exposed to Settings so the
+  // person can drop in a new voice's files and see it without restarting.
+  const refreshPiperVoices = useCallback(async () => {
+    try {
+      const voices = await invoke("list_piper_voices");
+      setPiperVoices(voices);
+      return voices;
+    } catch (e) {
+      setToast(`✕ Voice scan failed: ${e}`);
+      return [];
+    }
+  }, []);
+
   // ── History ─────────────────────────────────────────────────────────────────
   // Tick every 60s to refresh open charts with new collector data
   // Fetch item data for daily/timegated items that aren't on the TP (no icon in itemMap)
@@ -1889,6 +1922,10 @@ export default function App() {
         settingsGemAlertThresholdGold={settingsGemAlertThresholdGold} setSettingsGemAlertThresholdGold={setSettingsGemAlertThresholdGold}
         settingsCustomSoundPath={settingsCustomSoundPath} setSettingsCustomSoundPath={setSettingsCustomSoundPath}
         setCustomSoundPath={setCustomSoundPath}
+        piperVoices={piperVoices} refreshPiperVoices={refreshPiperVoices}
+        settingsPiperVoiceFile={settingsPiperVoiceFile} setSettingsPiperVoiceFile={setSettingsPiperVoiceFile}
+        settingsPiperSpeakerId={settingsPiperSpeakerId} setSettingsPiperSpeakerId={setSettingsPiperSpeakerId}
+        setPiperVoiceFile={setPiperVoiceFile} setPiperSpeakerId={setPiperSpeakerId}
         rescanningRecipes={rescanningRecipes} rescanAutoUnlockedRecipes={rescanAutoUnlockedRecipes}
         friends={friends} friendNameInput={friendNameInput} setFriendNameInput={setFriendNameInput}
         friendKeyInput={friendKeyInput} setFriendKeyInput={setFriendKeyInput}
