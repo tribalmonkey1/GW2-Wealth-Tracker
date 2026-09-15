@@ -340,7 +340,14 @@ function TimelineRow({ row, origin, windowEnd, ...rest }) {
   const positioned = rawSlots.flatMap(s => s.occurrences.map(occ => {
     const durationMin = occ.durationMin || DEFAULT_DURATION_MIN;
     const left = ((s.time - origin) / INTERVAL_MS) * COL_WIDTH + BLOCK_INSET_PX;
-    const width = Math.max(MIN_BLOCK_WIDTH, (durationMin / INTERVAL_MIN) * COL_WIDTH - BLOCK_INSET_PX * 2);
+    // TRUE, time-accurate width — deliberately NOT floored to MIN_BLOCK_WIDTH
+    // here. Lane assignment below must see real widths, or a short event
+    // inflated past its actual duration looks like it overlaps whatever
+    // comes right after it (even when it's genuinely back-to-back, like
+    // Dragon's End's Preparations → Jade Maw), and gets wrongly split into
+    // a separate lane. Legibility widening happens in a second pass below,
+    // after lanes are already correctly assigned from true widths.
+    const width = Math.max(1, (durationMin / INTERVAL_MIN) * COL_WIDTH - BLOCK_INSET_PX * 2);
     return { occurrences: [occ], left, width };
   }));
   // Real spawn times aren't aligned to the 15-minute column grid, and blocks
@@ -348,6 +355,30 @@ function TimelineRow({ row, origin, windowEnd, ...rest }) {
   // though they look like they're in "different columns" — push colliding
   // blocks into separate lanes instead of letting them draw on top of each other.
   const laned = assignLanes(positioned);
+
+  // Second pass, per lane: widen short blocks for legibility, but only as
+  // far as the real gap to the NEXT block in that same lane allows. A short
+  // event followed by genuinely empty time can stretch up to
+  // MIN_BLOCK_WIDTH; one immediately followed by another event (zero real
+  // gap) stays at its true width instead of visually creeping into — or
+  // past — its neighbor's start.
+  const byLane = {};
+  laned.forEach(item => { (byLane[item.lane] ||= []).push(item); });
+  Object.values(byLane).forEach(items => {
+    items.sort((a, b) => a.left - b.left);
+    items.forEach((item, idx) => {
+      const next = items[idx + 1];
+      // Must subtract the SAME amount trueWidth already subtracts
+      // (2×BLOCK_INSET_PX), not BLOCK_GAP_PX — those aren't the same value.
+      // Using the wrong one here let genuinely back-to-back short events
+      // eat into what should've been the neighbor's own leading inset,
+      // shrinking the visual gap after short events specifically instead of
+      // keeping every junction's gap the same size regardless of duration.
+      const maxAvailable = next ? Math.max(item.width, next.left - item.left - BLOCK_INSET_PX * 2) : Infinity;
+      item.width = Math.min(Math.max(item.width, MIN_BLOCK_WIDTH), maxAvailable);
+    });
+  });
+
   const numLanes = laned.reduce((m, s) => Math.max(m, s.lane + 1), 1);
   // Every laned item now carries exactly one occurrence (see the flatten
   // above), so every lane is the same fixed height — no per-lane variance
