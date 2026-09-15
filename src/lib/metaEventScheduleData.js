@@ -29,11 +29,11 @@
  * that bucket, only these two.
  *
  * Special Events (seasonal festivals) still need real-world active windows:
- * Dragon Bash has no activeFrom/activeTo at all yet (so it currently shows
- * as always-on rather than seasonal) and Shadow of the Mad King is using a
- * "safe buffer" estimate rather than confirmed 2026 dates — see those
- * sections below for specifics. Wintersday, Super Adventure Festival, and
- * Lunar New Year have no tracked events yet at all.
+ * Dragon Bash now has confirmed 2026 dates (June 2–23, verified via GW2
+ * forums/wiki, Sept 2026) and Shadow of the Mad King is using a "safe
+ * buffer" estimate rather than confirmed 2026 dates — see those sections
+ * below for specifics. Wintersday, Super Adventure Festival, and Lunar New
+ * Year have no tracked events yet at all.
  *
  * Source: docs/reference/events.json — the same structured data file that
  * powers the wiki's own timer widget — except Awakened Invasion (not
@@ -173,15 +173,15 @@ export const META_EVENT_SCHEDULE = [
   // ── Dragon Bash ──
   // "Hologram Stampede" rotates through 4 zones on an hourly cycle, the same
   // one-event-many-zones shape as Ley-Line Anomaly (grouped by name, not
-  // name+location — see bossKey/getNextOccurrenceForName). NO activeFrom/
-  // activeTo yet — Derrick didn't have Dragon Bash's real-world date range
-  // (Groc's research only covered Halloween/Wintersday/Super Adventure/Lunar
-  // New Year), so without those two fields this festival will show as
-  // always-on rather than seasonal until dates are supplied.
-  { eventName: 'Hologram Stampede', zoneName: 'Wayfarer Foothills', expansion: 'Dragon Bash', cycleLengthMin: ONE_HOUR, offsetMin: 0, chatLink: null, durationMin: 5 },
-  { eventName: 'Hologram Stampede', zoneName: 'Dredgehaunt Cliffs', expansion: 'Dragon Bash', cycleLengthMin: ONE_HOUR, offsetMin: 15, chatLink: null, durationMin: 5 },
-  { eventName: 'Hologram Stampede', zoneName: "Lornar's Pass", expansion: 'Dragon Bash', cycleLengthMin: ONE_HOUR, offsetMin: 30, chatLink: null, durationMin: 5 },
-  { eventName: 'Hologram Stampede', zoneName: 'Snowden Drifts', expansion: 'Dragon Bash', cycleLengthMin: ONE_HOUR, offsetMin: 45, chatLink: null, durationMin: 5 },
+  // name+location — see bossKey/getNextOccurrenceForName). Confirmed 2026
+  // dates (GW2 forums + wiki, checked Sept 2026): ran June 2 – June 23,
+  // 2026. Update these two fields each year once the next run is announced
+  // — without them this festival shows as always-on rather than seasonal,
+  // which is exactly what was happening before these were added.
+  { eventName: 'Hologram Stampede', zoneName: 'Wayfarer Foothills', expansion: 'Dragon Bash', cycleLengthMin: ONE_HOUR, offsetMin: 0, chatLink: null, durationMin: 5, activeFrom: '2026-06-02', activeTo: '2026-06-23' },
+  { eventName: 'Hologram Stampede', zoneName: 'Dredgehaunt Cliffs', expansion: 'Dragon Bash', cycleLengthMin: ONE_HOUR, offsetMin: 15, chatLink: null, durationMin: 5, activeFrom: '2026-06-02', activeTo: '2026-06-23' },
+  { eventName: 'Hologram Stampede', zoneName: "Lornar's Pass", expansion: 'Dragon Bash', cycleLengthMin: ONE_HOUR, offsetMin: 30, chatLink: null, durationMin: 5, activeFrom: '2026-06-02', activeTo: '2026-06-23' },
+  { eventName: 'Hologram Stampede', zoneName: 'Snowden Drifts', expansion: 'Dragon Bash', cycleLengthMin: ONE_HOUR, offsetMin: 45, chatLink: null, durationMin: 5, activeFrom: '2026-06-02', activeTo: '2026-06-23' },
 
   // ── Shadow of the Mad King (Halloween) ──
   // activeFrom/activeTo use the "safe buffer" window Derrick's research

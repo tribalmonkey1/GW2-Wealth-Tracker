@@ -232,8 +232,8 @@ tbody td { padding:11px 14px; color:var(--text2); vertical-align:middle; }
 .tl-row { display: flex; align-items: stretch; border-bottom: 1px solid var(--border); }
 .tl-row-label { width: 150px; flex-shrink: 0; font-size: 13px; color: var(--text2); padding: 10px; display: flex; align-items: center; }
 .tl-track { position: relative; flex: 1; }
-.tl-block { position: absolute; top: 6px; background: rgba(200,150,42,0.12); border: 1px solid rgba(200,150,42,0.4); border-radius: 4px; padding: 4px 6px; }
-.tl-occ-line { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text1); white-space: nowrap; padding: 1px 0; }
+.tl-block { position: absolute; background: var(--bg5); border: 1px solid rgba(200,150,42,0.45); border-radius: 4px; padding: 0 6px; z-index: 3; display: flex; align-items: center; overflow: hidden; }
+.tl-occ-line { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text1); white-space: nowrap; padding: 1px 0; width: 100%; min-width: 0; }
 .tl-occ-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .tl-nowline { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--red2,#e05555); z-index: 5; box-shadow: 0 0 6px var(--red2,#e05555); pointer-events: none; }
 /* Vertical gridlines marking each 15-minute column boundary — rendered behind
@@ -241,3 +241,15 @@ tbody td { padding:11px 14px; color:var(--text2); vertical-align:middle; }
    tracks and, via inline borderLeft on each header cell in BossTimersTab.jsx,
    the header row above them. */
 .tl-gridline { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(200,150,42,.14); pointer-events: none; z-index: 1; }
+
+/* Shared horizontal scroll for the whole Timeline view (header + every
+   zone/section together — see BossTimersTab.jsx). overflow-x:scroll (not
+   auto) plus the ::-webkit-scrollbar rules below replace WebKitGTK's
+   default auto-hiding overlay scrollbar — which fades out when idle and
+   changes size/shape on hover, reading as "two different scrollbars" — with
+   one themed bar that's always visible and always looks the same. */
+.tl-scroll-wrap { overflow-x: scroll; overflow-y: hidden; padding-bottom: 4px; }
+.tl-scroll-wrap::-webkit-scrollbar { height: 12px; }
+.tl-scroll-wrap::-webkit-scrollbar-track { background: var(--bg3); border-radius: 6px; }
+.tl-scroll-wrap::-webkit-scrollbar-thumb { background: var(--gold3,#7a5c1e); border-radius: 6px; border: 2px solid var(--bg3); }
+.tl-scroll-wrap::-webkit-scrollbar-thumb:hover { background: var(--gold2); }

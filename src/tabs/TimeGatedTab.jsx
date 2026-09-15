@@ -48,6 +48,11 @@ export function TimeGatedTab({
           {TIME_GATED_SUB_TABS.map(({ key, label }) => (
             <button key={key} className={`dtab${subTab === key ? " on" : ""}`} onClick={() => setSubTab(key)}>
             {label}
+            {key === "daily" && eligible.length > 0 && (
+              <span style={{ marginLeft: 7, fontSize: 10, fontFamily: "Cinzel,serif", opacity: 0.8 }}>
+              {eligible.filter(r => isDone(r)).length}/{eligible.length}
+              </span>
+            )}
             </button>
           ))}
           </div>

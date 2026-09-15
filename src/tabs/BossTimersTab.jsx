@@ -69,6 +69,38 @@ const COL_WIDTH = 150;
 const ROW_LABEL_WIDTH = 150;
 const FETCH_CYCLES = 8; // generous buffer, filtered down to the visible window
 const MIN_BLOCK_WIDTH = 40; // floor so very short events (5-9 min) still fit their checkbox/name
+// Single shared gap value used BOTH horizontally (the visual gap you see
+// between two back-to-back blocks, carved out of block width below) and
+// vertically (the gap between stacked lanes in TimelineRow) — so a
+// back-to-back pair and a two-lane stack read as the same "resting" amount
+// of space, per design intent.
+const BLOCK_GAP_PX = 4;
+// Deliberate inset applied to BOTH sides of every block, so a block never
+// sits flush against its own start-time gridline (or the boundary of the
+// next block) — half of BLOCK_GAP_PX per side, so two back-to-back blocks
+// still end up with the same total ~4px gap between them as before, but a
+// block starting fresh in an otherwise-empty stretch also gets breathing
+// room from its own gridline instead of looking flush-aligned to it.
+const BLOCK_INSET_PX = BLOCK_GAP_PX / 2;
+// Every timeline block now holds exactly one occurrence — same-start-time
+// events get their own lane instead of being crammed into one box (see
+// TimelineRow) — so a single fixed block height covers every lane. Matches
+// the original single-occurrence sizing (before stacking existed).
+const BLOCK_HEIGHT = 40;
+// A block's actual rendered content (one line of text + its own padding)
+// is shorter than the full lane slot it's allocated (BLOCK_HEIGHT) — without
+// this, a block sits pinned to the top of its slot with all the leftover
+// space below it instead of being centered. BLOCK_VERTICAL_INSET is applied
+// symmetrically above and below so the visible box centers within its lane.
+const BLOCK_VERTICAL_INSET = 5;
+const TRACK_TOP_PADDING = 6;
+// Fixed pixel width for the entire scrollable timeline content (labels +
+// all visible time columns). Used to force ONE shared horizontal scrollbar
+// for the whole timeline — header row and every expansion section's rows —
+// instead of each section/zone scrolling independently. See the render
+// branch below for how this is applied.
+const TIMELINE_CONTENT_WIDTH = SLOT_COUNT * COL_WIDTH;
+const TIMELINE_TOTAL_WIDTH = ROW_LABEL_WIDTH + TIMELINE_CONTENT_WIDTH;
 
 const URGENCY_STYLE = {
   default: { color: "var(--text2)" },
@@ -296,30 +328,43 @@ function TimelineOccLine({ occ, alerts, setAlertLead, collections, onToggleMembe
 
 function TimelineRow({ row, origin, windowEnd, ...rest }) {
   const rawSlots = row.slots.filter(s => s.time >= origin && s.time < windowEnd);
-  const positioned = rawSlots.map(s => {
-    // A slot can stack several occurrences that start at the same minute
-    // (e.g. Jade Maw + Preparations) — size the block to whichever of them
-    // runs longest so every stacked line fits inside it.
-    const durationMin = Math.max(...s.occurrences.map(o => o.durationMin || DEFAULT_DURATION_MIN));
-    const width = Math.max(MIN_BLOCK_WIDTH, (durationMin / INTERVAL_MIN) * COL_WIDTH - 4);
-    return { ...s, left: ((s.time - origin) / INTERVAL_MS) * COL_WIDTH, width };
-  });
+  // Timeline wants every occurrence as its OWN separate block — even when
+  // several start at the exact same minute — rather than crammed together
+  // as multiple stacked lines inside one box. row.slots groups same-minute
+  // occurrences together (that grouping is what the Countdown view's card
+  // format wants), so flatten it back out here: each occurrence becomes its
+  // own positioned item, and assignLanes naturally pushes same-start-time
+  // occurrences into separate lanes — vertically shifted — since they fully
+  // overlap in time, exactly like any other colliding pair already does.
+  const positioned = rawSlots.flatMap(s => s.occurrences.map(occ => {
+    const durationMin = occ.durationMin || DEFAULT_DURATION_MIN;
+    const left = ((s.time - origin) / INTERVAL_MS) * COL_WIDTH + BLOCK_INSET_PX;
+    const width = Math.max(MIN_BLOCK_WIDTH, (durationMin / INTERVAL_MIN) * COL_WIDTH - BLOCK_INSET_PX * 2);
+    return { occurrences: [occ], left, width };
+  }));
   // Real spawn times aren't aligned to the 15-minute column grid, and blocks
-  // now vary in width by duration, so two blocks can visually overlap even
+  // vary in width by duration, so two blocks can visually overlap even
   // though they look like they're in "different columns" — push colliding
   // blocks into separate lanes instead of letting them draw on top of each other.
   const laned = assignLanes(positioned);
   const numLanes = laned.reduce((m, s) => Math.max(m, s.lane + 1), 1);
-  const maxStack = laned.reduce((m, s) => Math.max(m, s.occurrences.length), 1);
-  const laneHeight = Math.max(30, maxStack * 26 + 14);
-  const rowHeight = numLanes * laneHeight;
+  // Every laned item now carries exactly one occurrence (see the flatten
+  // above), so every lane is the same fixed height — no per-lane variance
+  // to reason about, and no risk of one lane inheriting extra height from
+  // a neighbor that used to stack multiple lines.
+  const laneHeight = BLOCK_HEIGHT;
+  const rowHeight = TRACK_TOP_PADDING + numLanes * laneHeight + Math.max(0, numLanes - 1) * BLOCK_GAP_PX;
 
   return (
     <div className="tl-row" style={{ height: rowHeight }}>
       <div className="tl-row-label">{row.rowLabel}</div>
       <div className="tl-track">
         {laned.map((slot, i) => (
-          <div key={i} className="tl-block" style={{ left: slot.left, top: slot.lane * laneHeight + 6, width: slot.width }}>
+          <div key={i} className="tl-block" style={{
+            left: slot.left, width: slot.width,
+            top: TRACK_TOP_PADDING + slot.lane * (laneHeight + BLOCK_GAP_PX) + BLOCK_VERTICAL_INSET,
+            height: laneHeight - BLOCK_VERTICAL_INSET * 2,
+          }}>
             {slot.occurrences.map((occ, j) => <TimelineOccLine key={j} occ={occ} {...rest} />)}
           </div>
         ))}
@@ -338,7 +383,7 @@ function TimelineSection({ expansion, rows, origin, windowEnd, nowLineLeft, coll
         <span className="ci-name" style={{ flex: "unset" }}>{expansion}</span>
       </div>
       {!collapsed && (
-        <div style={{ position: "relative", borderTop: "1px solid var(--border)", background: "var(--bg2)", overflowX: "auto" }}>
+        <div style={{ position: "relative", borderTop: "1px solid var(--border)", background: "var(--bg2)" }}>
           <TimelineGridLines leftOffset={ROW_LABEL_WIDTH} />
           <div className="tl-nowline" style={{ left: nowLineLeft }} />
           {rows.map(row => (
@@ -654,43 +699,55 @@ export default function BossTimersTab({ bossAlerts }) {
           </div>
         )
       ) : (
-        <>
-          <div style={{ display: "flex", marginBottom: 8, paddingLeft: ROW_LABEL_WIDTH, position: "relative" }}>
-            {headerCols.map((label, i) => (
-              <div key={i} style={{
-                width: COL_WIDTH, flexShrink: 0, fontSize: 11, color: "var(--text3)", fontFamily: "Cinzel,serif",
-                letterSpacing: 1, textAlign: "center", borderLeft: "1px solid rgba(200,150,42,.18)",
-              }}>
-                {label}
-              </div>
-            ))}
-          </div>
-
-          {activeTabId === null ? (
-            timelineSectionsByExpansion.length === 0
-              ? <div className="empty">Nothing scheduled in the next {HOURS_AHEAD} hours for the selected areas.</div>
-              : timelineSectionsByExpansion.map(([expansion, rows]) => (
-                <TimelineSection key={expansion} expansion={expansion} rows={rows} origin={origin} windowEnd={windowEnd}
-                  nowLineLeft={nowLineLeft + ROW_LABEL_WIDTH} collapsed={collapsedExpansions.has(expansion)}
-                  onToggleCollapse={() => setCollapsedExpansions(prev => {
-                    const next = new Set(prev);
-                    if (next.has(expansion)) next.delete(expansion); else next.add(expansion);
-                    return next;
-                  })}
-                  {...cellProps} />
-              ))
-          ) : (
-            <div className="ci" style={{ marginBottom: 10 }}>
-              <div style={{ position: "relative", padding: "6px 0", background: "var(--bg2)", overflowX: "auto" }}>
-                <TimelineGridLines leftOffset={ROW_LABEL_WIDTH} />
-                <div className="tl-nowline" style={{ left: nowLineLeft + ROW_LABEL_WIDTH }} />
-                {timelineCollectionSlots.length === 0
-                  ? <div className="empty">Nothing in this collection is scheduled in the next {HOURS_AHEAD} hours.</div>
-                  : <TimelineRow row={{ rowLabel: activeList.name, slots: timelineCollectionSlots }} origin={origin} windowEnd={windowEnd} {...cellProps} />}
-              </div>
+        // Single shared horizontal scroll for the ENTIRE timeline — header
+        // row + every expansion section/collection row together, all sized
+        // to the same fixed TIMELINE_TOTAL_WIDTH. Previously each section
+        // had its own independent overflow-x:auto, so scrolling one zone
+        // left the header (and every other zone) behind — events no longer
+        // lined up with the time markers above them. One scrollbar here
+        // means the header always moves in lockstep with every row, and
+        // every row/zone extends the same distance regardless of whether
+        // its own events reach that far, so empty space reads as
+        // consistent background rather than a ragged right edge.
+        <div className="tl-scroll-wrap">
+          <div style={{ width: TIMELINE_TOTAL_WIDTH }}>
+            <div style={{ display: "flex", marginBottom: 8, paddingLeft: ROW_LABEL_WIDTH, position: "relative" }}>
+              {headerCols.map((label, i) => (
+                <div key={i} style={{
+                  width: COL_WIDTH, flexShrink: 0, fontSize: 11, color: "var(--text3)", fontFamily: "Cinzel,serif",
+                  letterSpacing: 1, textAlign: "center", borderLeft: "1px solid rgba(200,150,42,.18)",
+                }}>
+                  {label}
+                </div>
+              ))}
             </div>
-          )}
-        </>
+
+            {activeTabId === null ? (
+              timelineSectionsByExpansion.length === 0
+                ? <div className="empty">Nothing scheduled in the next {HOURS_AHEAD} hours for the selected areas.</div>
+                : timelineSectionsByExpansion.map(([expansion, rows]) => (
+                  <TimelineSection key={expansion} expansion={expansion} rows={rows} origin={origin} windowEnd={windowEnd}
+                    nowLineLeft={nowLineLeft + ROW_LABEL_WIDTH} collapsed={collapsedExpansions.has(expansion)}
+                    onToggleCollapse={() => setCollapsedExpansions(prev => {
+                      const next = new Set(prev);
+                      if (next.has(expansion)) next.delete(expansion); else next.add(expansion);
+                      return next;
+                    })}
+                    {...cellProps} />
+                ))
+            ) : (
+              <div className="ci" style={{ marginBottom: 10 }}>
+                <div style={{ position: "relative", padding: "6px 0", background: "var(--bg2)" }}>
+                  <TimelineGridLines leftOffset={ROW_LABEL_WIDTH} />
+                  <div className="tl-nowline" style={{ left: nowLineLeft + ROW_LABEL_WIDTH }} />
+                  {timelineCollectionSlots.length === 0
+                    ? <div className="empty">Nothing in this collection is scheduled in the next {HOURS_AHEAD} hours.</div>
+                    : <TimelineRow row={{ rowLabel: activeList.name, slots: timelineCollectionSlots }} origin={origin} windowEnd={windowEnd} {...cellProps} />}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

@@ -2059,15 +2059,6 @@ export default function App() {
       </button>
       <button className={`ntab${activeTab === "daily" ? " on" : ""}`} onClick={() => setActiveTab("daily")}>
       Time Gated
-      {data && (() => {
-        const eligible = data.timegatedList || [];
-        const done = eligible.filter(r => dailyCrafted.has(r.itemId)).length;
-        return eligible.length > 0
-        ? <span style={{ marginLeft: 7, fontSize: 10, fontFamily: "Cinzel,serif", opacity: 0.8 }}>
-        {done}/{eligible.length}
-        </span>
-        : null;
-      })()}
       </button>
       </div>
 
