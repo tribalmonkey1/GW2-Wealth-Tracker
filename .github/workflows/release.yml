@@ -12,16 +12,84 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Reads the version out of the pushed tag (v0.4.0 -> 0.4.0) and writes it
+  # into package.json, src-tauri/tauri.conf.json, and src-tauri/Cargo.toml,
+  # then regenerates package-lock.json from the corrected package.json (never
+  # hand-edit the lockfile directly - npm derives it). Commits the result to
+  # main so the three files can never drift out of sync with a release again.
+  #
+  # Note: the tag itself still points at whichever commit you tagged locally
+  # - this job adds ONE more commit on top of main with the version bump.
+  # That's expected and harmless: the build-and-upload job below checks out
+  # this job's commit SHA (not the raw tag), so the actual built app and
+  # release artifacts always reflect the corrected version, even though the
+  # tag ref and the version-bump commit aren't literally the same commit.
+  sync-version:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.commit.outputs.sha }}
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Compute version from tag
+        id: version
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Bump package.json
+        run: |
+          jq --arg v "${{ steps.version.outputs.version }}" '.version = $v' package.json > package.json.tmp
+          mv package.json.tmp package.json
+
+      - name: Bump tauri.conf.json
+        run: |
+          jq --arg v "${{ steps.version.outputs.version }}" '.version = $v' src-tauri/tauri.conf.json > src-tauri/tauri.conf.json.tmp
+          mv src-tauri/tauri.conf.json.tmp src-tauri/tauri.conf.json
+
+      - name: Bump Cargo.toml
+        run: |
+          sed -i "0,/^version = \".*\"/s//version = \"${{ steps.version.outputs.version }}\"/" src-tauri/Cargo.toml
+
+      - name: Regenerate package-lock.json
+        run: npm install
+
+      - name: Commit version bump
+        id: commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json src-tauri/tauri.conf.json src-tauri/Cargo.toml
+          if git diff --cached --quiet; then
+            echo "No version changes needed - files already at ${{ steps.version.outputs.version }}"
+          else
+            git commit -m "chore: sync version to ${{ steps.version.outputs.version }} [skip ci]"
+            git push origin main
+          fi
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
   # Creates the draft release ONCE, on its own, before either platform starts
   # building. This is the fix for the duplicate-draft bug: previously both
   # matrix jobs below called tauri-action independently, and each one tried
   # to find-or-create a release for the tag at roughly the same time. Running
   # in parallel, both checks could see "no release yet" and both would create
-  # one — a known race in tauri-action itself (see upstream issue #914,
+  # one - a known race in tauri-action itself (see upstream issue #914,
   # "Duplicate Releases Sometimes Created"). Having exactly one job create
   # the release, and having the build jobs upload into it via releaseId
   # instead of tagName-based lookup, removes the race entirely.
   create-release:
+    needs: sync-version
     permissions:
       contents: write
     runs-on: ubuntu-latest
@@ -45,7 +113,7 @@ jobs:
             return data.id
 
   build-and-upload:
-    needs: create-release
+    needs: [sync-version, create-release]
     permissions:
       contents: write
     strategy:
@@ -58,8 +126,10 @@ jobs:
             args: '--bundles nsis'
     runs-on: ${{ matrix.platform }}
     steps:
-      - name: Checkout repo
+      - name: Checkout version-synced commit
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.sync-version.outputs.sha }}
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
