@@ -65,10 +65,10 @@ const INTERVAL_MIN = 15;
 const INTERVAL_MS = INTERVAL_MIN * 60_000;
 const HOURS_AHEAD = 3;
 const SLOT_COUNT = (HOURS_AHEAD * 60) / INTERVAL_MIN + 1;
-const COL_WIDTH = 150;
+const COL_WIDTH = 200;
 const ROW_LABEL_WIDTH = 150;
 const FETCH_CYCLES = 8; // generous buffer, filtered down to the visible window
-const MIN_BLOCK_WIDTH = 40; // floor so very short events (5-9 min) still fit their checkbox/name
+const MIN_BLOCK_WIDTH = 95; // floor so very short events (5-9 min) still fit their checkbox/name/icons legibly
 // Single shared gap value used BOTH horizontally (the visual gap you see
 // between two back-to-back blocks, carved out of block width below) and
 // vertically (the gap between stacked lanes in TimelineRow) — so a
@@ -76,12 +76,13 @@ const MIN_BLOCK_WIDTH = 40; // floor so very short events (5-9 min) still fit th
 // of space, per design intent.
 const BLOCK_GAP_PX = 4;
 // Deliberate inset applied to BOTH sides of every block, so a block never
-// sits flush against its own start-time gridline (or the boundary of the
-// next block) — half of BLOCK_GAP_PX per side, so two back-to-back blocks
-// still end up with the same total ~4px gap between them as before, but a
-// block starting fresh in an otherwise-empty stretch also gets breathing
-// room from its own gridline instead of looking flush-aligned to it.
-const BLOCK_INSET_PX = BLOCK_GAP_PX / 2;
+// sits flush against its own start-time gridline. Uses the FULL gap value
+// per side (not half) — a block's own left/right margin should match what
+// you see as "the gap" next to it, whether that neighbor is a bare gridline
+// (isolated block) or another block. Two genuinely back-to-back blocks (no
+// real time gap between them) will show roughly double this as their
+// combined visual gap, since each contributes its own full inset.
+const BLOCK_INSET_PX = BLOCK_GAP_PX;
 // Every timeline block now holds exactly one occurrence — same-start-time
 // events get their own lane instead of being crammed into one box (see
 // TimelineRow) — so a single fixed block height covers every lane. Matches
@@ -353,7 +354,13 @@ function TimelineRow({ row, origin, windowEnd, ...rest }) {
   // to reason about, and no risk of one lane inheriting extra height from
   // a neighbor that used to stack multiple lines.
   const laneHeight = BLOCK_HEIGHT;
-  const rowHeight = TRACK_TOP_PADDING + numLanes * laneHeight + Math.max(0, numLanes - 1) * BLOCK_GAP_PX;
+  // TRACK_TOP_PADDING counted twice — once as the margin before the first
+  // lane, once as the matching margin after the last lane — so a
+  // single-lane row has equal empty space above and below its one block.
+  // Previously only the top margin was included, which is what made every
+  // block sit noticeably higher than centered ("sits low" — more brown
+  // above than below — was actually "more room above than below").
+  const rowHeight = TRACK_TOP_PADDING * 2 + numLanes * laneHeight + Math.max(0, numLanes - 1) * BLOCK_GAP_PX;
 
   return (
     <div className="tl-row" style={{ height: rowHeight }}>

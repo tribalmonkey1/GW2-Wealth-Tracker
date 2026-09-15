@@ -19,8 +19,18 @@
  * TTS paths.
  */
 export const TTS_PRONUNCIATION_OVERRIDES = {
-  "Tequatl the Sunless": "Teh-kwah-tuhl the Sunless",
-  "Admiral Taidha Covington": "Admiral Tie-ee-duh Covington",
+  "Tequatl the Sunless": "Te-kwah-tuhl the Sunless",
+  "Admiral Taidha Covington": "Admiral Tie-ee-duh Cuv-ington",
+  "Svanir Shaman Chief": "Svahn-eer shaman chief",
+  "Golem Mark II": "Golem Mark 2",
+  "Karka Queen": "Carr-Kuh Queen",
+  "Defeat Scarlet's Minions (Public)": "Defeat Scarlets Minions (Public)",
+  "Sandstorm": "Sand-storm",
+  "Pylons": "Py-lawns",
+  "Chake Garent": "Chak Garentt",
+  "Choya Pinata": "Choya Pin-yata",
+  "Aetherblade Assault": "Ae-therblade Assault",
+  "Kaineng Blackout": "Ky-neng Blackout",
 };
 
 export function applyPronunciation(name) {
