@@ -209,11 +209,18 @@ export const OBSIDIAN_SHARD_METHODS = [
 ];
 
 // ── Average Output Multipliers ─────────────────────────────────────────────────
-// From wiki.guildwars2.com/wiki/Mystic_Forge/Material_Promotion notes
-// Common tiers 1-4: x40 output (verified from recipe tables)
-// Common tier 5: x10 output
-// Fine tiers 1-4: x7 output (some are x6)
-// Fine tier 5: x5 or x6 output
+// From wiki.guildwars2.com/wiki/Mystic_Forge/Material_Promotion — these are the
+// wiki's stated STATISTICAL AVERAGE return per craft (verified against actual
+// community-logged promotion data), NOT the max stack size shown next to each
+// item's name in the recipe tables (e.g. "Wool Scrap (x40)"). That stack-size
+// number is only the ceiling of a random range — using it as outputCount
+// understates real yield substantially (roughly half, for common materials)
+// and was the root cause of this app's profit numbers not matching other
+// mystic forge calculators. Applies per material category:
+// Common materials (incl. refined) tiers 1-4: 86.34 average
+// Common materials (incl. refined) tier 5:     18.92 average
+// Fine materials tiers 1-4 (incl. Piles of Dust): 18.51 average
+// Fine materials tier 5 (incl. Crystalline Dust):  6.91 average
 
 // ── Recipe Helpers ────────────────────────────────────────────────────────────
 const F = FORGE_IDS; // shorthand
@@ -224,6 +231,7 @@ function ing(itemId, count, name) {
 
 // ── Material Promotion Recipes ────────────────────────────────────────────────
 // All recipes follow the pattern: 250× tier(n-1) + 1× tier(n) + dust/crystal + Phil's Stone
+// for common materials, or 50× tier(n-1) + 1× tier(n) + dust + Phil's Stone for fine materials.
 // The 1× of the output is a SEED — the visited set handles the self-reference cycle.
 
 export const MATERIAL_PROMOTION_RECIPES = [
@@ -232,7 +240,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_wool_scrap',
     name: 'Wool Scrap',
     outputId: F.WOOL_SCRAP,
-    outputCount: 40,
+    outputCount: 86.34,
     outputIsAverage: true,
     subcategory: 'Cloth Scraps',
     inputs: [
@@ -246,7 +254,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_cotton_scrap',
     name: 'Cotton Scrap',
     outputId: F.COTTON_SCRAP,
-    outputCount: 40,
+    outputCount: 86.34,
     outputIsAverage: true,
     subcategory: 'Cloth Scraps',
     inputs: [
@@ -260,7 +268,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_linen_scrap',
     name: 'Linen Scrap',
     outputId: F.LINEN_SCRAP,
-    outputCount: 40,
+    outputCount: 86.34,
     outputIsAverage: true,
     subcategory: 'Cloth Scraps',
     inputs: [
@@ -274,7 +282,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_silk_scrap',
     name: 'Silk Scrap',
     outputId: F.SILK_SCRAP,
-    outputCount: 40,
+    outputCount: 86.34,
     outputIsAverage: true,
     subcategory: 'Cloth Scraps',
     inputs: [
@@ -288,7 +296,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_gossamer_scrap',
     name: 'Gossamer Scrap',
     outputId: F.GOSSAMER_SCRAP,
-    outputCount: 10,
+    outputCount: 18.92,
     outputIsAverage: true,
     subcategory: 'Cloth Scraps',
     inputs: [
@@ -304,7 +312,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_thin_leather',
     name: 'Thin Leather Section',
     outputId: F.THIN_LEATHER_SECTION,
-    outputCount: 40,
+    outputCount: 86.34,
     outputIsAverage: true,
     subcategory: 'Leather Sections',
     inputs: [
@@ -318,7 +326,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_coarse_leather',
     name: 'Coarse Leather Section',
     outputId: F.COARSE_LEATHER_SECTION,
-    outputCount: 40,
+    outputCount: 86.34,
     outputIsAverage: true,
     subcategory: 'Leather Sections',
     inputs: [
@@ -332,7 +340,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_rugged_leather',
     name: 'Rugged Leather Section',
     outputId: F.RUGGED_LEATHER_SECTION,
-    outputCount: 40,
+    outputCount: 86.34,
     outputIsAverage: true,
     subcategory: 'Leather Sections',
     inputs: [
@@ -346,7 +354,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_thick_leather',
     name: 'Thick Leather Section',
     outputId: F.THICK_LEATHER_SECTION,
-    outputCount: 40,
+    outputCount: 86.34,
     outputIsAverage: true,
     subcategory: 'Leather Sections',
     inputs: [
@@ -360,7 +368,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_hardened_leather',
     name: 'Hardened Leather Section',
     outputId: F.HARDENED_LEATHER_SECTION,
-    outputCount: 10,
+    outputCount: 18.92,
     outputIsAverage: true,
     subcategory: 'Leather Sections',
     inputs: [
@@ -376,7 +384,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_iron_ore',
     name: 'Iron Ore',
     outputId: F.IRON_ORE,
-    outputCount: 40,
+    outputCount: 86.34,
     outputIsAverage: true,
     subcategory: 'Metal Ore',
     inputs: [
@@ -390,7 +398,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_gold_ore',
     name: 'Gold Ore',
     outputId: F.GOLD_ORE,
-    outputCount: 40,
+    outputCount: 86.34,
     outputIsAverage: true,
     subcategory: 'Metal Ore',
     inputs: [
@@ -404,7 +412,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_platinum_ore_a',
     name: 'Platinum Ore (from Iron)',
     outputId: F.PLATINUM_ORE,
-    outputCount: 20,
+    outputCount: 86.34,
     outputIsAverage: true,
     subcategory: 'Metal Ore',
     inputs: [
@@ -418,7 +426,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_platinum_ore_b',
     name: 'Platinum Ore (from Gold)',
     outputId: F.PLATINUM_ORE,
-    outputCount: 40,
+    outputCount: 86.34,
     outputIsAverage: true,
     subcategory: 'Metal Ore',
     inputs: [
@@ -432,7 +440,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_mithril_ore',
     name: 'Mithril Ore',
     outputId: F.MITHRIL_ORE,
-    outputCount: 40,
+    outputCount: 86.34,
     outputIsAverage: true,
     subcategory: 'Metal Ore',
     inputs: [
@@ -446,7 +454,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_orichalcum_ore',
     name: 'Orichalcum Ore',
     outputId: F.ORICHALCUM_ORE,
-    outputCount: 10,
+    outputCount: 18.92,
     outputIsAverage: true,
     subcategory: 'Metal Ore',
     inputs: [
@@ -462,7 +470,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_soft_wood_log',
     name: 'Soft Wood Log',
     outputId: F.SOFT_WOOD_LOG,
-    outputCount: 40,
+    outputCount: 86.34,
     outputIsAverage: true,
     subcategory: 'Wood Logs',
     inputs: [
@@ -476,7 +484,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_seasoned_wood_log',
     name: 'Seasoned Wood Log',
     outputId: F.SEASONED_WOOD_LOG,
-    outputCount: 40,
+    outputCount: 86.34,
     outputIsAverage: true,
     subcategory: 'Wood Logs',
     inputs: [
@@ -490,7 +498,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_hard_wood_log',
     name: 'Hard Wood Log',
     outputId: F.HARD_WOOD_LOG,
-    outputCount: 40,
+    outputCount: 86.34,
     outputIsAverage: true,
     subcategory: 'Wood Logs',
     inputs: [
@@ -504,7 +512,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_elder_wood_log',
     name: 'Elder Wood Log',
     outputId: F.ELDER_WOOD_LOG,
-    outputCount: 40,
+    outputCount: 86.34,
     outputIsAverage: true,
     subcategory: 'Wood Logs',
     inputs: [
@@ -518,7 +526,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_ancient_wood_log',
     name: 'Ancient Wood Log',
     outputId: F.ANCIENT_WOOD_LOG,
-    outputCount: 10,
+    outputCount: 18.92,
     outputIsAverage: true,
     subcategory: 'Wood Logs',
     inputs: [
@@ -534,7 +542,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_bolt_of_wool',
     name: 'Bolt of Wool',
     outputId: F.BOLT_OF_WOOL,
-    outputCount: 40,
+    outputCount: 86.34,
     outputIsAverage: true,
     subcategory: 'Bolts of Cloth',
     inputs: [
@@ -548,7 +556,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_bolt_of_cotton',
     name: 'Bolt of Cotton',
     outputId: F.BOLT_OF_COTTON,
-    outputCount: 40,
+    outputCount: 86.34,
     outputIsAverage: true,
     subcategory: 'Bolts of Cloth',
     inputs: [
@@ -562,7 +570,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_bolt_of_linen',
     name: 'Bolt of Linen',
     outputId: F.BOLT_OF_LINEN,
-    outputCount: 40,
+    outputCount: 86.34,
     outputIsAverage: true,
     subcategory: 'Bolts of Cloth',
     inputs: [
@@ -576,7 +584,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_bolt_of_silk',
     name: 'Bolt of Silk',
     outputId: F.BOLT_OF_SILK,
-    outputCount: 40,
+    outputCount: 86.34,
     outputIsAverage: true,
     subcategory: 'Bolts of Cloth',
     inputs: [
@@ -590,7 +598,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_bolt_of_gossamer',
     name: 'Bolt of Gossamer',
     outputId: F.BOLT_OF_GOSSAMER,
-    outputCount: 10,
+    outputCount: 18.92,
     outputIsAverage: true,
     subcategory: 'Bolts of Cloth',
     inputs: [
@@ -606,7 +614,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_cured_thin_leather',
     name: 'Cured Thin Leather Square',
     outputId: F.CURED_THIN_LEATHER_SQUARE,
-    outputCount: 40,
+    outputCount: 86.34,
     outputIsAverage: true,
     subcategory: 'Leather Squares',
     inputs: [
@@ -620,7 +628,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_cured_coarse_leather',
     name: 'Cured Coarse Leather Square',
     outputId: F.CURED_COARSE_LEATHER_SQUARE,
-    outputCount: 40,
+    outputCount: 86.34,
     outputIsAverage: true,
     subcategory: 'Leather Squares',
     inputs: [
@@ -634,7 +642,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_cured_rugged_leather',
     name: 'Cured Rugged Leather Square',
     outputId: F.CURED_RUGGED_LEATHER_SQUARE,
-    outputCount: 40,
+    outputCount: 86.34,
     outputIsAverage: true,
     subcategory: 'Leather Squares',
     inputs: [
@@ -648,7 +656,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_cured_thick_leather',
     name: 'Cured Thick Leather Square',
     outputId: F.CURED_THICK_LEATHER_SQUARE,
-    outputCount: 40,
+    outputCount: 86.34,
     outputIsAverage: true,
     subcategory: 'Leather Squares',
     inputs: [
@@ -662,7 +670,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_cured_hardened_leather',
     name: 'Cured Hardened Leather Square',
     outputId: F.CURED_HARDENED_LEATHER_SQUARE,
-    outputCount: 10,
+    outputCount: 18.92,
     outputIsAverage: true,
     subcategory: 'Leather Squares',
     inputs: [
@@ -678,7 +686,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_silver_ingot',
     name: 'Silver Ingot',
     outputId: F.SILVER_INGOT,
-    outputCount: 40,
+    outputCount: 86.34,
     outputIsAverage: true,
     subcategory: 'Metal Ingots',
     inputs: [
@@ -692,7 +700,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_iron_ingot',
     name: 'Iron Ingot',
     outputId: F.IRON_INGOT,
-    outputCount: 40,
+    outputCount: 86.34,
     outputIsAverage: true,
     subcategory: 'Metal Ingots',
     inputs: [
@@ -706,7 +714,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_gold_ingot',
     name: 'Gold Ingot',
     outputId: F.GOLD_INGOT,
-    outputCount: 40,
+    outputCount: 86.34,
     outputIsAverage: true,
     subcategory: 'Metal Ingots',
     inputs: [
@@ -720,7 +728,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_steel_ingot',
     name: 'Steel Ingot',
     outputId: F.STEEL_INGOT,
-    outputCount: 40,
+    outputCount: 86.34,
     outputIsAverage: true,
     subcategory: 'Metal Ingots',
     inputs: [
@@ -734,7 +742,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_platinum_ingot',
     name: 'Platinum Ingot',
     outputId: F.PLATINUM_INGOT,
-    outputCount: 40,
+    outputCount: 86.34,
     outputIsAverage: true,
     subcategory: 'Metal Ingots',
     inputs: [
@@ -748,7 +756,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_mithril_ingot_a',
     name: 'Mithril Ingot (from Darksteel)',
     outputId: F.MITHRIL_INGOT,
-    outputCount: 40,
+    outputCount: 86.34,
     outputIsAverage: true,
     subcategory: 'Metal Ingots',
     inputs: [
@@ -762,7 +770,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_mithril_ingot_b',
     name: 'Mithril Ingot (from Platinum)',
     outputId: F.MITHRIL_INGOT,
-    outputCount: 40,
+    outputCount: 86.34,
     outputIsAverage: true,
     subcategory: 'Metal Ingots',
     inputs: [
@@ -776,7 +784,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_orichalcum_ingot',
     name: 'Orichalcum Ingot',
     outputId: F.ORICHALCUM_INGOT,
-    outputCount: 10,
+    outputCount: 18.92,
     outputIsAverage: true,
     subcategory: 'Metal Ingots',
     inputs: [
@@ -792,7 +800,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_soft_wood_plank',
     name: 'Soft Wood Plank',
     outputId: F.SOFT_WOOD_PLANK,
-    outputCount: 40,
+    outputCount: 86.34,
     outputIsAverage: true,
     subcategory: 'Wood Planks',
     inputs: [
@@ -806,7 +814,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_seasoned_wood_plank',
     name: 'Seasoned Wood Plank',
     outputId: F.SEASONED_WOOD_PLANK,
-    outputCount: 40,
+    outputCount: 86.34,
     outputIsAverage: true,
     subcategory: 'Wood Planks',
     inputs: [
@@ -820,7 +828,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_hard_wood_plank',
     name: 'Hard Wood Plank',
     outputId: F.HARD_WOOD_PLANK,
-    outputCount: 40,
+    outputCount: 86.34,
     outputIsAverage: true,
     subcategory: 'Wood Planks',
     inputs: [
@@ -834,7 +842,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_elder_wood_plank',
     name: 'Elder Wood Plank',
     outputId: F.ELDER_WOOD_PLANK,
-    outputCount: 40,
+    outputCount: 86.34,
     outputIsAverage: true,
     subcategory: 'Wood Planks',
     inputs: [
@@ -848,7 +856,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_ancient_wood_plank',
     name: 'Ancient Wood Plank',
     outputId: F.ANCIENT_WOOD_PLANK,
-    outputCount: 10,
+    outputCount: 18.92,
     outputIsAverage: true,
     subcategory: 'Wood Planks',
     inputs: [
@@ -865,7 +873,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_shimmering_dust',
     name: 'Pile of Shimmering Dust',
     outputId: F.PILE_OF_SHIMMERING_DUST,
-    outputCount: 40,
+    outputCount: 18.51,
     outputIsAverage: true,
     subcategory: 'Piles of Dust',
     inputs: [
@@ -879,7 +887,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_radiant_dust',
     name: 'Pile of Radiant Dust',
     outputId: F.PILE_OF_RADIANT_DUST,
-    outputCount: 40,
+    outputCount: 18.51,
     outputIsAverage: true,
     subcategory: 'Piles of Dust',
     inputs: [
@@ -893,7 +901,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_luminous_dust',
     name: 'Pile of Luminous Dust',
     outputId: F.PILE_OF_LUMINOUS_DUST,
-    outputCount: 40,
+    outputCount: 18.51,
     outputIsAverage: true,
     subcategory: 'Piles of Dust',
     inputs: [
@@ -907,7 +915,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_incandescent_dust',
     name: 'Pile of Incandescent Dust',
     outputId: F.PILE_OF_INCANDESCENT_DUST,
-    outputCount: 40,
+    outputCount: 18.51,
     outputIsAverage: true,
     subcategory: 'Piles of Dust',
     inputs: [
@@ -921,7 +929,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_crystalline_dust',
     name: 'Pile of Crystalline Dust',
     outputId: F.PILE_OF_CRYSTALLINE_DUST,
-    outputCount: 6,
+    outputCount: 6.91,
     outputIsAverage: true,
     subcategory: 'Piles of Dust',
     inputs: [
@@ -937,7 +945,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_bone_shard',
     name: 'Bone Shard',
     outputId: F.BONE_SHARD,
-    outputCount: 7,
+    outputCount: 18.51,
     outputIsAverage: true,
     subcategory: 'Bones',
     inputs: [
@@ -951,7 +959,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_bone',
     name: 'Bone',
     outputId: F.BONE,
-    outputCount: 7,
+    outputCount: 18.51,
     outputIsAverage: true,
     subcategory: 'Bones',
     inputs: [
@@ -965,7 +973,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_heavy_bone',
     name: 'Heavy Bone',
     outputId: F.HEAVY_BONE,
-    outputCount: 7,
+    outputCount: 18.51,
     outputIsAverage: true,
     subcategory: 'Bones',
     inputs: [
@@ -979,7 +987,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_large_bone',
     name: 'Large Bone',
     outputId: F.LARGE_BONE,
-    outputCount: 7,
+    outputCount: 18.51,
     outputIsAverage: true,
     subcategory: 'Bones',
     inputs: [
@@ -993,7 +1001,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_ancient_bone',
     name: 'Ancient Bone',
     outputId: F.ANCIENT_BONE,
-    outputCount: 5,
+    outputCount: 6.91,
     outputIsAverage: true,
     subcategory: 'Bones',
     inputs: [
@@ -1009,7 +1017,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_small_claw',
     name: 'Small Claw',
     outputId: F.SMALL_CLAW,
-    outputCount: 7,
+    outputCount: 18.51,
     outputIsAverage: true,
     subcategory: 'Claws',
     inputs: [
@@ -1023,7 +1031,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_claw',
     name: 'Claw',
     outputId: F.CLAW,
-    outputCount: 7,
+    outputCount: 18.51,
     outputIsAverage: true,
     subcategory: 'Claws',
     inputs: [
@@ -1037,7 +1045,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_sharp_claw',
     name: 'Sharp Claw',
     outputId: F.SHARP_CLAW,
-    outputCount: 7,
+    outputCount: 18.51,
     outputIsAverage: true,
     subcategory: 'Claws',
     inputs: [
@@ -1051,7 +1059,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_large_claw',
     name: 'Large Claw',
     outputId: F.LARGE_CLAW,
-    outputCount: 7,
+    outputCount: 18.51,
     outputIsAverage: true,
     subcategory: 'Claws',
     inputs: [
@@ -1065,7 +1073,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_vicious_claw',
     name: 'Vicious Claw',
     outputId: F.VICIOUS_CLAW,
-    outputCount: 6,
+    outputCount: 6.91,
     outputIsAverage: true,
     subcategory: 'Claws',
     inputs: [
@@ -1081,7 +1089,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_small_fang',
     name: 'Small Fang',
     outputId: F.SMALL_FANG,
-    outputCount: 7,
+    outputCount: 18.51,
     outputIsAverage: true,
     subcategory: 'Fangs',
     inputs: [
@@ -1095,7 +1103,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_fang',
     name: 'Fang',
     outputId: F.FANG,
-    outputCount: 7,
+    outputCount: 18.51,
     outputIsAverage: true,
     subcategory: 'Fangs',
     inputs: [
@@ -1109,7 +1117,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_sharp_fang',
     name: 'Sharp Fang',
     outputId: F.SHARP_FANG,
-    outputCount: 7,
+    outputCount: 18.51,
     outputIsAverage: true,
     subcategory: 'Fangs',
     inputs: [
@@ -1123,7 +1131,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_large_fang',
     name: 'Large Fang',
     outputId: F.LARGE_FANG,
-    outputCount: 7,
+    outputCount: 18.51,
     outputIsAverage: true,
     subcategory: 'Fangs',
     inputs: [
@@ -1137,7 +1145,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_vicious_fang',
     name: 'Vicious Fang',
     outputId: F.VICIOUS_FANG,
-    outputCount: 5,
+    outputCount: 6.91,
     outputIsAverage: true,
     subcategory: 'Fangs',
     inputs: [
@@ -1153,7 +1161,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_small_scale',
     name: 'Small Scale',
     outputId: F.SMALL_SCALE,
-    outputCount: 7,
+    outputCount: 18.51,
     outputIsAverage: true,
     subcategory: 'Scales',
     inputs: [
@@ -1167,7 +1175,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_scale',
     name: 'Scale',
     outputId: F.SCALE,
-    outputCount: 7,
+    outputCount: 18.51,
     outputIsAverage: true,
     subcategory: 'Scales',
     inputs: [
@@ -1181,7 +1189,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_smooth_scale',
     name: 'Smooth Scale',
     outputId: F.SMOOTH_SCALE,
-    outputCount: 7,
+    outputCount: 18.51,
     outputIsAverage: true,
     subcategory: 'Scales',
     inputs: [
@@ -1195,7 +1203,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_large_scale',
     name: 'Large Scale',
     outputId: F.LARGE_SCALE,
-    outputCount: 6,
+    outputCount: 18.51,
     outputIsAverage: true,
     subcategory: 'Scales',
     inputs: [
@@ -1209,7 +1217,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     id: 'mp_armored_scale',
     name: 'Armored Scale',
     outputId: F.ARMORED_SCALE,
-    outputCount: 5,
+    outputCount: 6.91,
     outputIsAverage: true,
     subcategory: 'Scales',
     inputs: [
@@ -1226,7 +1234,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     name: 'Small Totem',
     outputId: null, // NAME_LOOKUP
     outputIdName: 'Small Totem',
-    outputCount: 7,
+    outputCount: 18.51,
     outputIsAverage: true,
     subcategory: 'Totems',
     inputs: [
@@ -1241,7 +1249,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     name: 'Totem',
     outputId: null,
     outputIdName: 'Totem',
-    outputCount: 7,
+    outputCount: 18.51,
     outputIsAverage: true,
     subcategory: 'Totems',
     inputs: [
@@ -1256,7 +1264,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     name: 'Engraved Totem',
     outputId: null,
     outputIdName: 'Engraved Totem',
-    outputCount: 7,
+    outputCount: 18.51,
     outputIsAverage: true,
     subcategory: 'Totems',
     inputs: [
@@ -1271,7 +1279,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     name: 'Intricate Totem',
     outputId: null,
     outputIdName: 'Intricate Totem',
-    outputCount: 7,
+    outputCount: 18.51,
     outputIsAverage: true,
     subcategory: 'Totems',
     inputs: [
@@ -1286,7 +1294,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     name: 'Elaborate Totem',
     outputId: null,
     outputIdName: 'Elaborate Totem',
-    outputCount: 5,
+    outputCount: 6.91,
     outputIsAverage: true,
     subcategory: 'Totems',
     inputs: [
@@ -1303,7 +1311,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     name: 'Small Venom Sac',
     outputId: null,
     outputIdName: 'Small Venom Sac',
-    outputCount: 7,
+    outputCount: 18.51,
     outputIsAverage: true,
     subcategory: 'Venom Sacs',
     inputs: [
@@ -1318,7 +1326,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     name: 'Venom Sac',
     outputId: null,
     outputIdName: 'Venom Sac',
-    outputCount: 7,
+    outputCount: 18.51,
     outputIsAverage: true,
     subcategory: 'Venom Sacs',
     inputs: [
@@ -1333,7 +1341,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     name: 'Full Venom Sac',
     outputId: null,
     outputIdName: 'Full Venom Sac',
-    outputCount: 7,
+    outputCount: 18.51,
     outputIsAverage: true,
     subcategory: 'Venom Sacs',
     inputs: [
@@ -1348,7 +1356,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     name: 'Potent Venom Sac',
     outputId: null,
     outputIdName: 'Potent Venom Sac',
-    outputCount: 7,
+    outputCount: 18.51,
     outputIsAverage: true,
     subcategory: 'Venom Sacs',
     inputs: [
@@ -1363,7 +1371,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     name: 'Powerful Venom Sac',
     outputId: null,
     outputIdName: 'Powerful Venom Sac',
-    outputCount: 5,
+    outputCount: 6.91,
     outputIsAverage: true,
     subcategory: 'Venom Sacs',
     inputs: [
@@ -1380,7 +1388,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     name: 'Vial of Thin Blood',
     outputId: null,
     outputIdName: 'Vial of Thin Blood',
-    outputCount: 7,
+    outputCount: 18.51,
     outputIsAverage: true,
     subcategory: 'Vials of Blood',
     inputs: [
@@ -1395,7 +1403,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     name: 'Vial of Blood',
     outputId: null,
     outputIdName: 'Vial of Blood',
-    outputCount: 7,
+    outputCount: 18.51,
     outputIsAverage: true,
     subcategory: 'Vials of Blood',
     inputs: [
@@ -1410,7 +1418,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     name: 'Vial of Thick Blood',
     outputId: null,
     outputIdName: 'Vial of Thick Blood',
-    outputCount: 7,
+    outputCount: 18.51,
     outputIsAverage: true,
     subcategory: 'Vials of Blood',
     inputs: [
@@ -1425,7 +1433,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     name: 'Vial of Potent Blood',
     outputId: null,
     outputIdName: 'Vial of Potent Blood',
-    outputCount: 7,
+    outputCount: 18.51,
     outputIsAverage: true,
     subcategory: 'Vials of Blood',
     inputs: [
@@ -1440,7 +1448,7 @@ export const MATERIAL_PROMOTION_RECIPES = [
     name: 'Vial of Powerful Blood',
     outputId: null,
     outputIdName: 'Vial of Powerful Blood',
-    outputCount: 5,
+    outputCount: 6.91,
     outputIsAverage: true,
     subcategory: 'Vials of Blood',
     inputs: [
@@ -1448,6 +1456,443 @@ export const MATERIAL_PROMOTION_RECIPES = [
       ing(null, 1, 'Vial of Powerful Blood'),
       ing(F.PILE_OF_CRYSTALLINE_DUST, 5, 'Pile of Crystalline Dust'),
       ing(F.PHILOSOPHER_STONE, 5, "Philosopher's Stone"),
+    ],
+  },
+
+  // ── Rare crafting materials (Sliver → Fragment → Shard → Core → Lodestone) ──
+  // Unlike everything above, these are DETERMINISTIC — a strict 2:1 ratio at
+  // every step, not a random average (see wiki.guildwars2.com/wiki/Mystic_Forge
+  // — "Rare crafting materials are promoted using two different recipes. The
+  // first combines two of a lower tier into one of a higher tier."). No
+  // outputIsAverage flag, since outputCount here is exact, not statistical.
+  // Verified end-to-end against the Charged family's own wiki pages
+  // (Charged_Fragment, Charged_Shard — both its Recipes and Used-in sections)
+  // and applied identically to the other 6 families, which the wiki's
+  // Mystic_Crystal/Material_promotion_recipes summary page confirms share the
+  // exact same recipe-count structure per family (only the item name differs).
+
+  {
+    id: 'mp_charged_fragment',
+    name: 'Charged Fragment',
+    outputId: null, // NAME_LOOKUP
+    outputIdName: 'Charged Fragment',
+    outputCount: 4,
+    subcategory: 'Charged',
+    inputs: [
+      ing(null, 8, 'Charged Sliver'),
+      ing(null, 1, 'Mystic Binding Agent'),
+      ing(null, 1, 'Pile of Radiant Dust'),
+      ing(null, 1, 'Mystic Crystal'),
+    ],
+  },
+  {
+    id: 'mp_charged_shard',
+    name: 'Charged Shard',
+    outputId: null,
+    outputIdName: 'Charged Shard',
+    outputCount: 1,
+    subcategory: 'Charged',
+    inputs: [
+      ing(null, 2, 'Charged Fragment'),
+      ing(null, 1, "Bottle of Elonian Wine"),
+      ing(null, 1, 'Pile of Luminous Dust'),
+      ing(null, 1, 'Mystic Crystal'),
+    ],
+  },
+  {
+    id: 'mp_charged_core',
+    name: 'Charged Core',
+    outputId: null,
+    outputIdName: 'Charged Core',
+    outputCount: 1,
+    subcategory: 'Charged',
+    inputs: [
+      ing(null, 2, 'Charged Shard'),
+      ing(null, 1, "Bottle of Elonian Wine"),
+      ing(null, 1, 'Pile of Incandescent Dust'),
+      ing(null, 1, 'Mystic Crystal'),
+    ],
+  },
+  {
+    id: 'mp_charged_lodestone',
+    name: 'Charged Lodestone',
+    outputId: null,
+    outputIdName: 'Charged Lodestone',
+    outputCount: 1,
+    subcategory: 'Charged',
+    inputs: [
+      ing(null, 2, 'Charged Core'),
+      ing(null, 1, "Bottle of Elonian Wine"),
+      ing(null, 1, 'Pile of Crystalline Dust'),
+      ing(null, 1, 'Mystic Crystal'),
+    ],
+  },
+  {
+    id: 'mp_corrupted_fragment',
+    name: 'Corrupted Fragment',
+    outputId: null, // NAME_LOOKUP
+    outputIdName: 'Corrupted Fragment',
+    outputCount: 4,
+    subcategory: 'Corrupted',
+    inputs: [
+      ing(null, 8, 'Corrupted Sliver'),
+      ing(null, 1, 'Mystic Binding Agent'),
+      ing(null, 1, 'Pile of Radiant Dust'),
+      ing(null, 1, 'Mystic Crystal'),
+    ],
+  },
+  {
+    id: 'mp_corrupted_shard',
+    name: 'Corrupted Shard',
+    outputId: null,
+    outputIdName: 'Corrupted Shard',
+    outputCount: 1,
+    subcategory: 'Corrupted',
+    inputs: [
+      ing(null, 2, 'Corrupted Fragment'),
+      ing(null, 1, "Bottle of Elonian Wine"),
+      ing(null, 1, 'Pile of Luminous Dust'),
+      ing(null, 1, 'Mystic Crystal'),
+    ],
+  },
+  {
+    id: 'mp_corrupted_core',
+    name: 'Corrupted Core',
+    outputId: null,
+    outputIdName: 'Corrupted Core',
+    outputCount: 1,
+    subcategory: 'Corrupted',
+    inputs: [
+      ing(null, 2, 'Corrupted Shard'),
+      ing(null, 1, "Bottle of Elonian Wine"),
+      ing(null, 1, 'Pile of Incandescent Dust'),
+      ing(null, 1, 'Mystic Crystal'),
+    ],
+  },
+  {
+    id: 'mp_corrupted_lodestone',
+    name: 'Corrupted Lodestone',
+    outputId: null,
+    outputIdName: 'Corrupted Lodestone',
+    outputCount: 1,
+    subcategory: 'Corrupted',
+    inputs: [
+      ing(null, 2, 'Corrupted Core'),
+      ing(null, 1, "Bottle of Elonian Wine"),
+      ing(null, 1, 'Pile of Crystalline Dust'),
+      ing(null, 1, 'Mystic Crystal'),
+    ],
+  },
+  {
+    id: 'mp_crystal_fragment',
+    name: 'Crystal Fragment',
+    outputId: null, // NAME_LOOKUP
+    outputIdName: 'Crystal Fragment',
+    outputCount: 4,
+    subcategory: 'Crystal',
+    inputs: [
+      ing(null, 8, 'Crystal Sliver'),
+      ing(null, 1, 'Mystic Binding Agent'),
+      ing(null, 1, 'Pile of Radiant Dust'),
+      ing(null, 1, 'Mystic Crystal'),
+    ],
+  },
+  {
+    id: 'mp_crystal_shard',
+    name: 'Crystal Shard',
+    outputId: null,
+    outputIdName: 'Crystal Shard',
+    outputCount: 1,
+    subcategory: 'Crystal',
+    inputs: [
+      ing(null, 2, 'Crystal Fragment'),
+      ing(null, 1, "Bottle of Elonian Wine"),
+      ing(null, 1, 'Pile of Luminous Dust'),
+      ing(null, 1, 'Mystic Crystal'),
+    ],
+  },
+  {
+    id: 'mp_crystal_core',
+    name: 'Crystal Core',
+    outputId: null,
+    outputIdName: 'Crystal Core',
+    outputCount: 1,
+    subcategory: 'Crystal',
+    inputs: [
+      ing(null, 2, 'Crystal Shard'),
+      ing(null, 1, "Bottle of Elonian Wine"),
+      ing(null, 1, 'Pile of Incandescent Dust'),
+      ing(null, 1, 'Mystic Crystal'),
+    ],
+  },
+  {
+    id: 'mp_crystal_lodestone',
+    name: 'Crystal Lodestone',
+    outputId: null,
+    outputIdName: 'Crystal Lodestone',
+    outputCount: 1,
+    subcategory: 'Crystal',
+    inputs: [
+      ing(null, 2, 'Crystal Core'),
+      ing(null, 1, "Bottle of Elonian Wine"),
+      ing(null, 1, 'Pile of Crystalline Dust'),
+      ing(null, 1, 'Mystic Crystal'),
+    ],
+  },
+  {
+    id: 'mp_destroyer_fragment',
+    name: 'Destroyer Fragment',
+    outputId: null, // NAME_LOOKUP
+    outputIdName: 'Destroyer Fragment',
+    outputCount: 4,
+    subcategory: 'Destroyer',
+    inputs: [
+      ing(null, 8, 'Destroyer Sliver'),
+      ing(null, 1, 'Mystic Binding Agent'),
+      ing(null, 1, 'Pile of Radiant Dust'),
+      ing(null, 1, 'Mystic Crystal'),
+    ],
+  },
+  {
+    id: 'mp_destroyer_shard',
+    name: 'Destroyer Shard',
+    outputId: null,
+    outputIdName: 'Destroyer Shard',
+    outputCount: 1,
+    subcategory: 'Destroyer',
+    inputs: [
+      ing(null, 2, 'Destroyer Fragment'),
+      ing(null, 1, "Bottle of Elonian Wine"),
+      ing(null, 1, 'Pile of Luminous Dust'),
+      ing(null, 1, 'Mystic Crystal'),
+    ],
+  },
+  {
+    id: 'mp_destroyer_core',
+    name: 'Destroyer Core',
+    outputId: null,
+    outputIdName: 'Destroyer Core',
+    outputCount: 1,
+    subcategory: 'Destroyer',
+    inputs: [
+      ing(null, 2, 'Destroyer Shard'),
+      ing(null, 1, "Bottle of Elonian Wine"),
+      ing(null, 1, 'Pile of Incandescent Dust'),
+      ing(null, 1, 'Mystic Crystal'),
+    ],
+  },
+  {
+    id: 'mp_destroyer_lodestone',
+    name: 'Destroyer Lodestone',
+    outputId: null,
+    outputIdName: 'Destroyer Lodestone',
+    outputCount: 1,
+    subcategory: 'Destroyer',
+    inputs: [
+      ing(null, 2, 'Destroyer Core'),
+      ing(null, 1, "Bottle of Elonian Wine"),
+      ing(null, 1, 'Pile of Crystalline Dust'),
+      ing(null, 1, 'Mystic Crystal'),
+    ],
+  },
+  {
+    id: 'mp_glacial_fragment',
+    name: 'Glacial Fragment',
+    outputId: null, // NAME_LOOKUP
+    outputIdName: 'Glacial Fragment',
+    outputCount: 4,
+    subcategory: 'Glacial',
+    inputs: [
+      ing(null, 8, 'Glacial Sliver'),
+      ing(null, 1, 'Mystic Binding Agent'),
+      ing(null, 1, 'Pile of Radiant Dust'),
+      ing(null, 1, 'Mystic Crystal'),
+    ],
+  },
+  {
+    id: 'mp_glacial_shard',
+    name: 'Glacial Shard',
+    outputId: null,
+    outputIdName: 'Glacial Shard',
+    outputCount: 1,
+    subcategory: 'Glacial',
+    inputs: [
+      ing(null, 2, 'Glacial Fragment'),
+      ing(null, 1, "Bottle of Elonian Wine"),
+      ing(null, 1, 'Pile of Luminous Dust'),
+      ing(null, 1, 'Mystic Crystal'),
+    ],
+  },
+  {
+    id: 'mp_glacial_core',
+    name: 'Glacial Core',
+    outputId: null,
+    outputIdName: 'Glacial Core',
+    outputCount: 1,
+    subcategory: 'Glacial',
+    inputs: [
+      ing(null, 2, 'Glacial Shard'),
+      ing(null, 1, "Bottle of Elonian Wine"),
+      ing(null, 1, 'Pile of Incandescent Dust'),
+      ing(null, 1, 'Mystic Crystal'),
+    ],
+  },
+  {
+    id: 'mp_glacial_lodestone',
+    name: 'Glacial Lodestone',
+    outputId: null,
+    outputIdName: 'Glacial Lodestone',
+    outputCount: 1,
+    subcategory: 'Glacial',
+    inputs: [
+      ing(null, 2, 'Glacial Core'),
+      ing(null, 1, "Bottle of Elonian Wine"),
+      ing(null, 1, 'Pile of Crystalline Dust'),
+      ing(null, 1, 'Mystic Crystal'),
+    ],
+  },
+  {
+    id: 'mp_molten_fragment',
+    name: 'Molten Fragment',
+    outputId: null, // NAME_LOOKUP
+    outputIdName: 'Molten Fragment',
+    outputCount: 4,
+    subcategory: 'Molten',
+    inputs: [
+      ing(null, 8, 'Molten Sliver'),
+      ing(null, 1, 'Mystic Binding Agent'),
+      ing(null, 1, 'Pile of Radiant Dust'),
+      ing(null, 1, 'Mystic Crystal'),
+    ],
+  },
+  {
+    id: 'mp_molten_shard',
+    name: 'Molten Shard',
+    outputId: null,
+    outputIdName: 'Molten Shard',
+    outputCount: 1,
+    subcategory: 'Molten',
+    inputs: [
+      ing(null, 2, 'Molten Fragment'),
+      ing(null, 1, "Bottle of Elonian Wine"),
+      ing(null, 1, 'Pile of Luminous Dust'),
+      ing(null, 1, 'Mystic Crystal'),
+    ],
+  },
+  {
+    id: 'mp_molten_core',
+    name: 'Molten Core',
+    outputId: null,
+    outputIdName: 'Molten Core',
+    outputCount: 1,
+    subcategory: 'Molten',
+    inputs: [
+      ing(null, 2, 'Molten Shard'),
+      ing(null, 1, "Bottle of Elonian Wine"),
+      ing(null, 1, 'Pile of Incandescent Dust'),
+      ing(null, 1, 'Mystic Crystal'),
+    ],
+  },
+  {
+    id: 'mp_molten_lodestone',
+    name: 'Molten Lodestone',
+    outputId: null,
+    outputIdName: 'Molten Lodestone',
+    outputCount: 1,
+    subcategory: 'Molten',
+    inputs: [
+      ing(null, 2, 'Molten Core'),
+      ing(null, 1, "Bottle of Elonian Wine"),
+      ing(null, 1, 'Pile of Crystalline Dust'),
+      ing(null, 1, 'Mystic Crystal'),
+    ],
+  },
+  {
+    id: 'mp_onyx_fragment',
+    name: 'Onyx Fragment',
+    outputId: null, // NAME_LOOKUP
+    outputIdName: 'Onyx Fragment',
+    outputCount: 4,
+    subcategory: 'Onyx',
+    inputs: [
+      ing(null, 8, 'Onyx Sliver'),
+      ing(null, 1, 'Mystic Binding Agent'),
+      ing(null, 1, 'Pile of Radiant Dust'),
+      ing(null, 1, 'Mystic Crystal'),
+    ],
+  },
+  {
+    id: 'mp_onyx_shard',
+    name: 'Onyx Shard',
+    outputId: null,
+    outputIdName: 'Onyx Shard',
+    outputCount: 1,
+    subcategory: 'Onyx',
+    inputs: [
+      ing(null, 2, 'Onyx Fragment'),
+      ing(null, 1, "Bottle of Elonian Wine"),
+      ing(null, 1, 'Pile of Luminous Dust'),
+      ing(null, 1, 'Mystic Crystal'),
+    ],
+  },
+  {
+    id: 'mp_onyx_core',
+    name: 'Onyx Core',
+    outputId: null,
+    outputIdName: 'Onyx Core',
+    outputCount: 1,
+    subcategory: 'Onyx',
+    inputs: [
+      ing(null, 2, 'Onyx Shard'),
+      ing(null, 1, "Bottle of Elonian Wine"),
+      ing(null, 1, 'Pile of Incandescent Dust'),
+      ing(null, 1, 'Mystic Crystal'),
+    ],
+  },
+  {
+    id: 'mp_onyx_lodestone',
+    name: 'Onyx Lodestone',
+    outputId: null,
+    outputIdName: 'Onyx Lodestone',
+    outputCount: 1,
+    subcategory: 'Onyx',
+    inputs: [
+      ing(null, 2, 'Onyx Core'),
+      ing(null, 1, "Bottle of Elonian Wine"),
+      ing(null, 1, 'Pile of Crystalline Dust'),
+      ing(null, 1, 'Mystic Crystal'),
+    ],
+  },
+  // ── Ascended crafting materials (Fractals of the Mists essence chain) ──────
+  // Also deterministic. Demotion recipes (the reverse direction, e.g. 1 Glob
+  // -> 3 Vials using a Master's Salvage Kit) exist too but aren't included
+  // here — this file only tracks promotion, matching everything else above.
+  {
+    id: 'mp_glob_of_coagulated_mists_essence',
+    name: 'Glob of Coagulated Mists Essence',
+    outputId: null,
+    outputIdName: 'Glob of Coagulated Mists Essence',
+    outputCount: 1,
+    subcategory: 'Ascended Essence',
+    inputs: [
+      ing(null, 5, 'Vial of Condensed Mists Essence'),
+      ing(null, 1, 'Glob of Ectoplasm'),
+      ing(null, 1, 'Mystic Coin'),
+      ing(null, 1, 'Pile of Crystalline Dust'),
+    ],
+  },
+  {
+    id: 'mp_shard_of_crystallized_mists_essence',
+    name: 'Shard of Crystallized Mists Essence',
+    outputId: null,
+    outputIdName: 'Shard of Crystallized Mists Essence',
+    outputCount: 1,
+    subcategory: 'Ascended Essence',
+    inputs: [
+      ing(null, 5, 'Glob of Coagulated Mists Essence'),
+      ing(null, 1, 'Glob of Ectoplasm'),
+      ing(null, 1, 'Mystic Coin'),
+      ing(null, 1, 'Pile of Crystalline Dust'),
     ],
   },
 ];

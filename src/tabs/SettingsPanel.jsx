@@ -188,7 +188,7 @@ export function SettingsPanel({
       <div style={{ fontSize: 12, color: "var(--text2)", marginTop: 8, paddingTop: 14, borderTop: "1px solid var(--border)" }}>
       <strong style={{ color: "var(--gold1)" }}>Rescan Auto-Unlocked Recipes</strong>
       <div style={{ fontSize: 11, color: "var(--text3)", marginBottom: 8, lineHeight: 1.6 }}>
-      A small number of recipes (e.g. Piece of Dragon Jade) never need to be "learned" — they become usable the moment a discipline hits the required rating. These never show up in the normal recipe refresh, so if you've leveled a discipline since your very first launch, run this to catch anything newly available. Can take a minute or two — it scans every recipe in the game.
+      A small number of recipes (e.g. Piece of Dragon Jade) never need to be "learned" — they become usable the moment a discipline hits the required rating. These never show up in the normal recipe refresh, so the app now checks for them automatically every few hours in the background. Click below for an on-demand check right now instead of waiting — takes a minute or two, since it scans every recipe in the game.
       </div>
       <button onClick={rescanAutoUnlockedRecipes} disabled={rescanningRecipes}
       style={{ fontSize: 11, color: "var(--gold2)", background: "transparent", border: "1px solid var(--border)", borderRadius: 3, padding: "5px 14px", cursor: rescanningRecipes ? "not-allowed" : "pointer", fontFamily: "Cinzel,serif", letterSpacing: 1, opacity: rescanningRecipes ? 0.5 : 1 }}>

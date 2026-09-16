@@ -17,6 +17,7 @@ import { DeleteFriendConfirmDialog } from "./tabs/DeleteFriendConfirmDialog.jsx"
 import { FlipMarketTab } from "./tabs/FlipMarketTab.jsx";
 import { TradingPostTab } from "./tabs/TradingPostTab.jsx";
 import { TimeGatedTab } from "./tabs/TimeGatedTab.jsx";
+import BossTimersTab from "./tabs/BossTimersTab.jsx";
 
 import { getRecipeDisciplines, dedupeRecipesById, DISCIPLINES, buildCraftItems } from "./lib/craftingCalc.js";
 import {
@@ -54,6 +55,7 @@ const RECIPE_REFRESH_MS = 4 * 60 * 60_000;
 const UPDATE_CHECK_MS = 4 * 60 * 60_000; // 4h — GitHub Releases doesn't need aggressive polling
 const GEM_QUANTITY_COPPER = 4_000_000; // 400g sample — coins_per_gem is stable enough at this size to extrapolate ×400
 const UNLEARNED_REFRESH_MS = 7 * 24 * 60 * 60_000; // weekly — full-catalog recipe ID diff for Unlearned Recipes tab
+const AUTO_UNLOCKED_RESCAN_MS = 4 * 60 * 60_000; // every 4h — background check for recipes newly usable purely from a discipline level crossing a threshold (see rescanAutoUnlockedRecipes)
 const FRIEND_REFRESH_MS = 24 * 60 * 60_000; // daily — friend recipes-known rarely changes, no need for tighter polling
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -995,10 +997,14 @@ export default function App() {
   // the one-time no-cache initial load. Once recipes are cached (i.e. every launch
   // after the very first), that scan never runs again — if a discipline crosses the
   // qualifying threshold afterward, the recipe is permanently invisible with no
-  // self-healing path. This is a manual, user-triggered re-scan (Settings button)
-  // rather than something run automatically on a timer, since it requires fetching
-  // and checking the full public recipe list — expensive to do silently every few hours.
+  // self-healing path. Runs automatically every AUTO_UNLOCKED_RESCAN_MS (see the
+  // scheduling effect below, which persists lastAutoUnlockedRescan so the wait
+  // between scans survives closing and reopening the app instead of restarting
+  // the full window on every launch) — still manually re-triggerable any time via
+  // the Settings button for an on-demand check.
   const [rescanningRecipes, setRescanningRecipes] = useState(false);
+  const rescanningRecipesRef = useRef(false);
+  useEffect(() => { rescanningRecipesRef.current = rescanningRecipes; }, [rescanningRecipes]);
   const rescanAutoUnlockedRecipes = useCallback(async () => {
     if (!cacheRef.current.itemMap || rescanningRecipes) return;
     setRescanningRecipes(true);
@@ -1020,6 +1026,15 @@ export default function App() {
         if ((r.flags || []).includes("LearnedFromItem")) return false;
         return r.disciplines.some(d => (disciplineLevels[d] || 0) >= (r.min_rating || 0));
       });
+
+      // Record that a scan just completed — regardless of whether it found anything
+      // new — so the next automatic scan (see the scheduling effect below) waits a
+      // fresh AUTO_UNLOCKED_RESCAN_MS from THIS run, not from whenever the app next
+      // happens to launch. Deliberately placed after the expensive fetch/filter above
+      // succeeds rather than in a finally block, so a network failure below doesn't
+      // get recorded as a completed scan and can retry sooner instead of waiting out
+      // the full interval.
+      cacheSet("lastAutoUnlockedRescan", Date.now());
 
       // Opportunistic seed for the Unlearned Recipes tab: this scan already fetched full
       // details for essentially every non-owned recipe — everything that DIDN'T qualify
@@ -1460,6 +1475,44 @@ export default function App() {
     return () => { clearInterval(waitForData); clearInterval(unlearnedInterval); };
   }, [loadState.phase]);
 
+  // Background schedule for rescanAutoUnlockedRecipes (see that function's own
+  // comment for what/why). Unlike the plain setInterval(..., UNLEARNED_REFRESH_MS)
+  // pattern above — which always waits a FULL fresh interval from whenever the app
+  // happens to launch, so time already waited before the last exit is lost — this
+  // self-reschedules against the persisted lastAutoUnlockedRescan timestamp every
+  // time, so the remaining wait survives closing and reopening the app: e.g. if 2 of
+  // the 4 hours had already passed when you quit, relaunching schedules the next
+  // scan for 2 hours from then, not a fresh 4.
+  useEffect(() => {
+    if (loadState.phase !== "done") return;
+    let cancelled = false;
+    let timeoutId;
+    const waitForData = setInterval(() => {
+      if (!dataReadyRef.current) return;
+      clearInterval(waitForData);
+      const scheduleNext = async () => {
+        if (cancelled) return;
+        const lastRunEntry = await cacheGet("lastAutoUnlockedRescan").catch(() => null);
+        const lastRun = lastRunEntry?.value || 0;
+        const delay = Math.max(0, AUTO_UNLOCKED_RESCAN_MS - (Date.now() - lastRun));
+        timeoutId = setTimeout(async () => {
+          if (cancelled) return;
+          // If a manual rescan (Settings button) happens to already be running,
+          // don't fire a second overlapping one — just check back shortly rather
+          // than busy-looping at delay≈0 until it finishes.
+          if (rescanningRecipesRef.current) {
+            timeoutId = setTimeout(scheduleNext, 5 * 60_000);
+            return;
+          }
+          await rescanAutoUnlockedRecipes();
+          scheduleNext();
+        }, delay);
+      };
+      scheduleNext();
+    }, 100);
+    return () => { cancelled = true; clearInterval(waitForData); clearTimeout(timeoutId); };
+  }, [loadState.phase, rescanAutoUnlockedRecipes]);
+
   // Once-daily background refresh of every added friend's known-recipe list.
   // Manual refresh (🔄 in Settings) is also always available — this just catches
   // friends up automatically without the user needing to remember to click it.
@@ -1844,8 +1897,9 @@ export default function App() {
   const timeGatedTabProps = useMemo(() => ({
     data, cacheRef, dailyCrafted, manualDailyCrafted, mySoldHistory,
     resetCountdown, weeklyKeyDone, setWeeklyKeyDone, extraDailyItems,
-    bossAlerts,
-  }), [data, dailyCrafted, manualDailyCrafted, mySoldHistory, resetCountdown, weeklyKeyDone, extraDailyItems, bossAlerts]);
+  }), [data, dailyCrafted, manualDailyCrafted, mySoldHistory, resetCountdown, weeklyKeyDone, extraDailyItems]);
+
+  const bossTimersTabProps = useMemo(() => ({ bossAlerts }), [bossAlerts]);
 
 
   // ── Render ───────────────────────────────────────────────────────────────────
@@ -2060,6 +2114,9 @@ export default function App() {
       <button className={`ntab${activeTab === "daily" ? " on" : ""}`} onClick={() => setActiveTab("daily")}>
       Time Gated
       </button>
+      <button className={`ntab${activeTab === "bosstimers" ? " on" : ""}`} onClick={() => setActiveTab("bosstimers")}>
+      ⏱ Boss Timers
+      </button>
       </div>
 
       {activeTab === "materials" && data && <MaterialsTab {...materialsTabProps} />}
@@ -2080,6 +2137,7 @@ export default function App() {
       {activeTab === "flipping" && data && <FlipMarketTab {...flipMarketTabProps} />}
       {activeTab === "listings" && data && <TradingPostTab {...tradingPostTabProps} />}
       {activeTab === "daily" && data && <TimeGatedTab {...timeGatedTabProps} />}
+      {activeTab === "bosstimers" && data && <BossTimersTab {...bossTimersTabProps} />}
       </>
     )}
     </div>

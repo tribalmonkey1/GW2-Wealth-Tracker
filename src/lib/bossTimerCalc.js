@@ -42,13 +42,22 @@ function parseHHMM(hhmm) {
 }
 
 // ── World boss fixed daily-time math ────────────────────────────────────────
-export function getNextSpawn(dailySpawnTimesUtc, nowMs) {
+// `inclusive` controls whether a spawn landing EXACTLY on nowMs counts as
+// still upcoming (true) or already happened (false, the default — used for
+// chaining below, see getUpcomingSpawns). The Timeline view's window filter
+// (TimelineRow) includes a slot whose time === origin ("s.time >= origin"),
+// but origin is itself snapped to a slot boundary, which is exactly where a
+// boss's own spawn time can land. Without an inclusive first lookup, that
+// occurrence got skipped ahead to its NEXT spawn before the Timeline ever
+// saw it, which is why the very first (leftmost/soonest) column could come
+// up empty even though a boss does spawn right at that instant.
+export function getNextSpawn(dailySpawnTimesUtc, nowMs, inclusive = false) {
   const now = new Date(nowMs);
   const y = now.getUTCFullYear(), mo = now.getUTCMonth(), d = now.getUTCDate();
 
   const candidatesToday = dailySpawnTimesUtc
     .map(t => { const { h, m } = parseHHMM(t); return Date.UTC(y, mo, d, h, m, 0); })
-    .filter(ts => ts > nowMs)
+    .filter(ts => (inclusive ? ts >= nowMs : ts > nowMs))
     .sort((a, b) => a - b);
 
   if (candidatesToday.length > 0) return candidatesToday[0];
@@ -64,27 +73,36 @@ export function getUpcomingSpawns(dailySpawnTimesUtc, nowMs, count) {
   const result = [];
   let cursor = nowMs;
   for (let i = 0; i < count; i++) {
-    cursor = getNextSpawn(dailySpawnTimesUtc, cursor);
+    // Only the very first lookup is inclusive of nowMs itself — every
+    // subsequent one chains off the spawn we just found, where strict
+    // "after" is what actually advances the cursor instead of returning
+    // the same timestamp forever.
+    cursor = getNextSpawn(dailySpawnTimesUtc, cursor, i === 0);
     result.push(cursor);
   }
   return result;
 }
 
 // ── Meta event repeating-cycle math ─────────────────────────────────────────
-export function getNextOccurrence(schedule, nowMs) {
+// Same `inclusive` reasoning as getNextSpawn above — see its comment.
+export function getNextOccurrence(schedule, nowMs, inclusive = false) {
   const cycleLengthMs = schedule.cycleLengthMin * ONE_MIN_MS;
   const cyclesElapsed = Math.floor((nowMs - CYCLE_EPOCH_MS) / cycleLengthMs);
   const currentCycleStart = CYCLE_EPOCH_MS + cyclesElapsed * cycleLengthMs;
   const candidate = currentCycleStart + schedule.offsetMin * ONE_MIN_MS;
-  // Exactly "now" counts as already happened, not still upcoming — strict >.
-  return candidate > nowMs ? candidate : candidate + cycleLengthMs;
+  // Exactly "now" counts as already happened, not still upcoming, UNLESS
+  // inclusive was requested (the Timeline's first-slot lookup) — strict >
+  // otherwise, same default as before.
+  const stillUpcoming = inclusive ? candidate >= nowMs : candidate > nowMs;
+  return stillUpcoming ? candidate : candidate + cycleLengthMs;
 }
 
 export function getUpcomingOccurrences(schedule, nowMs, count) {
   const result = [];
   let cursor = nowMs;
   for (let i = 0; i < count; i++) {
-    cursor = getNextOccurrence(schedule, cursor);
+    // Only the first lookup is inclusive — see getUpcomingSpawns' comment.
+    cursor = getNextOccurrence(schedule, cursor, i === 0);
     result.push(cursor);
   }
   return result;

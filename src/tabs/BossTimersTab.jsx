@@ -54,7 +54,9 @@ import {
 import { EXPANSION_ACCENT_COLORS, EXPANSION_ACCENT_FALLBACK, expansionSortKey } from "../lib/worldBossScheduleData.js";
 import { WORLD_BOSS_API_ID_TO_NAME } from "../lib/worldBossApiIds.js";
 import { apiFetch, BASE } from "../lib/gw2Api.js";
+import { getDailyResetTs } from "../lib/dailyCrafting.js";
 import { InteractivePopover } from "../components/InteractivePopover.jsx";
+import { copyWaypoint } from "../lib/clipboard.js";
 
 const CYCLES_AHEAD = 6;
 const TICK_MS = 1000;
@@ -115,8 +117,16 @@ function snapToLocalInterval(nowMs, intervalMin) {
   const snapped = Math.floor(d.getMinutes() / intervalMin) * intervalMin;
   return new Date(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours(), snapped, 0, 0).getTime();
 }
+// Completion "period" identity — now the same UTC-midnight reset boundary
+// Daily Crafting/Time Gated use (getDailyResetTs), instead of a separately
+// computed UTC-date string. Both landed on the same instant in practice,
+// but deriving it from one shared source means Boss Timers can't drift out
+// of sync with the rest of the app's dailies if that reset math ever
+// changes. getDailyResetTs() always reflects the actual current UTC day
+// (it doesn't take a nowMs param) — nowMs is accepted here only so every
+// call site below reads the same as before.
 function currentPeriod(nowMs) {
-  return new Date(nowMs).toISOString().slice(0, 10); // UTC calendar day
+  return getDailyResetTs();
 }
 
 // Greedy interval-scheduling lane packing: sort by horizontal start position,
@@ -206,6 +216,35 @@ function AutoTrackedBadge({ name }) {
   return <span title="Marked done automatically once GW2's API reports this boss killed for the day" style={{ fontSize: 9, opacity: .6, flexShrink: 0 }}>🔗</span>;
 }
 
+// Copy-to-clipboard button for a boss's waypoint chat-code. Mirrors the C#
+// reference app: hidden entirely when there's no fixed waypoint to copy
+// (e.g. Awakened Invasion, whose location rotates), and briefly swaps to a
+// checkmark after a successful copy instead of relying on a separate toast.
+function WaypointButton({ chatLink, name, fontSize = 13 }) {
+  const [copied, setCopied] = useState(false);
+  const timeoutRef = useRef(null);
+
+  useEffect(() => () => clearTimeout(timeoutRef.current), []);
+
+  if (!chatLink) return null;
+
+  const handleClick = async (e) => {
+    e.stopPropagation();
+    const ok = await copyWaypoint(chatLink);
+    if (ok) {
+      setCopied(true);
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = setTimeout(() => setCopied(false), 1500);
+    }
+  };
+
+  return (
+    <button className="bt-icon-btn" style={{ fontSize }}
+      title={copied ? `Copied waypoint for ${name}!` : `Copy waypoint for ${name}`}
+      onClick={handleClick}>{copied ? "✅" : "🗺️"}</button>
+  );
+}
+
 // ── Countdown view: one occurrence line ──
 function CountdownLine({ occ, now, alerts, setAlertLead, collections, onToggleMember, onCreateCollection, completions, currentPeriodStr, onToggleComplete }) {
   const msUntil = occ.spawnMs - now;
@@ -238,6 +277,7 @@ function CountdownLine({ occ, now, alerts, setAlertLead, collections, onToggleMe
             onClick={() => { setBellOpen(o => !o); setStarOpen(false); }}>🔔</button>
           <button ref={starRef} className={`bt-icon-btn${isFavorited ? " on" : ""}`} title="Save to a collection"
             onClick={() => { setStarOpen(o => !o); setBellOpen(false); }}>⭐</button>
+          <WaypointButton chatLink={occ.chatLink} name={occ.name} />
         </div>
       </div>
       <div className="bt-occ-time">
@@ -320,6 +360,7 @@ function TimelineOccLine({ occ, alerts, setAlertLead, collections, onToggleMembe
           onClick={e => { e.stopPropagation(); setBellOpen(o => !o); setStarOpen(false); }}>🔔</button>
         <button ref={starRef} className={`bt-icon-btn${isFavorited ? " on" : ""}`} style={{ fontSize: 11 }} title="Save to a collection"
           onClick={e => { e.stopPropagation(); setStarOpen(o => !o); setBellOpen(false); }}>⭐</button>
+        <WaypointButton chatLink={occ.chatLink} name={occ.name} fontSize={11} />
       </div>
 
       <AlertPopover anchorRef={bellRef} open={bellOpen} onClose={() => setBellOpen(false)} occ={occ} alerts={alerts} setAlertLead={setAlertLead} keyPrefix="tl-lead" />
