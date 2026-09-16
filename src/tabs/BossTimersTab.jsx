@@ -76,13 +76,14 @@ const MIN_BLOCK_WIDTH = 95; // floor so very short events (5-9 min) still fit th
 // of space, per design intent.
 const BLOCK_GAP_PX = 4;
 // Deliberate inset applied to BOTH sides of every block, so a block never
-// sits flush against its own start-time gridline. Uses the FULL gap value
-// per side (not half) — a block's own left/right margin should match what
-// you see as "the gap" next to it, whether that neighbor is a bare gridline
-// (isolated block) or another block. Two genuinely back-to-back blocks (no
-// real time gap between them) will show roughly double this as their
-// combined visual gap, since each contributes its own full inset.
-const BLOCK_INSET_PX = BLOCK_GAP_PX;
+// sits flush against its own start-time gridline. A block's own left/right
+// margin should match what you see as "the gap" next to it, whether that
+// neighbor is a bare gridline (isolated block) or another block. Two
+// genuinely back-to-back blocks (no real time gap between them) show double
+// this as their combined visual gap, since each contributes its own inset —
+// kept independent of BLOCK_GAP_PX (rather than reusing it directly) so the
+// two can be tuned separately now that they no longer need to match.
+const BLOCK_INSET_PX = 3;
 // Every timeline block now holds exactly one occurrence — same-start-time
 // events get their own lane instead of being crammed into one box (see
 // TimelineRow) — so a single fixed block height covers every lane. Matches
