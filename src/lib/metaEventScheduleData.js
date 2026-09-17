@@ -136,6 +136,11 @@ export const META_EVENT_SCHEDULE = [
   // ── Visions of Eternity ──
   { eventName: 'Hammerhart Rumble!', zoneName: 'Shipwreck Strand', expansion: 'Visions of Eternity', cycleLengthMin: TWO_HOUR, offsetMin: 40, chatLink: '[&BJEPAAA=]', durationMin: 20 },
   { eventName: 'Secrets of the Weald', zoneName: 'Starlit Weald', expansion: 'Visions of Eternity', cycleLengthMin: TWO_HOUR, offsetMin: 100, chatLink: '[&BJ4PAAA=]', durationMin: 35 },
+  // Shackles of the Ancients: starts 8:05 AM UTC-7 (= 15:05 UTC), every 2 hours, 25 min duration.
+  { eventName: 'Shackles of the Ancients', zoneName: "Eternity's Garden", expansion: 'Visions of Eternity', cycleLengthMin: TWO_HOUR, offsetMin: 905, chatLink: '[&BPwPAAA=]', durationMin: 25 },
+  // Depths of Cruelty: every 3 hours, UTC-7 start times 19:00/22:00/01:00/04:00/07:00/10:00/13:00/16:00
+  // (= 02:00 UTC anchor, offsetMin 120). Confirmed 30 min duration.
+  { eventName: 'Depths of Cruelty', zoneName: 'Leyspring Hollows', expansion: 'Visions of Eternity', cycleLengthMin: THREE_HOUR, offsetMin: 120, chatLink: '[&BDYQAAA=]', durationMin: 30 },
 
   // ── Public Instance — Convergences ──
   // Each expansion since Secrets of the Obscure has added its own
