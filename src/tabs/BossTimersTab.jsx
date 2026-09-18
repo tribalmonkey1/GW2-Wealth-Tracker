@@ -69,7 +69,18 @@ const HOURS_AHEAD = 3;
 const SLOT_COUNT = (HOURS_AHEAD * 60) / INTERVAL_MIN + 1;
 const COL_WIDTH = 200;
 const ROW_LABEL_WIDTH = 150;
-const FETCH_CYCLES = 8; // generous buffer, filtered down to the visible window
+// Generous buffer, filtered down to the visible window by TimelineRow/TimelineSection
+// (s.time >= origin && s.time < windowEnd). This is NOT "how many hours ahead" — it's
+// "how many distinct time-slots to keep" (see buildStackedSlots in bossTimerCalc.js,
+// which stops as soon as it has collected this many slots, regardless of how far into
+// the window those slots actually reach). A merged row/collection with several event
+// identities can burn through a small cap in well under HOURS_AHEAD once you count
+// every 15/20/30-min recurring event across all of them, which is why the Favorites
+// timeline used to visibly stop populating partway through the window even though the
+// timeline itself kept scrolling — 8 slots was enough to cover barely over an hour for
+// a busy list. Set high enough that even a Favorites list with many frequently-cycling
+// members can't exhaust it before reaching the end of the visible window.
+const FETCH_CYCLES = 60;
 const MIN_BLOCK_WIDTH = 95; // floor so very short events (5-9 min) still fit their checkbox/name/icons legibly
 // Single shared gap value used BOTH horizontally (the visual gap you see
 // between two back-to-back blocks, carved out of block width below) and
