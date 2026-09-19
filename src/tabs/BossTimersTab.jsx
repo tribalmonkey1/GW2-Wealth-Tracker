@@ -45,6 +45,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from "react"
 import {
   getUpcomingRowSeries, getUpcomingOccurrencesFor, getAllPossibleExpansions,
   formatCountdown, urgencyColor, ALERT_LEAD_OPTIONS_MIN, DEFAULT_DURATION_MIN,
+  slotVisibleInWindow,
 } from "../lib/bossTimerCalc.js";
 import {
   bossKey, loadFavoriteLists, saveFavoriteLists, nextDefaultFavoriteListName,
@@ -381,7 +382,12 @@ function TimelineOccLine({ occ, alerts, setAlertLead, collections, onToggleMembe
 }
 
 function TimelineRow({ row, origin, windowEnd, ...rest }) {
-  const rawSlots = row.slots.filter(s => s.time >= origin && s.time < windowEnd);
+  // slotVisibleInWindow (not a bare start-time check) so an event that started
+  // before `origin` but is still running stays visible instead of vanishing the
+  // instant the window's left edge ticks past its spawn time — see that
+  // function's comment for the exact symptoms this fixes (Palawadan missing
+  // entirely; Sunspear Uprising/Drakkar disappearing mid-countdown).
+  const rawSlots = row.slots.filter(s => slotVisibleInWindow(s, origin, windowEnd));
   // Timeline wants every occurrence as its OWN separate block — even when
   // several start at the exact same minute — rather than crammed together
   // as multiple stacked lines inside one box. row.slots groups same-minute
@@ -392,7 +398,7 @@ function TimelineRow({ row, origin, windowEnd, ...rest }) {
   // overlap in time, exactly like any other colliding pair already does.
   const positioned = rawSlots.flatMap(s => s.occurrences.map(occ => {
     const durationMin = occ.durationMin || DEFAULT_DURATION_MIN;
-    const left = ((s.time - origin) / INTERVAL_MS) * COL_WIDTH + BLOCK_INSET_PX;
+    let left = ((s.time - origin) / INTERVAL_MS) * COL_WIDTH + BLOCK_INSET_PX;
     // TRUE, time-accurate width — deliberately NOT floored to MIN_BLOCK_WIDTH
     // here. Lane assignment below must see real widths, or a short event
     // inflated past its actual duration looks like it overlaps whatever
@@ -400,7 +406,18 @@ function TimelineRow({ row, origin, windowEnd, ...rest }) {
     // Dragon's End's Preparations → Jade Maw), and gets wrongly split into
     // a separate lane. Legibility widening happens in a second pass below,
     // after lanes are already correctly assigned from true widths.
-    const width = Math.max(1, (durationMin / INTERVAL_MIN) * COL_WIDTH - BLOCK_INSET_PX * 2);
+    let width = Math.max(1, (durationMin / INTERVAL_MIN) * COL_WIDTH - BLOCK_INSET_PX * 2);
+    // An occurrence that started before `origin` (now visible thanks to
+    // slotVisibleInWindow above, since it's still running) computes a negative
+    // `left` — drawing it there would push the block off the track and into the
+    // row-label column. Clip its left edge to the track's own edge instead, and
+    // shrink the width by exactly however much got clipped so the block's RIGHT
+    // edge still lands at its true end time rather than overshooting.
+    if (left < BLOCK_INSET_PX) {
+      const clipped = BLOCK_INSET_PX - left;
+      width = Math.max(1, width - clipped);
+      left = BLOCK_INSET_PX;
+    }
     return { occurrences: [occ], left, width };
   }));
   // Real spawn times aren't aligned to the 15-minute column grid, and blocks
@@ -650,7 +667,7 @@ export default function BossTimersTab({ bossAlerts }) {
     const map = new Map();
     for (const row of timelineAllRows) {
       if (!effectiveSelectedAreas.has(row.expansion)) continue;
-      const hasVisibleSlot = row.slots.some(s => s.time >= origin && s.time < windowEnd);
+      const hasVisibleSlot = row.slots.some(s => slotVisibleInWindow(s, origin, windowEnd));
       if (!hasVisibleSlot) continue;
       if (!map.has(row.expansion)) map.set(row.expansion, []);
       map.get(row.expansion).push(row);
@@ -660,7 +677,7 @@ export default function BossTimersTab({ bossAlerts }) {
 
   const timelineCollectionSlots = useMemo(() => (
     activeList
-      ? getUpcomingOccurrencesFor(activeList.members, origin, FETCH_CYCLES).filter(s => s.time >= origin && s.time < windowEnd)
+      ? getUpcomingOccurrencesFor(activeList.members, origin, FETCH_CYCLES).filter(s => slotVisibleInWindow(s, origin, windowEnd))
       : []
   ), [activeList, origin, windowEnd]);
 

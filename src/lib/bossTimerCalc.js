@@ -153,6 +153,22 @@ function buildStackedSlots(occurrences, cyclesAhead) {
   return slots.slice(0, cyclesAhead);
 }
 
+// Whether a stacked slot has any presence in [windowStart, windowEnd) — either it
+// starts inside the window, or it started before windowStart but is still running
+// (the longest occurrence stacked into it hasn't finished yet). Checking only
+// `slot.time >= windowStart` (the Timeline view's original filter) drops an event
+// entirely the instant the window's start edge ticks past its spawn time, even
+// though the event itself is still going — that's what made an in-progress event
+// (Palawadan) fail to show up at all, and made others (Sunspear Uprising, Drakkar
+// and Spirits of the Wild) visibly disappear mid-countdown well before they
+// actually ended. A slot only stops being visible once its longest occurrence's
+// end time has actually passed, or once its start is beyond windowEnd.
+export function slotVisibleInWindow(slot, windowStart, windowEnd) {
+  if (slot.time >= windowEnd) return false;
+  const maxDurationMs = Math.max(...slot.occurrences.map(o => (o.durationMin || DEFAULT_DURATION_MIN) * ONE_MIN_MS));
+  return slot.time + maxDurationMs > windowStart;
+}
+
 // ── Main row-series builder (the "All" tab's data source) ──────────────────
 export function getUpcomingRowSeries(nowMs, cyclesAhead) {
   const fetchCount = cyclesAhead * OCCURRENCE_FETCH_MULTIPLIER;
