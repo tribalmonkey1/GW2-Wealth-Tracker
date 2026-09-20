@@ -17,11 +17,14 @@
  * getNextOccurrenceForName / getUpcomingOccurrencesFor and
  * bossTimerStorage's bossKey for where this lives.
  *
- * Completion (✓) is auto-detected for the 13 Core Tyria world bosses that
- * GW2's `/v2/account/worldbosses` endpoint tracks (the ones with a Hero's
- * Choice Chest) — see worldBossApiIds.js for exactly which ones and why the
- * rest of the schedule (meta events, Ley-Line Anomaly, HoT/PoF/EoD/SotO
- * metas, etc.) has no API-exposed completion signal and stays manual-only.
+ * Completion (✓) is auto-detected two ways: for the 13 Core Tyria world
+ * bosses that GW2's `/v2/account/worldbosses` endpoint tracks (see
+ * worldBossApiIds.js), and for 7 zone meta-chain finales that
+ * `/v2/account/mapchests` tracks via that zone's daily Hero's Choice Chest
+ * (see mapChestApiIds.js for exactly which ones, and why several zones with
+ * an ambiguous shared trigger are deliberately left out rather than guessed).
+ * Everything else in the schedule has no API-exposed completion signal and
+ * stays manual-only.
  *
  * Timeline blocks are sized proportionally to each event's real duration
  * (durationMin on the schedule entry — see worldBossScheduleData.js /
@@ -54,6 +57,7 @@ import {
 } from "../lib/bossTimerStorage.js";
 import { EXPANSION_ACCENT_COLORS, EXPANSION_ACCENT_FALLBACK, expansionSortKey } from "../lib/worldBossScheduleData.js";
 import { WORLD_BOSS_API_ID_TO_NAME } from "../lib/worldBossApiIds.js";
+import { MAP_CHEST_API_IDS, MAP_CHEST_ID_TO_NAME } from "../lib/mapChestApiIds.js";
 import { apiFetch, BASE } from "../lib/gw2Api.js";
 import { getDailyResetTs } from "../lib/dailyCrafting.js";
 import { InteractivePopover } from "../components/InteractivePopover.jsx";
@@ -62,6 +66,7 @@ import { copyWaypoint } from "../lib/clipboard.js";
 const CYCLES_AHEAD = 6;
 const TICK_MS = 1000;
 const WORLD_BOSS_POLL_MS = 2 * 60_000; // /v2/account/worldbosses only changes on kill or daily reset — no need to hammer it
+const MAP_CHEST_POLL_MS = 2 * 60_000; // /v2/account/mapchests — same reasoning, only changes on claim or daily reset
 
 // ── Timeline-view constants ──
 const INTERVAL_MIN = 15;
@@ -224,8 +229,13 @@ function CollectionPopover({ anchorRef, open, onClose, occ, collections, onToggl
 }
 
 function AutoTrackedBadge({ name }) {
-  if (!WORLD_BOSS_API_ID_TO_NAME[name]) return null;
-  return <span title="Marked done automatically once GW2's API reports this boss killed for the day" style={{ fontSize: 9, opacity: .6, flexShrink: 0 }}>🔗</span>;
+  const viaWorldBoss = !!WORLD_BOSS_API_ID_TO_NAME[name];
+  const viaMapChest = !!MAP_CHEST_API_IDS[name];
+  if (!viaWorldBoss && !viaMapChest) return null;
+  const title = viaWorldBoss
+    ? "Marked done automatically once GW2's API reports this boss killed for the day"
+    : "Marked done automatically once GW2's API reports this zone's daily Hero's Choice Chest claimed";
+  return <span title={title} style={{ fontSize: 9, opacity: .6, flexShrink: 0 }}>🔗</span>;
 }
 
 // Copy-to-clipboard button for a boss's waypoint chat-code. Mirrors the C#
@@ -566,6 +576,35 @@ export default function BossTimersTab({ bossAlerts }) {
     };
     poll();
     const t = setInterval(poll, WORLD_BOSS_POLL_MS);
+    return () => { cancelled = true; clearInterval(t); };
+  }, []);
+
+  // ── GW2 API auto-completion for zone Hero's Choice Chests (see mapChestApiIds.js
+  // for exactly which events this covers and why several zones are deliberately
+  // left out — same poll/dedup pattern as the world-boss effect above, just against
+  // /v2/account/mapchests instead of /v2/account/worldbosses. ──
+  useEffect(() => {
+    let cancelled = false;
+    const poll = async () => {
+      let claimed;
+      try { claimed = await apiFetch(`${BASE}/account/mapchests`); } catch { return; }
+      if (cancelled || !Array.isArray(claimed) || claimed.length === 0) return;
+      const claimedNames = claimed.map(id => MAP_CHEST_ID_TO_NAME[id]).filter(Boolean);
+      if (claimedNames.length === 0) return;
+      setCompletions(prev => {
+        const period = currentPeriod(Date.now());
+        let changed = false;
+        const next = { ...prev };
+        for (const name of claimedNames) {
+          if (next[name]?.period !== period) { next[name] = { period, auto: true }; changed = true; }
+        }
+        if (!changed) return prev;
+        saveCompletions(next);
+        return next;
+      });
+    };
+    poll();
+    const t = setInterval(poll, MAP_CHEST_POLL_MS);
     return () => { cancelled = true; clearInterval(t); };
   }, []);
 
