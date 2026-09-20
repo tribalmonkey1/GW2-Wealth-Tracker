@@ -155,8 +155,11 @@ export const META_EVENT_SCHEDULE = [
   { eventName: 'Outer Nayos', zoneName: 'Convergence', expansion: 'Public Instance', cycleLengthMin: THREE_HOUR, offsetMin: 90, chatLink: null, durationMin: 10 },
   // Opens every 3 hours at :00, UTC-7 anchor 18:00 (= 01:00 UTC) — offsetMin
   // 60 puts occurrences at 01:00, 04:00, 07:00, ... UTC. Runs 10 minutes,
-  // same as the other two Convergences. No chatLink known yet.
-  { eventName: 'Nexus of Eternity (Public)', zoneName: 'Convergence', expansion: 'Public Instance', cycleLengthMin: THREE_HOUR, offsetMin: 60, chatLink: null, durationMin: 10 },
+  // same as the other two Convergences. NOTE: chatLink [&BDYQAAA=] is the
+  // same code already used above for Depths of Cruelty (Leyspring Hollows) —
+  // Derrick provided this value directly; flagged here in case it was a
+  // copy/paste mix-up on his end, but used as given either way.
+  { eventName: 'Nexus of Eternity (Public)', zoneName: 'Convergence', expansion: 'Public Instance', cycleLengthMin: THREE_HOUR, offsetMin: 60, chatLink: '[&BDYQAAA=]', durationMin: 10 },
 
   // ── Special Events (seasonal) ──
   //
