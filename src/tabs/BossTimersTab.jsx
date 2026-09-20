@@ -60,7 +60,7 @@ import {
   loadAreasSelection, saveAreasSelection, loadViewMode, saveViewMode,
 } from "../lib/bossTimerStorage.js";
 import { EXPANSION_ACCENT_COLORS, EXPANSION_ACCENT_FALLBACK, expansionSortKey } from "../lib/worldBossScheduleData.js";
-import { WORLD_BOSS_API_ID_TO_NAME } from "../lib/worldBossApiIds.js";
+import { WORLD_BOSS_API_IDS, WORLD_BOSS_API_ID_TO_NAME } from "../lib/worldBossApiIds.js";
 import { MAP_CHEST_API_IDS, MAP_CHEST_ID_TO_NAME } from "../lib/mapChestApiIds.js";
 import { apiFetch, BASE } from "../lib/gw2Api.js";
 import { getDailyResetTs } from "../lib/dailyCrafting.js";
@@ -70,6 +70,11 @@ import { copyWaypoint } from "../lib/clipboard.js";
 const CYCLES_AHEAD = 6;
 const TICK_MS = 1000;
 const WORLD_BOSS_POLL_MS = 2 * 60_000; // /v2/account/worldbosses only changes on kill or daily reset — no need to hammer it
+// Master switch for every automatic completion source (the two GW2 API polls and the
+// material-count heuristic below). OFF = completions are purely manual checkboxes that
+// reset at 00:00 UTC (5 PM PDT / 4 PM PST). Either way, ALL completions (manual and
+// auto) are cleared at that reset by the sweep effect further down.
+const AUTO_COMPLETION_ENABLED = true;
 const MAP_CHEST_POLL_MS = 2 * 60_000; // /v2/account/mapchests — same reasoning, only changes on claim or daily reset
 
 // ── Heuristic auto-completion via material-count delta ──────────────────────
@@ -174,6 +179,24 @@ function currentPeriod(nowMs) {
   return getDailyResetTs();
 }
 
+// Applies one API poll's result to the completions map. Stamps every reported name as
+// done for the current period, and un-stamps any API-managed name that was AUTO-stamped
+// for this period but is no longer reported — so a stale or wrong earlier response can't
+// leave a box stuck checked. Manual checks (no `auto` flag) are never touched.
+function reconcileApiCompletions(prev, managedNames, reportedNames, period) {
+  const next = { ...prev };
+  let changed = false;
+  for (const name of reportedNames) {
+    if (next[name]?.period !== period) { next[name] = { period, auto: true }; changed = true; }
+  }
+  for (const name of managedNames) {
+    if (!reportedNames.has(name) && next[name]?.auto && next[name].period === period) {
+      delete next[name]; changed = true;
+    }
+  }
+  return changed ? next : prev;
+}
+
 // Greedy interval-scheduling lane packing: sort by horizontal start position,
 // place each block in the first lane whose last-placed block doesn't
 // horizontally overlap it, otherwise open a new lane. `items` must already
@@ -257,7 +280,8 @@ function CollectionPopover({ anchorRef, open, onClose, occ, collections, onToggl
 }
 
 function AutoTrackedBadge({ name }) {
-  const viaWorldBoss = !!WORLD_BOSS_API_ID_TO_NAME[name];
+  if (!AUTO_COMPLETION_ENABLED) return null;
+  const viaWorldBoss = !!WORLD_BOSS_API_IDS[name];
   const viaMapChest = !!MAP_CHEST_API_IDS[name];
   const viaMaterial = MATERIAL_REWARD_TRACKERS.find(t => t.eventName === name);
   if (!viaWorldBoss && !viaMapChest && !viaMaterial) return null;
@@ -599,58 +623,48 @@ export default function BossTimersTab({ bossAlerts, ownedMap = {} }) {
 
   // ── GW2 API auto-completion for the 13 world bosses that expose it ──
   useEffect(() => {
+    if (!loaded || !AUTO_COMPLETION_ENABLED) return; // wait for saved completions to load first, or a poll could overwrite them
     let cancelled = false;
     const poll = async () => {
       let killed;
-      try { killed = await apiFetch(`${BASE}/account/worldbosses`); } catch { return; }
-      if (cancelled || !Array.isArray(killed) || killed.length === 0) return;
-      const killedNames = killed.map(id => WORLD_BOSS_API_ID_TO_NAME[id]).filter(Boolean);
-      if (killedNames.length === 0) return;
+      // cache:"no-store" — the webview's HTTP cache can otherwise hand back an old response
+      // (same URL every poll), which would re-stamp yesterday's kills as today's.
+      try { killed = await apiFetch(`${BASE}/account/worldbosses`, { cache: "no-store" }); } catch { return; }
+      if (cancelled || !Array.isArray(killed)) return;
+      const reported = new Set(killed.map(id => WORLD_BOSS_API_ID_TO_NAME[id]).filter(Boolean));
       setCompletions(prev => {
-        const period = currentPeriod(Date.now());
-        let changed = false;
-        const next = { ...prev };
-        for (const name of killedNames) {
-          if (next[name]?.period !== period) { next[name] = { period, auto: true }; changed = true; }
-        }
-        if (!changed) return prev;
-        saveCompletions(next);
+        const next = reconcileApiCompletions(prev, Object.keys(WORLD_BOSS_API_IDS), reported, currentPeriod(Date.now()));
+        if (next !== prev) saveCompletions(next);
         return next;
       });
     };
     poll();
     const t = setInterval(poll, WORLD_BOSS_POLL_MS);
     return () => { cancelled = true; clearInterval(t); };
-  }, []);
+  }, [loaded]);
 
   // ── GW2 API auto-completion for zone Hero's Choice Chests (see mapChestApiIds.js
   // for exactly which events this covers and why several zones are deliberately
   // left out — same poll/dedup pattern as the world-boss effect above, just against
   // /v2/account/mapchests instead of /v2/account/worldbosses. ──
   useEffect(() => {
+    if (!loaded || !AUTO_COMPLETION_ENABLED) return;
     let cancelled = false;
     const poll = async () => {
       let claimed;
-      try { claimed = await apiFetch(`${BASE}/account/mapchests`); } catch { return; }
-      if (cancelled || !Array.isArray(claimed) || claimed.length === 0) return;
-      const claimedNames = claimed.map(id => MAP_CHEST_ID_TO_NAME[id]).filter(Boolean);
-      if (claimedNames.length === 0) return;
+      try { claimed = await apiFetch(`${BASE}/account/mapchests`, { cache: "no-store" }); } catch { return; }
+      if (cancelled || !Array.isArray(claimed)) return;
+      const reported = new Set(claimed.map(id => MAP_CHEST_ID_TO_NAME[id]).filter(Boolean));
       setCompletions(prev => {
-        const period = currentPeriod(Date.now());
-        let changed = false;
-        const next = { ...prev };
-        for (const name of claimedNames) {
-          if (next[name]?.period !== period) { next[name] = { period, auto: true }; changed = true; }
-        }
-        if (!changed) return prev;
-        saveCompletions(next);
+        const next = reconcileApiCompletions(prev, Object.keys(MAP_CHEST_API_IDS), reported, currentPeriod(Date.now()));
+        if (next !== prev) saveCompletions(next);
         return next;
       });
     };
     poll();
     const t = setInterval(poll, MAP_CHEST_POLL_MS);
     return () => { cancelled = true; clearInterval(t); };
-  }, []);
+  }, [loaded]);
 
   // ── Heuristic auto-completion via material-count delta (see
   // MATERIAL_REWARD_TRACKERS above for what this covers and its tradeoffs) ──
@@ -660,6 +674,7 @@ export default function BossTimersTab({ bossAlerts, ownedMap = {} }) {
   // call of its own — it only reacts to data the app is already fetching.
   const materialBaselineRef = useRef({}); // eventName -> { occurrenceSpawnMs, baselineCount, confirmed }
   useEffect(() => {
+    if (!AUTO_COMPLETION_ENABLED) return;
     for (const tracker of MATERIAL_REWARD_TRACKERS) {
       const occSpawnMs = getMostRecentOccurrenceForName(tracker.eventName, now);
       if (occSpawnMs == null) continue; // this event isn't in (or seasonally active in) the schedule at all
@@ -759,6 +774,24 @@ export default function BossTimersTab({ bossAlerts, ownedMap = {} }) {
     });
   }, []);
 
+  // Reset sweep. Whenever the period rolls over (00:00 UTC), or on load if the saved data is
+  // from an earlier period, drop every completion that isn't for the current period. Display
+  // already ignores stale periods; this also removes them from storage. While auto-completion
+  // is off it also drops any leftover auto-stamped entries (from the API polls / heuristic),
+  // so a wrongly-checked box from before this change clears itself.
+  useEffect(() => {
+    if (!loaded) return;
+    setCompletions(prev => {
+      const stale = Object.keys(prev).filter(k =>
+        prev[k]?.period !== currentPeriodStr || (!AUTO_COMPLETION_ENABLED && prev[k]?.auto));
+      if (stale.length === 0) return prev;
+      const next = { ...prev };
+      stale.forEach(k => delete next[k]);
+      saveCompletions(next);
+      return next;
+    });
+  }, [loaded, currentPeriodStr]);
+
   const cellProps = {
     now, alerts, setAlertLead, collections, onToggleMember: handleToggleMember, onCreateCollection: handleCreateCollection,
     completions, currentPeriodStr, onToggleComplete: handleToggleComplete,
@@ -823,7 +856,7 @@ export default function BossTimersTab({ bossAlerts, ownedMap = {} }) {
           👁 View: {viewMode === "countdown" ? "Countdown" : "Timeline"} ▾
         </button>
         <div style={{ marginLeft: "auto", fontSize: 11, color: "var(--text3)", fontFamily: "Cinzel,serif", letterSpacing: 1 }}>
-          ✓ marks done for today · 🔔 sets an alert · ⭐ saves to a collection · 🔗 auto-tracked via API
+          ✓ marks done until reset ({new Date(currentPeriodStr + 86400000).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}) · 🔔 sets an alert · ⭐ saves to a collection{AUTO_COMPLETION_ENABLED && " · 🔗 auto-tracked via API"}
         </div>
       </div>
 

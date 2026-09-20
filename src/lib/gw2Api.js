@@ -11,10 +11,10 @@ export { BASE };
 export const chunk = (arr, size) =>
 Array.from({ length: Math.ceil(arr.length / size) }, (_, i) => arr.slice(i * size, i * size + size));
 
-export async function apiFetch(url) {
+export async function apiFetch(url, options = {}) {
   const sep = url.includes("?") ? "&" : "?";
   const key = window.__gw2ApiKey || "";
-  const res = await fetch(`${url}${sep}access_token=${key}`);
+  const res = await fetch(`${url}${sep}access_token=${key}`, options);
   if (!res.ok) throw new Error(`API error ${res.status}`);
   return res.json();
 }
