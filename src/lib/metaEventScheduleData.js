@@ -23,10 +23,10 @@
  * applied there.
  *
  * Convergences are grouped under a "Public Instance" expansion / "Convergence"
- * zone (Mount Balrior, Outer Nayos) rather than filed under whichever
- * expansion introduced them — see that section below. The original SotO
- * Convergence ("Convergences (Public)" at Amnytas) hasn't been moved into
- * that bucket, only these two.
+ * zone (Mount Balrior, Outer Nayos, Nexus of Eternity) rather than filed
+ * under whichever expansion introduced them — see that section below. The
+ * original SotO Convergence ("Convergences (Public)" at Amnytas) hasn't been
+ * moved into that bucket, only these three.
  *
  * Special Events (seasonal festivals) still need real-world active windows:
  * Dragon Bash now has confirmed 2026 dates (June 2–23, verified via GW2
@@ -148,11 +148,15 @@ export const META_EVENT_SCHEDULE = [
   // expansion / "Convergence" zone bucket rather than filed under whichever
   // expansion happened to introduce it, since Derrick thinks of them as one
   // family of content. (The original SotO one, "Convergences (Public)" at
-  // Amnytas above, hasn't been moved into this bucket — only these two.)
+  // Amnytas above, hasn't been moved into this bucket — only these three.)
   { eventName: 'Mount Balrior', zoneName: 'Convergence', expansion: 'Public Instance', cycleLengthMin: THREE_HOUR, offsetMin: 0, chatLink: '[&BK4OAAA=]', durationMin: 10 },
   // Opens every 3 hours at :30, UTC-7 anchor 18:30 (= 01:30 UTC) — offsetMin
   // 90 puts occurrences at 01:30, 04:30, 07:30, ... UTC.
   { eventName: 'Outer Nayos', zoneName: 'Convergence', expansion: 'Public Instance', cycleLengthMin: THREE_HOUR, offsetMin: 90, chatLink: null, durationMin: 10 },
+  // Opens every 3 hours at :00, UTC-7 anchor 18:00 (= 01:00 UTC) — offsetMin
+  // 60 puts occurrences at 01:00, 04:00, 07:00, ... UTC. Runs 10 minutes,
+  // same as the other two Convergences. No chatLink known yet.
+  { eventName: 'Nexus of Eternity (Public)', zoneName: 'Convergence', expansion: 'Public Instance', cycleLengthMin: THREE_HOUR, offsetMin: 60, chatLink: null, durationMin: 10 },
 
   // ── Special Events (seasonal) ──
   //
