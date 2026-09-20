@@ -1899,7 +1899,12 @@ export default function App() {
     resetCountdown, weeklyKeyDone, setWeeklyKeyDone, extraDailyItems,
   }), [data, dailyCrafted, manualDailyCrafted, mySoldHistory, resetCountdown, weeklyKeyDone, extraDailyItems]);
 
-  const bossTimersTabProps = useMemo(() => ({ bossAlerts }), [bossAlerts]);
+  // ownedMap keyed narrowly on data?.ownedMap itself (not the whole data object,
+  // which changes on every unrelated update — prices, listings, gold, etc.) so
+  // BossTimersTab only re-renders when materials actually refresh. Feeds the
+  // Mystic Coin / Ley-Line Anomaly material-delta auto-completion heuristic —
+  // see MATERIAL_REWARD_TRACKERS in BossTimersTab.jsx.
+  const bossTimersTabProps = useMemo(() => ({ bossAlerts, ownedMap: data?.ownedMap }), [bossAlerts, data?.ownedMap]);
 
 
   // ── Render ───────────────────────────────────────────────────────────────────

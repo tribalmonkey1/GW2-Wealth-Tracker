@@ -17,14 +17,18 @@
  * getNextOccurrenceForName / getUpcomingOccurrencesFor and
  * bossTimerStorage's bossKey for where this lives.
  *
- * Completion (✓) is auto-detected two ways: for the 13 Core Tyria world
+ * Completion (✓) is auto-detected three ways: for the 13 Core Tyria world
  * bosses that GW2's `/v2/account/worldbosses` endpoint tracks (see
- * worldBossApiIds.js), and for 7 zone meta-chain finales that
+ * worldBossApiIds.js); for 7 zone meta-chain finales that
  * `/v2/account/mapchests` tracks via that zone's daily Hero's Choice Chest
  * (see mapChestApiIds.js for exactly which ones, and why several zones with
- * an ambiguous shared trigger are deliberately left out rather than guessed).
- * Everything else in the schedule has no API-exposed completion signal and
- * stays manual-only.
+ * an ambiguous shared trigger are deliberately left out rather than guessed);
+ * and, for events with no dedicated API signal at all, a best-effort
+ * heuristic that watches for a specific reward material's owned count
+ * increasing during the event's window (+ a grace period) — see
+ * MATERIAL_REWARD_TRACKERS below (currently just Ley-Line Anomaly's
+ * guaranteed Mystic Coin). Everything else in the schedule has no usable
+ * completion signal at all and stays manual-only.
  *
  * Timeline blocks are sized proportionally to each event's real duration
  * (durationMin on the schedule entry — see worldBossScheduleData.js /
@@ -48,7 +52,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from "react"
 import {
   getUpcomingRowSeries, getUpcomingOccurrencesFor, getAllPossibleExpansions,
   formatCountdown, urgencyColor, ALERT_LEAD_OPTIONS_MIN, DEFAULT_DURATION_MIN,
-  slotVisibleInWindow,
+  slotVisibleInWindow, getMostRecentOccurrenceForName, getEventDurationMin,
 } from "../lib/bossTimerCalc.js";
 import {
   bossKey, loadFavoriteLists, saveFavoriteLists, nextDefaultFavoriteListName,
@@ -67,6 +71,30 @@ const CYCLES_AHEAD = 6;
 const TICK_MS = 1000;
 const WORLD_BOSS_POLL_MS = 2 * 60_000; // /v2/account/worldbosses only changes on kill or daily reset — no need to hammer it
 const MAP_CHEST_POLL_MS = 2 * 60_000; // /v2/account/mapchests — same reasoning, only changes on claim or daily reset
+
+// ── Heuristic auto-completion via material-count delta ──────────────────────
+// A handful of recurring events reliably drop a specific, identifiable
+// material every time they're completed, even though GW2 exposes no
+// dedicated API completion flag for them (unlike the 13 world bosses or the
+// mapchest-tracked zone finales — see worldBossApiIds.js / mapChestApiIds.js).
+// For these, the app takes its own snapshot of the account's owned count for
+// that material as soon as it notices the event's window has opened, then
+// compares against the current count through the end of that window plus
+// `graceMinutes` (to absorb the API's own lag in reflecting a just-picked-up
+// material) — an increase means the reward was very likely collected.
+//
+// This is a best-effort HEURISTIC, not a real completion signal: the same
+// material can come from other sources too (other events, salvaging, login
+// rewards, trading) inside that same short window, so an increase doesn't
+// PROVE this specific event was the source — it's an inference the person
+// explicitly asked for despite that tradeoff. Kept to short, low-traffic
+// windows (20 min event + 5 min grace, for Ley-Line Anomaly) to minimize
+// coincidental false positives. ownedMap (passed down from App.jsx) is the
+// same combined bank-storage + all-characters'-bags total the rest of the
+// app already treats as "what you own" — not a separate, narrower fetch.
+const MATERIAL_REWARD_TRACKERS = [
+  { eventName: 'Ley-Line Anomaly', itemId: 19976, itemName: 'Mystic Coin', graceMinutes: 5 },
+];
 
 // ── Timeline-view constants ──
 const INTERVAL_MIN = 15;
@@ -231,10 +259,13 @@ function CollectionPopover({ anchorRef, open, onClose, occ, collections, onToggl
 function AutoTrackedBadge({ name }) {
   const viaWorldBoss = !!WORLD_BOSS_API_ID_TO_NAME[name];
   const viaMapChest = !!MAP_CHEST_API_IDS[name];
-  if (!viaWorldBoss && !viaMapChest) return null;
+  const viaMaterial = MATERIAL_REWARD_TRACKERS.find(t => t.eventName === name);
+  if (!viaWorldBoss && !viaMapChest && !viaMaterial) return null;
   const title = viaWorldBoss
     ? "Marked done automatically once GW2's API reports this boss killed for the day"
-    : "Marked done automatically once GW2's API reports this zone's daily Hero's Choice Chest claimed";
+    : viaMapChest
+    ? "Marked done automatically once GW2's API reports this zone's daily Hero's Choice Chest claimed"
+    : `Best-effort: marked done automatically if your ${viaMaterial.itemName} count goes up during this event's window (+${viaMaterial.graceMinutes} min grace) — not a guaranteed signal, since that material can come from other sources too`;
   return <span title={title} style={{ fontSize: 9, opacity: .6, flexShrink: 0 }}>🔗</span>;
 }
 
@@ -513,7 +544,7 @@ function TimelineSection({ expansion, rows, origin, windowEnd, nowLineLeft, coll
   );
 }
 
-export default function BossTimersTab({ bossAlerts }) {
+export default function BossTimersTab({ bossAlerts, ownedMap = {} }) {
   const { alerts, setAlertLead, soundSettings, setSoundSettings } = bossAlerts;
   const [now, setNow] = useState(Date.now());
   const [collections, setCollections] = useState([]);
@@ -607,6 +638,47 @@ export default function BossTimersTab({ bossAlerts }) {
     const t = setInterval(poll, MAP_CHEST_POLL_MS);
     return () => { cancelled = true; clearInterval(t); };
   }, []);
+
+  // ── Heuristic auto-completion via material-count delta (see
+  // MATERIAL_REWARD_TRACKERS above for what this covers and its tradeoffs) ──
+  // Re-evaluated on every `now` tick (cheap — a handful of comparisons against
+  // a one-entry array today) AND whenever `ownedMap` itself changes (a fresh
+  // materials/inventory fetch from App.jsx's normal refresh cycle). No network
+  // call of its own — it only reacts to data the app is already fetching.
+  const materialBaselineRef = useRef({}); // eventName -> { occurrenceSpawnMs, baselineCount, confirmed }
+  useEffect(() => {
+    for (const tracker of MATERIAL_REWARD_TRACKERS) {
+      const occSpawnMs = getMostRecentOccurrenceForName(tracker.eventName, now);
+      if (occSpawnMs == null) continue; // this event isn't in (or seasonally active in) the schedule at all
+      const durationMin = getEventDurationMin(tracker.eventName);
+      const windowEndMs = occSpawnMs + durationMin * 60_000 + tracker.graceMinutes * 60_000;
+      if (now > windowEndMs) continue; // too late for this occurrence — leave it manual-only, wait for the next one
+      const curCount = ownedMap[tracker.itemId] || 0;
+      const existing = materialBaselineRef.current[tracker.eventName];
+      if (!existing || existing.occurrenceSpawnMs !== occSpawnMs) {
+        // First time we've observed this occurrence — baseline against
+        // whatever we currently own. Same "capture baseline the moment we
+        // notice a new period started" approach dailyCrafting.js's
+        // recordManualDailyBaseline already uses for other count-delta
+        // tracking, with the same accepted caveat: if the app only starts
+        // polling partway into the window, a reward collected in the gap
+        // before this first observation won't be caught.
+        materialBaselineRef.current[tracker.eventName] = { occurrenceSpawnMs: occSpawnMs, baselineCount: curCount, confirmed: false };
+        continue;
+      }
+      if (existing.confirmed) continue; // already marked done for this occurrence
+      if (curCount > existing.baselineCount) {
+        existing.confirmed = true;
+        setCompletions(prev => {
+          const period = currentPeriod(Date.now());
+          if (prev[tracker.eventName]?.period === period) return prev; // already done today via some other path
+          const next = { ...prev, [tracker.eventName]: { period, auto: true } };
+          saveCompletions(next);
+          return next;
+        });
+      }
+    }
+  }, [now, ownedMap]);
 
   const allExpansions = useMemo(() => getAllPossibleExpansions(), []);
   const effectiveSelectedAreas = selectedAreas || new Set(allExpansions);

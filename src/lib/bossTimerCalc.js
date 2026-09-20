@@ -320,3 +320,46 @@ export function getNextOccurrenceForName(name, nowMs) {
   }
   return best;
 }
+
+// ── Most-recent-PAST-occurrence lookup (for material-delta auto-completion) ─
+// The inverse of getNextOccurrenceForName above: returns the START time of
+// the most recent occurrence of a named meta event that has ALREADY BEGUN
+// (its cycle-relative spawn time is <= nowMs), across every zone sharing that
+// name — or null if nothing in META_EVENT_SCHEDULE matches or is currently
+// seasonally active. Used to answer "did this event's window (plus a grace
+// period) already open, and if so when" for heuristics that watch for a
+// reward material appearing rather than relying on a dedicated GW2 API
+// completion flag (see MATERIAL_REWARD_TRACKERS in BossTimersTab.jsx).
+// World bosses aren't covered here — nothing needs it for them yet; extend
+// the same way (walking dailySpawnTimesUtc backwards) if that ever changes.
+export function getMostRecentOccurrenceForName(name, nowMs) {
+  let best = null;
+  for (const schedule of META_EVENT_SCHEDULE) {
+    if (schedule.eventName !== name) continue;
+    if (!isMetaEventActive(schedule, nowMs)) continue;
+    const cycleLengthMs = schedule.cycleLengthMin * ONE_MIN_MS;
+    const cyclesElapsed = Math.floor((nowMs - CYCLE_EPOCH_MS) / cycleLengthMs);
+    const currentCycleStart = CYCLE_EPOCH_MS + cyclesElapsed * cycleLengthMs;
+    const candidate = currentCycleStart + schedule.offsetMin * ONE_MIN_MS;
+    // If this cycle's occurrence hasn't happened yet, the most recent one was
+    // last cycle's — same "step back one cycle length" logic getNextOccurrence
+    // uses to step forward, just in the other direction.
+    const mostRecent = candidate <= nowMs ? candidate : candidate - cycleLengthMs;
+    if (best === null || mostRecent > best) best = mostRecent;
+  }
+  return best;
+}
+
+// Longest confirmed duration (minutes) among schedule entries sharing this
+// event name — mirrors the "use the longest stacked occurrence" convention
+// slotVisibleInWindow already uses for Timeline block sizing. Falls back to
+// DEFAULT_DURATION_MIN if the name matches nothing.
+export function getEventDurationMin(name) {
+  let max = null;
+  for (const schedule of META_EVENT_SCHEDULE) {
+    if (schedule.eventName !== name) continue;
+    const d = schedule.durationMin || DEFAULT_DURATION_MIN;
+    if (max === null || d > max) max = d;
+  }
+  return max ?? DEFAULT_DURATION_MIN;
+}
