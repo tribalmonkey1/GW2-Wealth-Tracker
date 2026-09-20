@@ -248,8 +248,14 @@ tbody td { padding:11px 14px; color:var(--text2); vertical-align:middle; }
    default auto-hiding overlay scrollbar — which fades out when idle and
    changes size/shape on hover, reading as "two different scrollbars" — with
    one themed bar that's always visible and always looks the same. */
-.tl-scroll-wrap { overflow-x: scroll; overflow-y: hidden; padding-bottom: 4px; }
-.tl-scroll-wrap::-webkit-scrollbar { height: 12px; }
-.tl-scroll-wrap::-webkit-scrollbar-track { background: var(--bg3); border-radius: 6px; }
-.tl-scroll-wrap::-webkit-scrollbar-thumb { background: var(--gold3,#7a5c1e); border-radius: 6px; border: 2px solid var(--bg3); }
-.tl-scroll-wrap::-webkit-scrollbar-thumb:hover { background: var(--gold2); }
+/* The timeline's own scrollbar is hidden; .tl-sticky-scroll below it is the one
+   you actually use. It's position:sticky at the bottom of the window, so it stays
+   visible wherever you are on the page. */
+.tl-scroll-wrap { overflow-x: scroll; overflow-y: hidden; scrollbar-width: none; }
+.tl-scroll-wrap::-webkit-scrollbar { display: none; }
+
+.tl-sticky-scroll { position: sticky; bottom: 0; z-index: 10; overflow-x: scroll; overflow-y: hidden; background: var(--bg); border-top: 1px solid var(--border); }
+.tl-sticky-scroll::-webkit-scrollbar { height: 12px; }
+.tl-sticky-scroll::-webkit-scrollbar-track { background: var(--bg3); border-radius: 6px; }
+.tl-sticky-scroll::-webkit-scrollbar-thumb { background: var(--gold3,#7a5c1e); border-radius: 6px; border: 2px solid var(--bg3); }
+.tl-sticky-scroll::-webkit-scrollbar-thumb:hover { background: var(--gold2); }

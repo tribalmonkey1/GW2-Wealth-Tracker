@@ -563,6 +563,19 @@ export default function BossTimersTab({ bossAlerts, ownedMap = {} }) {
   const soundBtnRef = useRef(null);
   const viewBtnRef = useRef(null);
   const newCollectionBtnRef = useRef(null);
+  const tlWrapRef = useRef(null);
+  const tlBarRef = useRef(null);
+  // Two-way scrollLeft sync between the timeline and the sticky scrollbar below it.
+  // Assigning an unchanged scrollLeft doesn't fire a scroll event, so the equality
+  // check is enough to stop the two from bouncing off each other.
+  const handleTlWrapScroll = useCallback(() => {
+    const wrap = tlWrapRef.current, bar = tlBarRef.current;
+    if (wrap && bar && bar.scrollLeft !== wrap.scrollLeft) bar.scrollLeft = wrap.scrollLeft;
+  }, []);
+  const handleTlBarScroll = useCallback(() => {
+    const wrap = tlWrapRef.current, bar = tlBarRef.current;
+    if (wrap && bar && wrap.scrollLeft !== bar.scrollLeft) wrap.scrollLeft = bar.scrollLeft;
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -928,7 +941,8 @@ export default function BossTimersTab({ bossAlerts, ownedMap = {} }) {
         // every row/zone extends the same distance regardless of whether
         // its own events reach that far, so empty space reads as
         // consistent background rather than a ragged right edge.
-        <div className="tl-scroll-wrap">
+        <div>
+        <div className="tl-scroll-wrap" ref={tlWrapRef} onScroll={handleTlWrapScroll}>
           <div style={{ width: TIMELINE_TOTAL_WIDTH }}>
             <div style={{ display: "flex", marginBottom: 8, paddingLeft: ROW_LABEL_WIDTH, position: "relative" }}>
               {headerCols.map((label, i) => (
@@ -966,6 +980,10 @@ export default function BossTimersTab({ bossAlerts, ownedMap = {} }) {
               </div>
             )}
           </div>
+        </div>
+        <div className="tl-sticky-scroll" ref={tlBarRef} onScroll={handleTlBarScroll}>
+          <div style={{ width: TIMELINE_TOTAL_WIDTH, height: 1 }} />
+        </div>
         </div>
       )}
     </div>
