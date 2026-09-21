@@ -1201,10 +1201,20 @@ export default function App() {
         const levels = friendDisciplineLevels[fid];
         const qualifies = r.disciplines.some(d => (levels[d] || 0) >= (r.min_rating || 0));
         if (!qualifies) continue;
-        const friend = friends.find(f => f.id === fid);
+        // fid comes from Object.keys(friendDisciplineLevels), which always returns
+        // strings — even though friend.id (from the Rust backend, an i64) comes
+        // through Tauri's JSON bridge as a real number. A bare `f.id === fid`
+        // strict comparison (e.g. 3 === "3") is always false, which silently
+        // dropped every discipline-eligible match regardless of whether the data
+        // was correct. Coerce both sides to numbers before comparing/storing so
+        // friendId stays consistently numeric everywhere downstream, matching the
+        // genuinely-known-recipe path (friendData.js's buildFriendRecipeMap),
+        // which already stores friendId as the raw (numeric) friend_id.
+        const fidNum = Number(fid);
+        const friend = friends.find(f => f.id === fidNum);
         if (!friend) continue;
         if (!map[r.id]) map[r.id] = [];
-        map[r.id].push({ friendId: fid, friendName: friend.name, viaDiscipline: true });
+        map[r.id].push({ friendId: fidNum, friendName: friend.name, viaDiscipline: true });
       }
     }
     return map;
