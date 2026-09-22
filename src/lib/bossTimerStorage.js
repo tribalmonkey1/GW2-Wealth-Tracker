@@ -19,6 +19,7 @@ export const CACHE_KEYS = {
   soundSettings: "bossTimerSoundSettings",   // { mode: "beep"|"tts"|"custom", customPath, piperVoiceFile, piperSpeakerId }
   areasSelection: "bossTimerAreasSelection", // string[] of selected expansion names, or absent = all
   viewMode: "bossTimerViewMode",             // "countdown" | "timeline"
+  apiFreshness: "bossTimerApiFreshness",     // { [source]: { period, names: string[], confirmed } } — see evaluateApiFreshness in BossTimersTab.jsx
 };
 
 // Identity key for alerts/collections/completions — the event NAME alone.
@@ -96,6 +97,21 @@ export function saveAlerts(alertsMap) {
 
 export function saveCompletions(completionsMap) {
   return cacheSet(CACHE_KEYS.completions, completionsMap);
+}
+
+// Persists, per API-tracked source ("worldbosses" | "mapchests"), the last poll result
+// and whether it's been confirmed fresh for its period — see evaluateApiFreshness in
+// BossTimersTab.jsx for what this gates. Stored as plain arrays (Sets aren't JSON-safe);
+// callers convert back to Sets after loading. Survives app restarts, which matters
+// specifically for the case this exists to handle: the app wasn't running when the
+// daily reset happened, so there's no in-memory state to compare a fresh poll against.
+export async function loadApiFreshness() {
+  const entry = await cacheGet(CACHE_KEYS.apiFreshness);
+  return entry?.value || {};
+}
+
+export function saveApiFreshness(freshnessMap) {
+  return cacheSet(CACHE_KEYS.apiFreshness, freshnessMap);
 }
 
 export function saveSoundSettings(settings) {

@@ -58,6 +58,7 @@ import {
   bossKey, loadFavoriteLists, saveFavoriteLists, nextDefaultFavoriteListName,
   loadCompletions, saveCompletions, migrateLocationKeyedMap,
   loadAreasSelection, saveAreasSelection, loadViewMode, saveViewMode,
+  loadApiFreshness, saveApiFreshness,
 } from "../lib/bossTimerStorage.js";
 import { EXPANSION_ACCENT_COLORS, EXPANSION_ACCENT_FALLBACK, expansionSortKey } from "../lib/worldBossScheduleData.js";
 import { WORLD_BOSS_API_IDS, WORLD_BOSS_API_ID_TO_NAME } from "../lib/worldBossApiIds.js";
@@ -76,6 +77,14 @@ const WORLD_BOSS_POLL_MS = 2 * 60_000; // /v2/account/worldbosses only changes o
 // auto) are cleared at that reset by the sweep effect further down.
 const AUTO_COMPLETION_ENABLED = true;
 const MAP_CHEST_POLL_MS = 2 * 60_000; // /v2/account/mapchests — same reasoning, only changes on claim or daily reset
+// How long after the daily reset (00:00 UTC) an API-tracked source is allowed to keep
+// reporting yesterday's list before it's trusted anyway — see evaluateApiFreshness below.
+// UNVERIFIED GUESS: Derrick observed that /v2/account/worldbosses and /v2/account/mapchests
+// can still show yesterday's completions for a while after reset if the account hasn't
+// logged in since, then go empty (or change) once he logged in. GW2's API docs don't state
+// how this refreshes or how long it can lag, so this number isn't backed by anything more
+// than one observation — tune it if it's consistently too short or too long.
+const UNCONFIRMED_GRACE_MS = 20 * 60_000;
 
 // ── Heuristic auto-completion via material-count delta ──────────────────────
 // A handful of recurring events reliably drop a specific, identifiable
@@ -195,6 +204,49 @@ function reconcileApiCompletions(prev, managedNames, reportedNames, period) {
     }
   }
   return changed ? next : prev;
+}
+
+function setsEqual(a, b) {
+  if (a.size !== b.size) return false;
+  for (const v of a) if (!b.has(v)) return false;
+  return true;
+}
+
+// Decides whether an API-tracked source's LATEST poll is safe to act on, or whether it
+// might still be reporting yesterday's data. `current` is what was stored after the
+// previous poll for this source (or undefined the very first time): { period, names,
+// confirmed }. `reported` is this poll's result. `periodMs`/`nowMs` are the current
+// reset-period identifier and the current time.
+//
+// The problem this guards against: Derrick observed /v2/account/worldbosses and
+// /v2/account/mapchests can still list yesterday's completions after the 00:00 UTC
+// reset if the account hasn't logged in since — so a poll run shortly after reset (by
+// an app that WAS running, or on first launch after one that wasn't) can re-stamp
+// yesterday's kills as today's. This isn't documented ArenaNet behavior, just one
+// observed case, so the fix is a heuristic, not a guarantee.
+//
+// Approach: once the period changes, don't trust a source until either (a) its
+// reported list stops matching the last list seen for the PREVIOUS period — evidence
+// GW2 has actually updated it for today — or (b) UNCONFIRMED_GRACE_MS has passed since
+// reset regardless, so a source that legitimately still reports an empty/unchanged
+// list forever (nothing done yet today) doesn't stay gated indefinitely. Once
+// confirmed for a period, every later poll that period is trusted immediately.
+function evaluateApiFreshness(current, reported, periodMs, nowMs) {
+  if (!current) return { next: { period: periodMs, names: reported, confirmed: true }, shouldReconcile: true };
+  if (current.period === periodMs && current.confirmed) {
+    return { next: { period: periodMs, names: reported, confirmed: true }, shouldReconcile: true };
+  }
+  // Either the period just rolled over (current.period !== periodMs — current.names is
+  // whatever the previous period's list settled on) or we're still waiting within the
+  // same new period (current.names is that same carried-over baseline). Either way the
+  // comparison is the same: has today's poll diverged from that pre-reset snapshot?
+  const baseline = current.names;
+  const differs = !setsEqual(reported, baseline);
+  const graceExpired = nowMs - periodMs >= UNCONFIRMED_GRACE_MS;
+  if (differs || graceExpired) {
+    return { next: { period: periodMs, names: reported, confirmed: true }, shouldReconcile: true };
+  }
+  return { next: { period: periodMs, names: baseline, confirmed: false }, shouldReconcile: false };
 }
 
 // Greedy interval-scheduling lane packing: sort by horizontal start position,
@@ -587,6 +639,13 @@ export default function BossTimersTab({ bossAlerts, ownedMap = {} }) {
   const soundBtnRef = useRef(null);
   const viewBtnRef = useRef(null);
   const newCollectionBtnRef = useRef(null);
+  // Per-source ("worldbosses" | "mapchests") API-freshness baseline — see
+  // evaluateApiFreshness. A ref because it's read/written inside poll intervals, not
+  // rendered directly; apiUnconfirmed mirrors just the confirmed/unconfirmed bit into
+  // state so the legend can show a "still verifying" note without re-rendering on
+  // every poll tick.
+  const apiFreshnessRef = useRef({});
+  const [apiUnconfirmed, setApiUnconfirmed] = useState({});
   const tlWrapRef = useRef(null);
   const tlBarRef = useRef(null);
   // Two-way scrollLeft sync between the timeline and the sticky scrollbar below it.
@@ -603,13 +662,20 @@ export default function BossTimersTab({ bossAlerts, ownedMap = {} }) {
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([loadFavoriteLists(), loadCompletions(), loadAreasSelection(), loadViewMode()])
-      .then(([lists, comps, areas, view]) => {
+    Promise.all([loadFavoriteLists(), loadCompletions(), loadAreasSelection(), loadViewMode(), loadApiFreshness()])
+      .then(([lists, comps, areas, view, freshness]) => {
         if (cancelled) return;
         setCollections(lists);
         setCompletions(migrateLocationKeyedMap(comps)); // pre-name-grouping saves used "name|location" keys
         if (areas) setSelectedAreas(new Set(areas));
         if (view) setViewMode(view);
+        // Rehydrate the persisted per-source baseline (names were stored as arrays —
+        // JSON has no Set — back into Sets for evaluateApiFreshness to compare against).
+        const restored = {};
+        for (const [source, entry] of Object.entries(freshness || {})) {
+          restored[source] = { period: entry.period, names: new Set(entry.names || []), confirmed: entry.confirmed };
+        }
+        apiFreshnessRef.current = restored;
         setLoaded(true);
       })
       .catch(() => setLoaded(true));
@@ -632,10 +698,19 @@ export default function BossTimersTab({ bossAlerts, ownedMap = {} }) {
       try { killed = await apiFetch(`${BASE}/account/worldbosses`, { cache: "no-store" }); } catch { return; }
       if (cancelled || !Array.isArray(killed)) return;
       const reported = new Set(killed.map(id => WORLD_BOSS_API_ID_TO_NAME[id]).filter(Boolean));
+      const periodMs = currentPeriod(Date.now());
+      const { next, shouldReconcile } = evaluateApiFreshness(apiFreshnessRef.current.worldbosses, reported, periodMs, Date.now());
+      apiFreshnessRef.current = { ...apiFreshnessRef.current, worldbosses: next };
+      saveApiFreshness({
+        worldbosses: next && { period: next.period, names: [...next.names], confirmed: next.confirmed },
+        mapchests: apiFreshnessRef.current.mapchests && { period: apiFreshnessRef.current.mapchests.period, names: [...apiFreshnessRef.current.mapchests.names], confirmed: apiFreshnessRef.current.mapchests.confirmed },
+      });
+      setApiUnconfirmed(prev => (prev.worldbosses === !next.confirmed ? prev : { ...prev, worldbosses: !next.confirmed }));
+      if (!shouldReconcile) return; // still might be yesterday's list — leave completions as the reset sweep left them
       setCompletions(prev => {
-        const next = reconcileApiCompletions(prev, Object.keys(WORLD_BOSS_API_IDS), reported, currentPeriod(Date.now()));
-        if (next !== prev) saveCompletions(next);
-        return next;
+        const nextCompletions = reconcileApiCompletions(prev, Object.keys(WORLD_BOSS_API_IDS), reported, periodMs);
+        if (nextCompletions !== prev) saveCompletions(nextCompletions);
+        return nextCompletions;
       });
     };
     poll();
@@ -655,10 +730,19 @@ export default function BossTimersTab({ bossAlerts, ownedMap = {} }) {
       try { claimed = await apiFetch(`${BASE}/account/mapchests`, { cache: "no-store" }); } catch { return; }
       if (cancelled || !Array.isArray(claimed)) return;
       const reported = new Set(claimed.map(id => MAP_CHEST_ID_TO_NAME[id]).filter(Boolean));
+      const periodMs = currentPeriod(Date.now());
+      const { next, shouldReconcile } = evaluateApiFreshness(apiFreshnessRef.current.mapchests, reported, periodMs, Date.now());
+      apiFreshnessRef.current = { ...apiFreshnessRef.current, mapchests: next };
+      saveApiFreshness({
+        mapchests: next && { period: next.period, names: [...next.names], confirmed: next.confirmed },
+        worldbosses: apiFreshnessRef.current.worldbosses && { period: apiFreshnessRef.current.worldbosses.period, names: [...apiFreshnessRef.current.worldbosses.names], confirmed: apiFreshnessRef.current.worldbosses.confirmed },
+      });
+      setApiUnconfirmed(prev => (prev.mapchests === !next.confirmed ? prev : { ...prev, mapchests: !next.confirmed }));
+      if (!shouldReconcile) return; // still might be yesterday's list — leave completions as the reset sweep left them
       setCompletions(prev => {
-        const next = reconcileApiCompletions(prev, Object.keys(MAP_CHEST_API_IDS), reported, currentPeriod(Date.now()));
-        if (next !== prev) saveCompletions(next);
-        return next;
+        const nextCompletions = reconcileApiCompletions(prev, Object.keys(MAP_CHEST_API_IDS), reported, periodMs);
+        if (nextCompletions !== prev) saveCompletions(nextCompletions);
+        return nextCompletions;
       });
     };
     poll();
@@ -857,6 +941,11 @@ export default function BossTimersTab({ bossAlerts, ownedMap = {} }) {
         </button>
         <div style={{ marginLeft: "auto", fontSize: 11, color: "var(--text3)", fontFamily: "Cinzel,serif", letterSpacing: 1 }}>
           ✓ marks done until reset ({new Date(currentPeriodStr + 86400000).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}) · 🔔 sets an alert · ⭐ saves to a collection{AUTO_COMPLETION_ENABLED && " · 🔗 auto-tracked via API"}
+          {AUTO_COMPLETION_ENABLED && (apiUnconfirmed.worldbosses || apiUnconfirmed.mapchests) && (
+            <span style={{ color: "var(--gold2)", marginLeft: 10 }} title="GW2's API can briefly keep reporting yesterday's completions after the daily reset — auto-checks are held back until it reports something different, or up to 20 minutes, whichever comes first.">
+              ⏳ verifying today's API completions…
+            </span>
+          )}
         </div>
       </div>
 
