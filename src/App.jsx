@@ -48,6 +48,7 @@ import {
 import { DEFAULT_RARITY_FILTER, passesRarityFilter, RarityDropdown } from "./RarityFilter.jsx";
 import { DEFAULT_FRIEND_FILTER, passesFriendFilter, FriendFilterDropdown } from "./FriendFilter.jsx";
 import { useBossAlerts } from "./lib/useBossAlerts.js";
+import { useDrfLiveFeed } from "./lib/drfClient.js";
 
 // ── Timing / config constants ───────────────────────────────────────────────
 const PRICE_REFRESH_MS = 60_000;
@@ -133,6 +134,8 @@ export default function App() {
   const [noApiKey, setNoApiKey] = useState(false);
   const [apiKey, setApiKey] = useState("");
   const [settingsApiKey, setSettingsApiKey] = useState("");
+  const [drfToken, setDrfToken] = useState(""); // DRF (Drop Research Facilities) token — optional, enables the live gold/materials/wallet feed
+  const [settingsDrfToken, setSettingsDrfToken] = useState("");
   const [settingsMarketDbPath, setSettingsMarketDbPath] = useState("");
   const [settingsNasSsh, setSettingsNasSsh] = useState("");
   const [settingsMsg, setSettingsMsg] = useState(null);
@@ -161,6 +164,12 @@ export default function App() {
   const [showDeleteFriendConfirm, setShowDeleteFriendConfirm] = useState(null); // friend id pending delete confirmation
 
   const bossAlerts = useBossAlerts(customSoundPath, piperVoiceFile, piperSpeakerId); // global — fires boss/event alerts regardless of active tab
+  // DRF (Drop Research Facilities) live feed — optional. When a token is set, patches
+  // goldCopper/materialRows/ownedMap/forgeWallet the instant a drop/consume/salvage
+  // event comes in, on top of (never instead of) the normal GW2 API polling below.
+  const { status: drfStatus, statusDetail: drfStatusDetail } = useDrfLiveFeed({
+    cacheRef, setData, setForgeWallet, token: drfToken, enabled: !!drfToken,
+  });
 
   const prog = (pct, msg) => setLoadState({ phase: "loading", pct, msg });
   const fullLoadInProgressRef = useRef(false);
@@ -765,6 +774,9 @@ export default function App() {
     // Other settings — load in parallel
     invoke("get_market_db_info").then(info => { if (info.path) setSettingsNasSsh(info.path); }).catch(() => {});
     invoke("cache_get", { key: "nas_ssh" }).then(e => { if (e?.value) setSettingsNasSsh(e.value); }).catch(() => {});
+    invoke("cache_get", { key: "drfToken" }).then(e => {
+      if (e?.value) { setDrfToken(e.value); setSettingsDrfToken(e.value); }
+    }).catch(() => {});
     invoke("cache_get", { key: "alert_threshold" }).then(e => { if (e?.value) { const v = Number(e.value); if (v >= 50 && v <= 100) { setAlertThreshold(v); setSettingsAlertThreshold(v); } } }).catch(() => {});
     invoke("cache_get", { key: "gem_alert_threshold_gold" }).then(e => {
       if (e?.value) { const v = Number(e.value); if (v >= 0) { setGemAlertThresholdGold(v); setSettingsGemAlertThresholdGold(v); } }
@@ -2011,6 +2023,8 @@ export default function App() {
         settingsMsg={settingsMsg} setSettingsMsg={setSettingsMsg}
         setAlertThreshold={setAlertThreshold} setGemAlertThresholdGold={setGemAlertThresholdGold}
         setApiKey={setApiKey}
+        settingsDrfToken={settingsDrfToken} setSettingsDrfToken={setSettingsDrfToken}
+        setDrfToken={setDrfToken} drfStatus={drfStatus} drfStatusDetail={drfStatusDetail}
       />
     )}
     {showMigration && (

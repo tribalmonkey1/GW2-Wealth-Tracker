@@ -2,6 +2,7 @@ use rusqlite::Connection;
 use std::sync::Mutex;
 
 pub mod commands;
+pub mod drf_client;
 
 // Personal data DB — always local (flips, daily resets, cache)
 pub struct PersonalDbState(pub Mutex<Connection>);
@@ -106,6 +107,7 @@ pub fn run() {
 
     tauri::Builder::default()
         .manage(PersonalDbState(Mutex::new(personal_conn)))
+        .manage(drf_client::DrfState::default())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -147,6 +149,8 @@ pub fn run() {
             commands::get_friends,
             commands::get_friend_recipes_known,
             commands::get_friend_discipline_levels,
+            drf_client::drf_connect,
+            drf_client::drf_disconnect,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

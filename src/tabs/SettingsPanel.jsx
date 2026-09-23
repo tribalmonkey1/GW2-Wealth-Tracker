@@ -124,6 +124,7 @@ export function SettingsPanel({
   updateError, handleCheckForUpdates, handleInstallUpdate, showChangelog,
   handleOpenChangelog, changelog, changelogLoading, settingsMsg, setSettingsMsg,
   setAlertThreshold, setGemAlertThresholdGold, setApiKey,
+  settingsDrfToken, setSettingsDrfToken, setDrfToken, drfStatus, drfStatusDetail,
 }) {
   return (
       <div style={{ background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: 6, padding: 20, marginBottom: 16 }}>
@@ -137,6 +138,34 @@ export function SettingsPanel({
       <input value={settingsApiKey} onChange={e => setSettingsApiKey(e.target.value)}
       placeholder="XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXXXXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
       style={{ width: "100%", background: "var(--bg3)", border: "1px solid var(--border)", borderRadius: 4, padding: "5px 10px", color: "var(--text1)", fontSize: 12, fontFamily: "monospace" }} />
+      </div>
+
+      <div style={{ fontSize: 12, color: "var(--text2)", marginTop: 8 }}>
+      <strong style={{ color: "var(--gold1)" }}>DRF Token (optional — live gold / materials / wallet)</strong>
+      <div style={{ fontSize: 11, color: "var(--text3)", marginBottom: 6, lineHeight: 1.6 }}>
+      From your drf.rs account / the Drop Research Facilities Nexus addon's settings — not your GW2 API key.
+      Requires Guild Wars 2 running with Nexus + DRF loaded and actively streaming. When set, gold, material
+      counts, and Spirit Shards/Volatile Magic/Unbound Magic/Karma/Laurels update instantly on pickup, craft,
+      or salvage instead of waiting on the next GW2 API refresh. Leave blank to rely on GW2 API polling only.
+      </div>
+      <input value={settingsDrfToken} onChange={e => setSettingsDrfToken(e.target.value)}
+      placeholder="DRF token"
+      style={{ width: "100%", background: "var(--bg3)", border: "1px solid var(--border)", borderRadius: 4, padding: "5px 10px", color: "var(--text1)", fontSize: 12, fontFamily: "monospace" }} />
+      {drfStatus && (
+        <div style={{ fontSize: 11, marginTop: 6, color:
+          drfStatus === "connected" ? "var(--green2)" :
+          drfStatus === "error" ? "var(--red2,#e05555)" :
+          drfStatus === "disconnected" ? "var(--text3)" : "var(--gold2)" }}>
+          {({
+            connected: "🟢 live",
+            connecting: "⏳ connecting…",
+            reconnecting: "🟡 reconnecting…",
+            error: "✕ error",
+            disconnected: "⚪ not connected",
+          })[drfStatus] || drfStatus}
+          {drfStatusDetail ? ` — ${drfStatusDetail}` : ""}
+        </div>
+      )}
       </div>
 
       <div style={{ fontSize: 12, color: "var(--text2)", marginTop: 8 }}>
@@ -368,6 +397,7 @@ export function SettingsPanel({
           await invoke("cache_set", { key: "alert_threshold", value: String(settingsAlertThreshold) });
           await invoke("cache_set", { key: "gem_alert_threshold_gold", value: String(settingsGemAlertThresholdGold) });
           await invoke("cache_set", { key: "api_key", value: settingsApiKey.trim() });
+          await invoke("cache_set", { key: "drfToken", value: settingsDrfToken.trim() });
           await invoke("cache_set", { key: "customSoundPath", value: settingsCustomSoundPath });
           await invoke("cache_set", { key: "piperVoiceFile", value: settingsPiperVoiceFile || "" });
           await invoke("cache_set", { key: "piperSpeakerId", value: settingsPiperSpeakerId != null ? String(settingsPiperSpeakerId) : "" });
@@ -377,6 +407,7 @@ export function SettingsPanel({
           setPiperVoiceFile(settingsPiperVoiceFile);
           setPiperSpeakerId(settingsPiperSpeakerId);
           if (settingsApiKey.trim()) { setApiKey(settingsApiKey.trim()); window.__gw2ApiKey = settingsApiKey.trim(); }
+          setDrfToken(settingsDrfToken.trim()); // empty string disables the live feed (useDrfLiveFeed checks !!token)
           setSettingsMsg({ ok: true, text: msg });
         } catch(e) { setSettingsMsg({ ok: false, text: String(e) }); }
       }} style={{ fontSize: 12, color: "#fff", background: "var(--gold3,#7a5c1e)", border: "none", borderRadius: 4, padding: "6px 16px", cursor: "pointer", fontFamily: "Cinzel,serif", letterSpacing: 1 }}>
