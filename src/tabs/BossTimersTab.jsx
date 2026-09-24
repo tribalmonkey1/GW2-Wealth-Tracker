@@ -935,7 +935,7 @@ export default function BossTimersTab({ bossAlerts, ownedMap = {} }) {
         <button ref={areasBtnRef} className="rbtn" onClick={() => setAreasOpen(o => !o)}>
           Areas ({effectiveSelectedAreas.size}/{allExpansions.length}) ▾
         </button>
-        <button ref={soundBtnRef} className="rbtn" onClick={() => setSoundOpen(o => !o)}>🔊 Sound ▾</button>
+        <button ref={soundBtnRef} className="rbtn" onClick={() => setSoundOpen(o => !o)}>{soundSettings.mode === "off" ? "🔇" : "🔊"} Sound ▾</button>
         <button ref={viewBtnRef} className="rbtn" onClick={() => setViewOpen(o => !o)}>
           👁 View: {viewMode === "countdown" ? "Countdown" : "Timeline"} ▾
         </button>
@@ -970,7 +970,7 @@ export default function BossTimersTab({ bossAlerts, ownedMap = {} }) {
 
       <InteractivePopover anchorRef={soundBtnRef} open={soundOpen} onClose={() => setSoundOpen(false)} minWidth={190}>
         <div className="bt-pop-lbl">ALERT SOUND</div>
-        {[["beep", "Beep"], ["tts", "Text-to-Speech"], ["custom", "Custom Sound"]].map(([mode, label]) => (
+        {[["off", "Off"], ["beep", "Beep"], ["tts", "Text-to-Speech"], ["custom", "Custom Sound"]].map(([mode, label]) => (
           <label key={mode} className="bt-pop-row">
             <input type="radio" name="sound-mode" checked={soundSettings.mode === mode}
               onChange={() => setSoundSettings({ ...soundSettings, mode })} />
@@ -980,6 +980,17 @@ export default function BossTimersTab({ bossAlerts, ownedMap = {} }) {
         {soundSettings.mode === "custom" && (
           <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 6, paddingTop: 6, borderTop: "1px solid var(--border)", lineHeight: 1.5, maxWidth: 180 }}>
             Set the sound file in <strong style={{ color: "var(--text2)" }}>Settings → Alert Sound</strong>.
+          </div>
+        )}
+        {soundSettings.mode !== "off" && (
+          <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid var(--border)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--text3)", marginBottom: 4 }}>
+              <span>Volume</span>
+              <span>{soundSettings.volume ?? 100}%</span>
+            </div>
+            <input type="range" min={0} max={100} step={5} value={soundSettings.volume ?? 100}
+              onChange={e => setSoundSettings({ ...soundSettings, volume: Number(e.target.value) })}
+              style={{ width: "100%" }} />
           </div>
         )}
       </InteractivePopover>

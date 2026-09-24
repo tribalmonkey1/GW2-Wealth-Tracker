@@ -653,7 +653,7 @@ fn piper_sample_rate(config_path: &std::path::Path) -> i64 {
         .unwrap_or(22050)
 }
 
-fn try_speak_with_piper(text: &str, voice_file: Option<&str>, speaker_id: Option<i64>) -> Result<(), String> {
+fn try_speak_with_piper(text: &str, voice_file: Option<&str>, speaker_id: Option<i64>, volume: f64) -> Result<(), String> {
     let (model, config) = piper_voice_paths(voice_file).ok_or_else(|| "no piper voice configured".to_string())?;
     let sample_rate = piper_sample_rate(&config);
 
@@ -673,15 +673,51 @@ fn try_speak_with_piper(text: &str, voice_file: Option<&str>, speaker_id: Option
         .map_err(|e| format!("failed to launch piper: {e}"))?;
 
     let stdin = piper.stdin.take().ok_or_else(|| "no piper stdin".to_string())?;
-    let piper_stdout = piper.stdout.take().ok_or_else(|| "no piper stdout".to_string())?;
+    let mut piper_stdout = piper.stdout.take().ok_or_else(|| "no piper stdout".to_string())?;
 
-    // Pipe piper's raw PCM straight into aplay rather than writing a temp
-    // file — matches piper's own documented streaming usage.
-    std::process::Command::new("aplay")
+    // aplay has no built-in gain control, and we don't want to depend on sox/
+    // ffmpeg being installed just to turn the volume down — so instead of
+    // piping piper's stdout straight into aplay's stdin (the old approach),
+    // we read the raw S16LE PCM ourselves, scale each sample by `volume`,
+    // and write the scaled bytes to aplay's stdin on a background thread.
+    let mut aplay = std::process::Command::new("aplay")
         .args(["-q", "-r", &sample_rate.to_string(), "-f", "S16_LE", "-t", "raw", "-"])
-        .stdin(std::process::Stdio::from(piper_stdout))
+        .stdin(std::process::Stdio::piped())
         .spawn()
         .map_err(|e| format!("failed to launch aplay: {e}. Is alsa-utils installed?"))?;
+    let mut aplay_stdin = aplay.stdin.take().ok_or_else(|| "no aplay stdin".to_string())?;
+
+    let vol = volume.clamp(0.0, 1.0);
+    let apply_gain = (vol - 1.0).abs() > f64::EPSILON;
+    std::thread::spawn(move || {
+        use std::io::{Read, Write};
+        let mut buf = [0u8; 4096];
+        loop {
+            let n = match piper_stdout.read(&mut buf) {
+                Ok(0) => break,
+                Ok(n) => n,
+                Err(_) => break,
+            };
+            if apply_gain {
+                let mut chunk = buf[..n].to_vec();
+                // Scale as little-endian i16 samples in place. Any odd trailing
+                // byte (shouldn't happen for 16-bit PCM on a clean read boundary)
+                // is passed through unscaled rather than dropped.
+                let mut i = 0;
+                while i + 1 < chunk.len() {
+                    let sample = i16::from_le_bytes([chunk[i], chunk[i + 1]]);
+                    let scaled = (sample as f64 * vol).round().clamp(i16::MIN as f64, i16::MAX as f64) as i16;
+                    let bytes = scaled.to_le_bytes();
+                    chunk[i] = bytes[0];
+                    chunk[i + 1] = bytes[1];
+                    i += 2;
+                }
+                if aplay_stdin.write_all(&chunk).is_err() { break; }
+            } else if aplay_stdin.write_all(&buf[..n]).is_err() {
+                break;
+            }
+        }
+    });
 
     // Write the text on a background thread and return immediately — fire-
     // and-forget, matching the espeak-ng fallback below, rather than
@@ -701,15 +737,23 @@ fn try_speak_with_piper(text: &str, voice_file: Option<&str>, speaker_id: Option
 }
 
 #[tauri::command]
-pub fn speak_text(text: String, voice_file: Option<String>, speaker_id: Option<i64>) -> Result<(), String> {
-    if try_speak_with_piper(&text, voice_file.as_deref(), speaker_id).is_ok() {
+pub fn speak_text(text: String, voice_file: Option<String>, speaker_id: Option<i64>, volume: Option<f64>) -> Result<(), String> {
+    // `volume` is 0.0-1.0 from the frontend's 0-100% slider; None (an older
+    // caller, or the field simply omitted) means full volume.
+    let vol = volume.unwrap_or(1.0).clamp(0.0, 1.0);
+    if try_speak_with_piper(&text, voice_file.as_deref(), speaker_id, vol).is_ok() {
         return Ok(());
     }
     // No Piper voice configured/found, or Piper failed for some reason —
     // fall back to espeak-ng. Fire-and-forget: plays straight to the
     // system's audio output (Pulse/ALSA), no temp file, no waiting on the
-    // synth to finish before returning to the caller.
+    // synth to finish before returning to the caller. espeak-ng's -a flag
+    // takes amplitude 0-200 (100 = default/full) and is linear enough with
+    // volume for an alert-loudness slider, even though it isn't a true
+    // perceptual-loudness curve.
+    let amplitude = (vol * 100.0).round() as i64;
     std::process::Command::new("espeak-ng")
+        .args(["-a", &amplitude.to_string()])
         .arg(&text)
         .spawn()
         .map_err(|e| format!("failed to launch espeak-ng: {e}. Is it installed and on PATH?"))?;

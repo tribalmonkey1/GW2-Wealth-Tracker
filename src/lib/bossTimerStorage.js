@@ -56,7 +56,7 @@ export function migrateLocationKeyedMap(map) {
 // (e.g. the "semaine" dataset's Prudence/Spike/Obadiah/Poppy), or null for
 // ordinary single-speaker voices / default speaker 0. Both are Linux-only
 // concerns — ignored entirely on the browser-TTS path Windows/macOS use.
-export const DEFAULT_SOUND_SETTINGS = { mode: "beep", customPath: null, piperVoiceFile: null, piperSpeakerId: null };
+export const DEFAULT_SOUND_SETTINGS = { mode: "beep", customPath: null, piperVoiceFile: null, piperSpeakerId: null, volume: 100 };
 
 // Bulk-loads everything Boss Timers needs on startup in one IPC round-trip,
 // same pattern App.jsx's fullLoad already uses via cacheGetBulk. Falls back

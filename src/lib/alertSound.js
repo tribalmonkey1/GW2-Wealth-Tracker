@@ -61,9 +61,9 @@ const BEEP_TONES = [
 ];
 const BEEP_GAP_MS = 40;
 
-function playBeep() {
+function playBeep(volume = 1) {
   const ctx = getAudioCtx();
-  if (!ctx) return;
+  if (!ctx || volume <= 0) return;
   try {
     let t = ctx.currentTime;
     for (const { freq, durationMs } of BEEP_TONES) {
@@ -71,7 +71,7 @@ function playBeep() {
       const gain = ctx.createGain();
       osc.type = "sine";
       osc.frequency.value = freq;
-      gain.gain.setValueAtTime(0.25, t);
+      gain.gain.setValueAtTime(0.25 * volume, t);
       gain.gain.exponentialRampToValueAtTime(0.001, t + durationMs / 1000);
       osc.connect(gain).connect(ctx.destination);
       osc.start(t);
@@ -111,18 +111,19 @@ function getVoicesAsync(synth, timeoutMs = 250) {
 // speech-dispatcher/espeak-ng can fix — the frontend API itself doesn't
 // exist. In that case, shell out to espeak-ng directly via a Tauri command
 // instead of going through the (absent) browser API.
-function speakNative(text, settings) {
+function speakNative(text, settings, volume = 1) {
   invoke("speak_text", {
     text,
     voiceFile: settings?.piperVoiceFile || null,
     speakerId: settings?.piperSpeakerId ?? null,
+    volume,
   }).catch((e) => {
     console.warn("[alertSound] native speak_text failed, falling back to beep:", e);
-    playBeep();
+    playBeep(volume);
   });
 }
 
-function playTextToSpeech(bossName, settings) {
+function playTextToSpeech(bossName, settings, volume = 1) {
   const text = `${applyPronunciation(bossName)} starting soon`;
   const synth = window.speechSynthesis;
   if (!synth) {
@@ -130,7 +131,7 @@ function playTextToSpeech(bossName, settings) {
       "[alertSound] window.speechSynthesis is undefined in this webview (expected on stock " +
       "webkit2gtk) — using native espeak-ng/Piper via the Rust backend instead."
     );
-    speakNative(text, settings);
+    speakNative(text, settings, volume);
     return;
   }
 
@@ -138,13 +139,14 @@ function playTextToSpeech(bossName, settings) {
     try {
       const utter = new SpeechSynthesisUtterance(text);
       utter.rate = 0.95;
+      utter.volume = volume;
 
       let settled = false;
       const fallbackToBeep = (reason) => {
         if (settled) return;
         settled = true;
         console.warn(`[alertSound] TTS did not produce speech (${reason}) — trying native TTS instead.`);
-        speakNative(text, settings);
+        speakNative(text, settings, volume);
       };
 
       utter.onstart = () => { settled = true; };
@@ -160,7 +162,7 @@ function playTextToSpeech(bossName, settings) {
       synth.speak(utter);
     } catch (e) {
       console.warn("[alertSound] speechSynthesis threw, falling back to beep:", e);
-      playBeep();
+      playBeep(volume);
     }
   });
 }
@@ -169,27 +171,31 @@ function playTextToSpeech(bossName, settings) {
 // SettingsPanel.jsx / App.jsx's customSoundPath). Absolute local paths need
 // to go through Tauri's asset protocol (convertFileSrc) before a plain
 // <audio> element can load them; http(s)/asset URLs are used as-is.
-function playCustomAudioFile(path) {
+function playCustomAudioFile(path, volume = 1) {
   try {
-    if (!path) { playBeep(); return; }
+    if (!path) { playBeep(volume); return; }
     const isUrl = /^(https?|asset):\/\//i.test(path);
     let src = path;
     if (!isUrl) {
       try { src = convertFileSrc(path); } catch { src = path; }
     }
     const audio = new Audio(src);
-    audio.play().catch(() => playBeep()); // e.g. file missing/unsupported — fall back
-  } catch { playBeep(); }
+    audio.volume = volume;
+    audio.play().catch(() => playBeep(volume)); // e.g. file missing/unsupported — fall back
+  } catch { playBeep(volume); }
 }
 
-// mode: "beep" | "tts" | "custom". Falls back to beep for "custom" with no
-// path configured yet — same reasoning as the reference app: a silent
-// alert looks identical to a broken one, so degrade audibly instead.
+// mode: "off" | "beep" | "tts" | "custom". "off" plays nothing at all. Falls back to
+// beep for "custom" with no path configured yet — same reasoning as the reference
+// app: a silent alert looks identical to a broken one, so degrade audibly instead.
 export function playAlert(bossName, settings) {
   const mode = settings?.mode || "beep";
-  if (mode === "tts") return playTextToSpeech(bossName, settings);
-  if (mode === "custom") return playCustomAudioFile(settings?.customPath);
-  return playBeep();
+  if (mode === "off") return;
+  const rawVolume = settings?.volume;
+  const volume = Math.min(100, Math.max(0, rawVolume == null ? 100 : rawVolume)) / 100;
+  if (mode === "tts") return playTextToSpeech(bossName, settings, volume);
+  if (mode === "custom") return playCustomAudioFile(settings?.customPath, volume);
+  return playBeep(volume);
 }
 
 // Plays a batch of alerts staggered so simultaneous spawns don't overlap
