@@ -151,8 +151,10 @@ export const META_EVENT_SCHEDULE = [
   // Amnytas above, hasn't been moved into this bucket — only these three.)
   { eventName: 'Mount Balrior', zoneName: 'Convergence', expansion: 'Public Instance', cycleLengthMin: THREE_HOUR, offsetMin: 0, chatLink: '[&BK4OAAA=]', durationMin: 10 },
   // Opens every 3 hours at :30, UTC-7 anchor 18:30 (= 01:30 UTC) — offsetMin
-  // 90 puts occurrences at 01:30, 04:30, 07:30, ... UTC.
-  { eventName: 'Outer Nayos', zoneName: 'Convergence', expansion: 'Public Instance', cycleLengthMin: THREE_HOUR, offsetMin: 90, chatLink: null, durationMin: 10 },
+  // 90 puts occurrences at 01:30, 04:30, 07:30, ... UTC. chatLink confirmed
+  // (matches the waypoint used for Wizard's Tower/SotO Convergences above —
+  // Outer Nayos is reached from the same Wizard's Tower waypoint).
+  { eventName: 'Outer Nayos', zoneName: 'Convergence', expansion: 'Public Instance', cycleLengthMin: THREE_HOUR, offsetMin: 90, chatLink: '[&BB8OAAA=]', durationMin: 10 },
   // Opens every 3 hours at :00, UTC-7 anchor 18:00 (= 01:00 UTC) — offsetMin
   // 60 puts occurrences at 01:00, 04:00, 07:00, ... UTC. Runs 10 minutes,
   // same as the other two Convergences. NOTE: chatLink [&BDYQAAA=] is the

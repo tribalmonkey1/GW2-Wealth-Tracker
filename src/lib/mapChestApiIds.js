@@ -18,12 +18,10 @@
  *   either row risks auto-marking the wrong one "done".
  * - Domain of Vabbi (`domain_of_vabbi_heros_choice_chest`): same shared-
  *   trigger situation, between "Forged with Fire" and "Serpents' Ire".
- * - Seitung Province, New Kaineng City, The Echovald Wilds, Amnytas: EoD/
- *   SotO zones expected to have their own chest ids (an EoD coverage gap in
- *   the public `/v2/mapchests` reference list was confirmed fixed via a
- *   closed GitHub issue), but their exact single-event trigger criteria
- *   haven't been individually confirmed against the wiki the way the zones
- *   below have. Add them here once verified, rather than guessing.
+ * - New Kaineng City, The Echovald Wilds, Amnytas: EoD/SotO zones expected
+ *   to have their own chest ids, but their exact single-event trigger
+ *   criteria haven't been individually confirmed against the wiki the way
+ *   the zones below have. Add them here once verified, rather than guessing.
  *
  * `/v2/mapchests` (public, no key needed) is the reference list of valid
  * chest ids — deliberately not fetched/cached here. This app only needs to
@@ -44,8 +42,14 @@ export const MAP_CHEST_API_IDS = {
   'Doppelganger':                      'elon_riverlands_heros_choice_chest',
 
   // End of Dragons — Dragon's End's trigger ("Defeat Soo-Won") is confirmed
-  // and maps to this app's tracked finale event for that zone.
+  // and maps to this app's tracked finale event for that zone. Seitung
+  // Province's trigger ("Defeat Renyak!", the finale of the Aetherblade
+  // Assault meta chain, which is this app's one tracked event for that
+  // zone) is confirmed via the GW2 API's own /v2/mapchests reference list
+  // (id: seitung_province_heros_choice_chest) and the wiki page for the
+  // chest itself — single, unambiguous trigger, so safe to auto-track.
   'The Battle for the Jade Sea':       'dragons_end_heros_choice_chest',
+  'Aetherblade Assault':               'seitung_province_heros_choice_chest',
 };
 
 // Reverse lookup — chest id -> display name (matches META_EVENT_SCHEDULE's eventName).

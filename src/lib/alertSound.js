@@ -12,6 +12,22 @@
  * autoplay-blocked AudioContext, or a bad custom file path should degrade
  * to silence (or beep), never crash the alert-checking tick that called this.
  *
+ * ── Serial playback queue ─────────────────────────────────────────────────
+ * Every alert (beep, TTS, or custom sound) is funneled through one shared
+ * module-level queue (see enqueueAlert below) rather than played immediately.
+ * Each queued alert only starts once the PREVIOUS one has actually finished
+ * playing — not after a fixed guessed delay — which is what makes this safe
+ * against overlap: a longer-than-expected TTS sentence (a verbose boss name,
+ * a slower rate) used to spill into the next alert's start under the old
+ * fixed-stagger design, since that stagger didn't know how long the audio
+ * would actually take. Every player function below (playBeep,
+ * playTextToSpeech, playCustomAudioFile) now returns a Promise that resolves
+ * only when its sound has genuinely finished, and the queue awaits that
+ * before advancing. This also means two separate calls to
+ * playAlertsSequentially() fired close together (e.g. from two different
+ * alert-check ticks) naturally serialize onto the same queue instead of
+ * fighting over the audio output.
+ *
  * ── Linux/WebKitGTK TTS gotcha (confirmed Sept 2026) ──────────────────────
  * `window.speechSynthesis` is undefined on stock webkit2gtk everywhere,
  * Arch included — getting it to exist requires building WebKitGTK yourself
@@ -60,10 +76,13 @@ const BEEP_TONES = [
   { freq: 1100, durationMs: 220 },
 ];
 const BEEP_GAP_MS = 40;
+const BEEP_TOTAL_MS = BEEP_TONES.reduce((s, t) => s + t.durationMs, 0) + BEEP_GAP_MS * (BEEP_TONES.length - 1);
 
+// Resolves once the beep sequence has actually finished playing (or immediately if
+// no AudioContext is available/allowed — e.g. blocked by autoplay policy).
 function playBeep(volume = 1) {
   const ctx = getAudioCtx();
-  if (!ctx || volume <= 0) return;
+  if (!ctx || volume <= 0) return Promise.resolve();
   try {
     let t = ctx.currentTime;
     for (const { freq, durationMs } of BEEP_TONES) {
@@ -78,7 +97,11 @@ function playBeep(volume = 1) {
       osc.stop(t + durationMs / 1000);
       t += (durationMs + BEEP_GAP_MS) / 1000;
     }
-  } catch { /* autoplay policy or unsupported — silently do nothing */ }
+    return new Promise(resolve => setTimeout(resolve, BEEP_TOTAL_MS));
+  } catch {
+    // autoplay policy or unsupported — silently do nothing, but don't block the queue
+    return Promise.resolve();
+  }
 }
 
 // Waits (briefly) for the voice list to populate. Some engines — including
@@ -110,19 +133,30 @@ function getVoicesAsync(synth, timeoutMs = 250) {
 // undefined there is not a missing-backend problem installing
 // speech-dispatcher/espeak-ng can fix — the frontend API itself doesn't
 // exist. In that case, shell out to espeak-ng directly via a Tauri command
-// instead of going through the (absent) browser API.
+// instead of going through the (absent) browser API. Returns a Promise that
+// resolves once the native command's playback has finished (or, on failure,
+// once the beep fallback has finished) — the Tauri `speak_text` command
+// blocks until the spoken audio actually completes, so awaiting its own
+// promise is enough; no extra timing guess needed here.
 function speakNative(text, settings, volume = 1) {
-  invoke("speak_text", {
+  return invoke("speak_text", {
     text,
     voiceFile: settings?.piperVoiceFile || null,
     speakerId: settings?.piperSpeakerId ?? null,
     volume,
   }).catch((e) => {
     console.warn("[alertSound] native speak_text failed, falling back to beep:", e);
-    playBeep(volume);
+    return playBeep(volume);
   });
 }
 
+// Longest we'll ever wait on a single browser TTS utterance before treating it as
+// hung and moving the queue on — a genuine "onstart fired but onend never does"
+// stall should never be able to silence every alert behind it forever.
+const SPEECH_SAFETY_TIMEOUT_MS = 15_000;
+
+// Resolves once the utterance has genuinely finished speaking (onend), or once
+// whatever fallback path (native TTS, then beep) it took has itself finished.
 function playTextToSpeech(bossName, settings, volume = 1) {
   const text = `${applyPronunciation(bossName)} starting soon`;
   const synth = window.speechSynthesis;
@@ -131,66 +165,81 @@ function playTextToSpeech(bossName, settings, volume = 1) {
       "[alertSound] window.speechSynthesis is undefined in this webview (expected on stock " +
       "webkit2gtk) — using native espeak-ng/Piper via the Rust backend instead."
     );
-    speakNative(text, settings, volume);
-    return;
+    return speakNative(text, settings, volume);
   }
 
-  getVoicesAsync(synth).then(() => {
+  return getVoicesAsync(synth).then(() => new Promise((resolve) => {
     try {
       const utter = new SpeechSynthesisUtterance(text);
       utter.rate = 0.95;
       utter.volume = volume;
 
+      let started = false;
       let settled = false;
+      const finish = () => { if (!settled) { settled = true; resolve(); } };
       const fallbackToBeep = (reason) => {
         if (settled) return;
         settled = true;
         console.warn(`[alertSound] TTS did not produce speech (${reason}) — trying native TTS instead.`);
-        speakNative(text, settings, volume);
+        speakNative(text, settings, volume).then(resolve);
       };
 
-      utter.onstart = () => { settled = true; };
+      utter.onstart = () => { started = true; };
+      utter.onend = finish;
       utter.onerror = (e) => fallbackToBeep(`error: ${e?.error || "unknown"}`);
 
       // WebKitGTK with no working backend can accept the utterance and never
       // fire onstart, onend, or onerror at all — it just silently does
       // nothing. Treat "never started within a short window" as failure too,
-      // so a dead TTS backend degrades to an audible beep instead of dead
-      // silence with no alert at all.
-      setTimeout(() => fallbackToBeep("no onstart event within 1.2s"), 1200);
+      // so a dead TTS backend degrades to an audible beep (and the queue
+      // still advances) instead of hanging forever with no alert at all.
+      setTimeout(() => { if (!started) fallbackToBeep("no onstart event within 1.2s"); }, 1200);
+      // Separate safety net for the rarer case where it DID start but never
+      // fires onend — never let one stuck utterance block every alert behind it.
+      setTimeout(finish, SPEECH_SAFETY_TIMEOUT_MS);
 
       synth.speak(utter);
     } catch (e) {
       console.warn("[alertSound] speechSynthesis threw, falling back to beep:", e);
-      playBeep(volume);
+      playBeep(volume).then(resolve);
     }
-  });
+  }));
 }
 
 // Custom sound file — path comes from Settings → Alert Sound (see
 // SettingsPanel.jsx / App.jsx's customSoundPath). Absolute local paths need
 // to go through Tauri's asset protocol (convertFileSrc) before a plain
-// <audio> element can load them; http(s)/asset URLs are used as-is.
+// <audio> element can load them; http(s)/asset URLs are used as-is. Resolves
+// once playback actually ends (or once the beep fallback finishes).
 function playCustomAudioFile(path, volume = 1) {
-  try {
-    if (!path) { playBeep(volume); return; }
-    const isUrl = /^(https?|asset):\/\//i.test(path);
-    let src = path;
-    if (!isUrl) {
-      try { src = convertFileSrc(path); } catch { src = path; }
+  return new Promise((resolve) => {
+    try {
+      if (!path) { playBeep(volume).then(resolve); return; }
+      const isUrl = /^(https?|asset):\/\//i.test(path);
+      let src = path;
+      if (!isUrl) {
+        try { src = convertFileSrc(path); } catch { src = path; }
+      }
+      const audio = new Audio(src);
+      audio.volume = volume;
+      audio.addEventListener("ended", resolve, { once: true });
+      audio.addEventListener("error", () => playBeep(volume).then(resolve), { once: true });
+      audio.play().catch(() => playBeep(volume).then(resolve)); // e.g. file missing/unsupported — fall back
+    } catch {
+      playBeep(volume).then(resolve);
     }
-    const audio = new Audio(src);
-    audio.volume = volume;
-    audio.play().catch(() => playBeep(volume)); // e.g. file missing/unsupported — fall back
-  } catch { playBeep(volume); }
+  });
 }
 
 // mode: "off" | "beep" | "tts" | "custom". "off" plays nothing at all. Falls back to
 // beep for "custom" with no path configured yet — same reasoning as the reference
 // app: a silent alert looks identical to a broken one, so degrade audibly instead.
+// Returns a Promise that resolves once playback has actually finished — callers that
+// need alerts not to overlap should go through enqueueAlert/playAlertsSequentially
+// below rather than calling this directly.
 export function playAlert(bossName, settings) {
   const mode = settings?.mode || "beep";
-  if (mode === "off") return;
+  if (mode === "off") return Promise.resolve();
   const rawVolume = settings?.volume;
   const volume = Math.min(100, Math.max(0, rawVolume == null ? 100 : rawVolume)) / 100;
   if (mode === "tts") return playTextToSpeech(bossName, settings, volume);
@@ -198,12 +247,28 @@ export function playAlert(bossName, settings) {
   return playBeep(volume);
 }
 
-// Plays a batch of alerts staggered so simultaneous spawns don't overlap
-// audibly — same purpose as the reference app's AlertStaggerDelay/
-// PlayAlertsSequentiallyAsync.
-const ALERT_STAGGER_MS = 2000;
+// Serial playback queue — every alert, from any call site, funnels through this one
+// shared tail so nothing ever plays on top of anything else. Each entry waits for the
+// real completion of whatever came before it (not a guessed duration), plus a short
+// fixed QUEUE_GAP_MS pause so consecutive alerts stay clearly separated instead of
+// blurring together. A failure in one alert (e.g. a rejected promise somewhere) can
+// never wedge the rest of the queue — it's swallowed and the queue moves on.
+const QUEUE_GAP_MS = 300;
+let queueTail = Promise.resolve();
+
+function enqueueAlert(bossName, settings) {
+  queueTail = queueTail
+    .then(() => playAlert(bossName, settings), () => playAlert(bossName, settings))
+    .catch(() => {})
+    .then(() => new Promise(resolve => setTimeout(resolve, QUEUE_GAP_MS)));
+  return queueTail;
+}
+
+// Queues a batch of alerts to play one after another, waiting for each one's actual
+// playback to finish (see enqueueAlert) rather than a fixed per-item delay — this is
+// what prevents overlap, especially for TTS where speech duration varies with the
+// name being spoken. Safe to call again while a previous batch is still draining;
+// the new names simply join the end of the same queue.
 export function playAlertsSequentially(bossNames, settings) {
-  bossNames.forEach((name, i) => {
-    setTimeout(() => playAlert(name, settings), i * ALERT_STAGGER_MS);
-  });
+  for (const name of bossNames) enqueueAlert(name, settings);
 }

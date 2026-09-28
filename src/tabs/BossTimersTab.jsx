@@ -17,18 +17,32 @@
  * getNextOccurrenceForName / getUpcomingOccurrencesFor and
  * bossTimerStorage's bossKey for where this lives.
  *
- * Completion (✓) is auto-detected three ways: for the 13 Core Tyria world
+ * Completion (✓) state itself now lives in the shared useBossAlerts hook
+ * (mounted globally in App.jsx), not in this component — it has to, since the
+ * DRF-driven auto-completion heuristics need to keep running whenever a drop
+ * comes in, regardless of whether this tab is even open. This tab just reads
+ * `completions`/`setCompletions`/`toggleComplete` from the `bossAlerts` prop.
+ * See useBossAlerts.js for the full list of what auto-completes and how.
+ *
+ * Completion is auto-detected several ways: for the 13 Core Tyria world
  * bosses that GW2's `/v2/account/worldbosses` endpoint tracks (see
  * worldBossApiIds.js); for 7 zone meta-chain finales that
  * `/v2/account/mapchests` tracks via that zone's daily Hero's Choice Chest
  * (see mapChestApiIds.js for exactly which ones, and why several zones with
  * an ambiguous shared trigger are deliberately left out rather than guessed);
- * and, for events with no dedicated API signal at all, a best-effort
- * heuristic that watches for a specific reward material's owned count
- * increasing during the event's window (+ a grace period) — see
- * MATERIAL_REWARD_TRACKERS below (currently just Ley-Line Anomaly's
- * guaranteed Mystic Coin). Everything else in the schedule has no usable
+ * and, for events with no dedicated API signal at all, a family of DRF-driven
+ * heuristics in useBossAlerts.js (item-count-exclusive-to-one-event,
+ * item-count-during-the-event's-window, exact-count-with-invalidation, and
+ * dual gold+currency threshold — see ITEM_COMPLETION_TRACKERS /
+ * MATERIAL_REWARD_TRACKERS / EXACT_COUNT_TRACKERS / DUAL_THRESHOLD_TRACKERS in
+ * bossTimerStorage.js). Everything else in the schedule has no usable
  * completion signal at all and stays manual-only.
+ *
+ * An event already marked done today no longer triggers its alert bell,
+ * UNLESS that alert's "alert me every time" checkbox is set — see the bell
+ * popover below and the suppression check in useBossAlerts.js. That's for
+ * farming-loop events (recurring meta events done many times a day) where
+ * the daily "done" checkbox doesn't mean "don't tell me when it's back up".
  *
  * Timeline blocks are sized proportionally to each event's real duration
  * (durationMin on the schedule entry — see worldBossScheduleData.js /
@@ -52,63 +66,25 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from "react"
 import {
   getUpcomingRowSeries, getUpcomingOccurrencesFor, getAllPossibleExpansions,
   formatCountdown, urgencyColor, ALERT_LEAD_OPTIONS_MIN, DEFAULT_DURATION_MIN,
-  slotVisibleInWindow, getMostRecentOccurrenceForName, getEventDurationMin,
+  slotVisibleInWindow,
 } from "../lib/bossTimerCalc.js";
 import {
   bossKey, loadFavoriteLists, saveFavoriteLists, nextDefaultFavoriteListName,
-  loadCompletions, saveCompletions, migrateLocationKeyedMap,
-  loadAreasSelection, saveAreasSelection, loadViewMode, saveViewMode,
-  loadApiFreshness, saveApiFreshness,
+  migrateLocationKeyedMap, loadAreasSelection, saveAreasSelection, loadViewMode, saveViewMode,
+  loadApiFreshness, saveApiFreshness, currentPeriod, AUTO_COMPLETION_ENABLED,
+  ITEM_COMPLETION_TRACKERS, MATERIAL_REWARD_TRACKERS, EXACT_COUNT_TRACKERS, DUAL_THRESHOLD_TRACKERS,
 } from "../lib/bossTimerStorage.js";
 import { EXPANSION_ACCENT_COLORS, EXPANSION_ACCENT_FALLBACK, expansionSortKey } from "../lib/worldBossScheduleData.js";
 import { WORLD_BOSS_API_IDS, WORLD_BOSS_API_ID_TO_NAME } from "../lib/worldBossApiIds.js";
 import { MAP_CHEST_API_IDS, MAP_CHEST_ID_TO_NAME } from "../lib/mapChestApiIds.js";
 import { apiFetch, BASE } from "../lib/gw2Api.js";
-import { getDailyResetTs } from "../lib/dailyCrafting.js";
 import { InteractivePopover } from "../components/InteractivePopover.jsx";
 import { copyWaypoint } from "../lib/clipboard.js";
 
 const CYCLES_AHEAD = 6;
 const TICK_MS = 1000;
 const WORLD_BOSS_POLL_MS = 2 * 60_000; // /v2/account/worldbosses only changes on kill or daily reset — no need to hammer it
-// Master switch for every automatic completion source (the two GW2 API polls and the
-// material-count heuristic below). OFF = completions are purely manual checkboxes that
-// reset at 00:00 UTC (5 PM PDT / 4 PM PST). Either way, ALL completions (manual and
-// auto) are cleared at that reset by the sweep effect further down.
-const AUTO_COMPLETION_ENABLED = true;
 const MAP_CHEST_POLL_MS = 2 * 60_000; // /v2/account/mapchests — same reasoning, only changes on claim or daily reset
-// How long after the daily reset (00:00 UTC) an API-tracked source is allowed to keep
-// reporting yesterday's list before it's trusted anyway — see evaluateApiFreshness below.
-// UNVERIFIED GUESS: Derrick observed that /v2/account/worldbosses and /v2/account/mapchests
-// can still show yesterday's completions for a while after reset if the account hasn't
-// logged in since, then go empty (or change) once he logged in. GW2's API docs don't state
-// how this refreshes or how long it can lag, so this number isn't backed by anything more
-// than one observation — tune it if it's consistently too short or too long.
-const UNCONFIRMED_GRACE_MS = 20 * 60_000;
-
-// ── Heuristic auto-completion via material-count delta ──────────────────────
-// A handful of recurring events reliably drop a specific, identifiable
-// material every time they're completed, even though GW2 exposes no
-// dedicated API completion flag for them (unlike the 13 world bosses or the
-// mapchest-tracked zone finales — see worldBossApiIds.js / mapChestApiIds.js).
-// For these, the app takes its own snapshot of the account's owned count for
-// that material as soon as it notices the event's window has opened, then
-// compares against the current count through the end of that window plus
-// `graceMinutes` (to absorb the API's own lag in reflecting a just-picked-up
-// material) — an increase means the reward was very likely collected.
-//
-// This is a best-effort HEURISTIC, not a real completion signal: the same
-// material can come from other sources too (other events, salvaging, login
-// rewards, trading) inside that same short window, so an increase doesn't
-// PROVE this specific event was the source — it's an inference the person
-// explicitly asked for despite that tradeoff. Kept to short, low-traffic
-// windows (20 min event + 5 min grace, for Ley-Line Anomaly) to minimize
-// coincidental false positives. ownedMap (passed down from App.jsx) is the
-// same combined bank-storage + all-characters'-bags total the rest of the
-// app already treats as "what you own" — not a separate, narrower fetch.
-const MATERIAL_REWARD_TRACKERS = [
-  { eventName: 'Ley-Line Anomaly', itemId: 19976, itemName: 'Mystic Coin', graceMinutes: 5 },
-];
 
 // ── Timeline-view constants ──
 const INTERVAL_MIN = 15;
@@ -176,17 +152,6 @@ function snapToLocalInterval(nowMs, intervalMin) {
   const snapped = Math.floor(d.getMinutes() / intervalMin) * intervalMin;
   return new Date(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours(), snapped, 0, 0).getTime();
 }
-// Completion "period" identity — now the same UTC-midnight reset boundary
-// Daily Crafting/Time Gated use (getDailyResetTs), instead of a separately
-// computed UTC-date string. Both landed on the same instant in practice,
-// but deriving it from one shared source means Boss Timers can't drift out
-// of sync with the rest of the app's dailies if that reset math ever
-// changes. getDailyResetTs() always reflects the actual current UTC day
-// (it doesn't take a nowMs param) — nowMs is accepted here only so every
-// call site below reads the same as before.
-function currentPeriod(nowMs) {
-  return getDailyResetTs();
-}
 
 // Applies one API poll's result to the completions map. Stamps every reported name as
 // done for the current period, and un-stamps any API-managed name that was AUTO-stamped
@@ -215,23 +180,41 @@ function setsEqual(a, b) {
 // Decides whether an API-tracked source's LATEST poll is safe to act on, or whether it
 // might still be reporting yesterday's data. `current` is what was stored after the
 // previous poll for this source (or undefined the very first time): { period, names,
-// confirmed }. `reported` is this poll's result. `periodMs`/`nowMs` are the current
-// reset-period identifier and the current time.
+// confirmed }. `reported` is this poll's result. `periodMs` is the current reset-period
+// identifier. `activeConfirmed` is true once the account is known to have actually
+// synced fresh data this period — see the gold-divergence tracking below for how that's
+// determined.
 //
-// The problem this guards against: Derrick observed /v2/account/worldbosses and
-// /v2/account/mapchests can still list yesterday's completions after the 00:00 UTC
-// reset if the account hasn't logged in since — so a poll run shortly after reset (by
-// an app that WAS running, or on first launch after one that wasn't) can re-stamp
-// yesterday's kills as today's. This isn't documented ArenaNet behavior, just one
-// observed case, so the fix is a heuristic, not a guarantee.
+// The problem this guards against: /v2/account/worldbosses and /v2/account/mapchests
+// keep reporting EXACTLY yesterday's completions after the 00:00 UTC reset until the
+// account actually logs into the game — not for some bounded grace window, but
+// indefinitely, however long that takes. An earlier version of this function assumed
+// a bounded window and force-trusted the response after 20 minutes regardless of
+// whether it had actually changed — which is precisely how a still-stale response
+// got re-stamped as "done today" while the game was never even running: the person
+// checked the app 48 minutes after reset with the game closed, the API was still
+// serving yesterday's list untouched, and the old timeout treated "still unchanged
+// after 20 minutes" as "confirmed accurate for today", which it wasn't.
 //
-// Approach: once the period changes, don't trust a source until either (a) its
-// reported list stops matching the last list seen for the PREVIOUS period — evidence
-// GW2 has actually updated it for today — or (b) UNCONFIRMED_GRACE_MS has passed since
-// reset regardless, so a source that legitimately still reports an empty/unchanged
-// list forever (nothing done yet today) doesn't stay gated indefinitely. Once
-// confirmed for a period, every later poll that period is trusted immediately.
-function evaluateApiFreshness(current, reported, periodMs, nowMs) {
+// A later revision tried gating this on DRF connection status instead — but that only
+// helps the subset of people who've set up a DRF token; everyone else got no safety
+// net at all. The fix that actually works for everyone: gold cannot change without a
+// real, active session, and logging in is exactly what makes GW2's API refresh — so a
+// gold value that has genuinely moved since the first poll of the new period is direct
+// proof the account has synced today, independent of whatever the (possibly still
+// identical) worldbosses/mapchests content says. See the gold-baseline tracking in the
+// component below for how `activeConfirmed` gets set. DRF connection is kept as an
+// additional, faster-arriving path to the same conclusion for people who have it
+// configured — it's ORed in, never required.
+//
+// Approach: once the period changes, don't trust a source until either
+// (a) its reported list stops matching the last list seen for the PREVIOUS period —
+// real evidence GW2 has actually refreshed it for today — or (b) the account is
+// confirmed active this period (gold moved, or DRF connected). No bare timeout
+// fallback — waiting indefinitely for one of these real signals is safer than ever
+// guessing a response is fresh. Once confirmed for a period, every later poll that
+// period is trusted immediately.
+function evaluateApiFreshness(current, reported, periodMs, activeConfirmed) {
   if (!current) return { next: { period: periodMs, names: reported, confirmed: true }, shouldReconcile: true };
   if (current.period === periodMs && current.confirmed) {
     return { next: { period: periodMs, names: reported, confirmed: true }, shouldReconcile: true };
@@ -242,8 +225,7 @@ function evaluateApiFreshness(current, reported, periodMs, nowMs) {
   // comparison is the same: has today's poll diverged from that pre-reset snapshot?
   const baseline = current.names;
   const differs = !setsEqual(reported, baseline);
-  const graceExpired = nowMs - periodMs >= UNCONFIRMED_GRACE_MS;
-  if (differs || graceExpired) {
+  if (differs || activeConfirmed) {
     return { next: { period: periodMs, names: reported, confirmed: true }, shouldReconcile: true };
   }
   return { next: { period: periodMs, names: baseline, confirmed: false }, shouldReconcile: false };
@@ -281,9 +263,10 @@ function TimelineGridLines({ leftOffset, count = SLOT_COUNT }) {
 }
 
 // ── Shared alert/collection popovers — identical content in both views ──
-function AlertPopover({ anchorRef, open, onClose, occ, alerts, setAlertLead, keyPrefix }) {
+function AlertPopover({ anchorRef, open, onClose, occ, alerts, setAlertLead, setAlertAlways, keyPrefix }) {
   const key = bossKey(occ.name);
-  const leadMinutes = alerts[key];
+  const entry = alerts[key];
+  const leadMinutes = entry?.lead;
   return (
     <InteractivePopover anchorRef={anchorRef} open={open} onClose={onClose}>
       <div className="bt-pop-lbl">ALERT ME</div>
@@ -298,6 +281,13 @@ function AlertPopover({ anchorRef, open, onClose, occ, alerts, setAlertLead, key
         <input type="radio" name={`${keyPrefix}-${key}`} checked={!leadMinutes} onChange={() => setAlertLead(occ.name, null)} />
         Off
       </label>
+      {!!leadMinutes && (
+        <label className="bt-pop-row" style={{ marginTop: 6, paddingTop: 6, borderTop: "1px solid var(--border)" }}
+          title="Keep alerting for this event even on days it's already marked done — for events you farm more than once a day.">
+          <input type="checkbox" checked={!!entry?.always} onChange={e => setAlertAlways(occ.name, e.target.checked)} />
+          Alert me every time (even if already done)
+        </label>
+      )}
     </InteractivePopover>
   );
 }
@@ -331,17 +321,38 @@ function CollectionPopover({ anchorRef, open, onClose, occ, collections, onToggl
   );
 }
 
+// Which auto-completion tracker (if any) covers this event name, across all sources —
+// used purely to pick the 🔗 badge's tooltip text. Order mirrors the categories in
+// bossTimerStorage.js; an event only ever matches one.
+function findAutoTracker(name) {
+  const item = ITEM_COMPLETION_TRACKERS.find(t => t.eventName === name);
+  if (item) return { kind: "item", ...item };
+  const material = MATERIAL_REWARD_TRACKERS.find(t => t.eventName === name);
+  if (material) return { kind: "material", ...material };
+  const exact = EXACT_COUNT_TRACKERS.find(t => t.eventName === name);
+  if (exact) return { kind: "exact", ...exact };
+  const dual = DUAL_THRESHOLD_TRACKERS.find(t => t.eventName === name);
+  if (dual) return { kind: "dual", ...dual };
+  return null;
+}
+
 function AutoTrackedBadge({ name }) {
   if (!AUTO_COMPLETION_ENABLED) return null;
   const viaWorldBoss = !!WORLD_BOSS_API_IDS[name];
   const viaMapChest = !!MAP_CHEST_API_IDS[name];
-  const viaMaterial = MATERIAL_REWARD_TRACKERS.find(t => t.eventName === name);
-  if (!viaWorldBoss && !viaMapChest && !viaMaterial) return null;
+  const tracker = viaWorldBoss || viaMapChest ? null : findAutoTracker(name);
+  if (!viaWorldBoss && !viaMapChest && !tracker) return null;
   const title = viaWorldBoss
     ? "Marked done automatically once GW2's API reports this boss killed for the day"
     : viaMapChest
     ? "Marked done automatically once GW2's API reports this zone's daily Hero's Choice Chest claimed"
-    : `Best-effort: marked done automatically if your ${viaMaterial.itemName} count goes up during this event's window (+${viaMaterial.graceMinutes} min grace) — not a guaranteed signal, since that material can come from other sources too`;
+    : tracker.kind === "item"
+    ? `Marked done automatically as soon as your "${tracker.itemName}" count goes up — that reward is exclusive to this event, so timing doesn't matter`
+    : tracker.kind === "material"
+    ? `Best-effort: marked done automatically if your ${tracker.itemName} count goes up during this event's window (+${tracker.graceMinutes} min grace) — not a guaranteed signal, since that material can come from other sources too`
+    : tracker.kind === "exact"
+    ? `Best-effort: marked done automatically if your ${tracker.itemName} count goes up by exactly ${tracker.exactCount} during this event's window (+${tracker.graceMinutes} min grace), unless a chest that also grants exactly ${tracker.exactCount} was looted first this occurrence`
+    : `Marked done automatically if both gold and ${tracker.currencyName} increase together (by the reward's guaranteed amounts) during this event's window (+${tracker.graceMinutes} min grace)`;
   return <span title={title} style={{ fontSize: 9, opacity: .6, flexShrink: 0 }}>🔗</span>;
 }
 
@@ -375,11 +386,11 @@ function WaypointButton({ chatLink, name, fontSize = 13 }) {
 }
 
 // ── Countdown view: one occurrence line ──
-function CountdownLine({ occ, now, alerts, setAlertLead, collections, onToggleMember, onCreateCollection, completions, currentPeriodStr, onToggleComplete }) {
+function CountdownLine({ occ, now, alerts, setAlertLead, setAlertAlways, collections, onToggleMember, onCreateCollection, completions, currentPeriodStr, onToggleComplete }) {
   const msUntil = occ.spawnMs - now;
   const urgency = urgencyColor(msUntil);
   const key = bossKey(occ.name);
-  const leadMinutes = alerts[key];
+  const leadMinutes = alerts[key]?.lead;
   const localTime = new Date(occ.spawnMs).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
   const done = completions[key]?.period === currentPeriodStr;
 
@@ -414,7 +425,7 @@ function CountdownLine({ occ, now, alerts, setAlertLead, collections, onToggleMe
         <span className="bt-occ-local">{localTime}</span>
       </div>
 
-      <AlertPopover anchorRef={bellRef} open={bellOpen} onClose={() => setBellOpen(false)} occ={occ} alerts={alerts} setAlertLead={setAlertLead} keyPrefix="cd-lead" />
+      <AlertPopover anchorRef={bellRef} open={bellOpen} onClose={() => setBellOpen(false)} occ={occ} alerts={alerts} setAlertLead={setAlertLead} setAlertAlways={setAlertAlways} keyPrefix="cd-lead" />
       <CollectionPopover anchorRef={starRef} open={starOpen} onClose={() => setStarOpen(false)} occ={occ} collections={collections} onToggleMember={onToggleMember} onCreateCollection={onCreateCollection} />
     </div>
   );
@@ -463,10 +474,10 @@ function CountdownSection({ expansion, rows, collapsed, onToggle, ...rest }) {
 }
 
 // ── Timeline view: one occurrence line inside a Gantt block ──
-function TimelineOccLine({ occ, alerts, setAlertLead, collections, onToggleMember, onCreateCollection, completions, currentPeriodStr, onToggleComplete }) {
+function TimelineOccLine({ occ, alerts, setAlertLead, setAlertAlways, collections, onToggleMember, onCreateCollection, completions, currentPeriodStr, onToggleComplete }) {
   const key = bossKey(occ.name);
   const done = completions[key]?.period === currentPeriodStr;
-  const leadMinutes = alerts[key];
+  const leadMinutes = alerts[key]?.lead;
   const memberListIds = collections.filter(l => l.members.some(m => m.name === occ.name)).map(l => l.id);
   const isFavorited = memberListIds.length > 0;
 
@@ -492,7 +503,7 @@ function TimelineOccLine({ occ, alerts, setAlertLead, collections, onToggleMembe
         <WaypointButton chatLink={occ.chatLink} name={occ.name} fontSize={11} />
       </div>
 
-      <AlertPopover anchorRef={bellRef} open={bellOpen} onClose={() => setBellOpen(false)} occ={occ} alerts={alerts} setAlertLead={setAlertLead} keyPrefix="tl-lead" />
+      <AlertPopover anchorRef={bellRef} open={bellOpen} onClose={() => setBellOpen(false)} occ={occ} alerts={alerts} setAlertLead={setAlertLead} setAlertAlways={setAlertAlways} keyPrefix="tl-lead" />
       <CollectionPopover anchorRef={starRef} open={starOpen} onClose={() => setStarOpen(false)} occ={occ} collections={collections} onToggleMember={onToggleMember} onCreateCollection={onCreateCollection} />
     </div>
   );
@@ -620,11 +631,50 @@ function TimelineSection({ expansion, rows, origin, windowEnd, nowLineLeft, coll
   );
 }
 
-export default function BossTimersTab({ bossAlerts, ownedMap = {} }) {
-  const { alerts, setAlertLead, soundSettings, setSoundSettings } = bossAlerts;
+// Small safety margin after gold is first seen to have moved this period before trusting
+// worldbosses/mapchests fully — different account-data backends may not all refresh in
+// perfect lockstep, so this buffers against a few minutes' skew between them rather than
+// trusting the exact instant gold ticks over. Deliberately much shorter than the old
+// blind 20-minute timeout this replaces, and — critically — it only starts counting once
+// there's real evidence (gold actually moved), not from the reset itself.
+const GOLD_CONFIRM_BUFFER_MS = 5 * 60_000;
+
+export default function BossTimersTab({ bossAlerts, goldCopper, drfConnected = false }) {
+  const {
+    alerts, setAlertLead, setAlertAlways, soundSettings, setSoundSettings,
+    completions, setCompletions, toggleComplete,
+  } = bossAlerts;
   const [now, setNow] = useState(Date.now());
+  // Tracks the most recent reset period during which DRF was actually seen connected —
+  // a reliable, but DRF-only, "the game has genuinely been active this period" signal.
+  // Not reset on disconnect — once confirmed for a period, it stays confirmed for the
+  // rest of that period even if DRF later drops.
+  const drfConfirmedPeriodRef = useRef(null);
+  useEffect(() => {
+    if (drfConnected) drfConfirmedPeriodRef.current = currentPeriod(Date.now());
+  }, [drfConnected]);
+  // Gold-divergence tracking — the signal that works for EVERYONE, not just people with
+  // DRF set up: gold cannot change without a real, active session, and logging in is
+  // exactly what makes GW2's account API refresh, so a gold value that has genuinely
+  // moved since the first reading of the new period is direct proof the account has
+  // synced today. goldBaselineRef holds the first gold reading seen for the current
+  // period; goldDivergedAtRef records when (if ever) gold was first seen to differ from
+  // that baseline this period.
+  const goldBaselineRef = useRef(null); // { period, gold }
+  const goldDivergedAtRef = useRef(null); // { period, ts }
+  useEffect(() => {
+    if (goldCopper == null) return;
+    const period = currentPeriod(Date.now());
+    if (!goldBaselineRef.current || goldBaselineRef.current.period !== period) {
+      goldBaselineRef.current = { period, gold: goldCopper };
+      goldDivergedAtRef.current = null;
+      return;
+    }
+    if (goldCopper !== goldBaselineRef.current.gold && (!goldDivergedAtRef.current || goldDivergedAtRef.current.period !== period)) {
+      goldDivergedAtRef.current = { period, ts: Date.now() };
+    }
+  }, [goldCopper]);
   const [collections, setCollections] = useState([]);
-  const [completions, setCompletions] = useState({});
   const [loaded, setLoaded] = useState(false);
   const [viewMode, setViewMode] = useState("countdown"); // "countdown" | "timeline"
   const [activeTabId, setActiveTabId] = useState(null); // null = "All" — shared by both views
@@ -662,11 +712,10 @@ export default function BossTimersTab({ bossAlerts, ownedMap = {} }) {
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([loadFavoriteLists(), loadCompletions(), loadAreasSelection(), loadViewMode(), loadApiFreshness()])
-      .then(([lists, comps, areas, view, freshness]) => {
+    Promise.all([loadFavoriteLists(), loadAreasSelection(), loadViewMode(), loadApiFreshness()])
+      .then(([lists, areas, view, freshness]) => {
         if (cancelled) return;
         setCollections(lists);
-        setCompletions(migrateLocationKeyedMap(comps)); // pre-name-grouping saves used "name|location" keys
         if (areas) setSelectedAreas(new Set(areas));
         if (view) setViewMode(view);
         // Rehydrate the persisted per-source baseline (names were stored as arrays —
@@ -689,7 +738,7 @@ export default function BossTimersTab({ bossAlerts, ownedMap = {} }) {
 
   // ── GW2 API auto-completion for the 13 world bosses that expose it ──
   useEffect(() => {
-    if (!loaded || !AUTO_COMPLETION_ENABLED) return; // wait for saved completions to load first, or a poll could overwrite them
+    if (!loaded || !bossAlerts.loaded || !AUTO_COMPLETION_ENABLED) return; // wait for saved completions to load first, or a poll could overwrite them
     let cancelled = false;
     const poll = async () => {
       let killed;
@@ -699,7 +748,10 @@ export default function BossTimersTab({ bossAlerts, ownedMap = {} }) {
       if (cancelled || !Array.isArray(killed)) return;
       const reported = new Set(killed.map(id => WORLD_BOSS_API_ID_TO_NAME[id]).filter(Boolean));
       const periodMs = currentPeriod(Date.now());
-      const { next, shouldReconcile } = evaluateApiFreshness(apiFreshnessRef.current.worldbosses, reported, periodMs, Date.now());
+      const goldConfirmed = goldDivergedAtRef.current?.period === periodMs
+        && (Date.now() - goldDivergedAtRef.current.ts) >= GOLD_CONFIRM_BUFFER_MS;
+      const activeConfirmed = goldConfirmed || drfConfirmedPeriodRef.current === periodMs;
+      const { next, shouldReconcile } = evaluateApiFreshness(apiFreshnessRef.current.worldbosses, reported, periodMs, activeConfirmed);
       apiFreshnessRef.current = { ...apiFreshnessRef.current, worldbosses: next };
       saveApiFreshness({
         worldbosses: next && { period: next.period, names: [...next.names], confirmed: next.confirmed },
@@ -707,23 +759,19 @@ export default function BossTimersTab({ bossAlerts, ownedMap = {} }) {
       });
       setApiUnconfirmed(prev => (prev.worldbosses === !next.confirmed ? prev : { ...prev, worldbosses: !next.confirmed }));
       if (!shouldReconcile) return; // still might be yesterday's list — leave completions as the reset sweep left them
-      setCompletions(prev => {
-        const nextCompletions = reconcileApiCompletions(prev, Object.keys(WORLD_BOSS_API_IDS), reported, periodMs);
-        if (nextCompletions !== prev) saveCompletions(nextCompletions);
-        return nextCompletions;
-      });
+      setCompletions(prev => reconcileApiCompletions(prev, Object.keys(WORLD_BOSS_API_IDS), reported, periodMs));
     };
     poll();
     const t = setInterval(poll, WORLD_BOSS_POLL_MS);
     return () => { cancelled = true; clearInterval(t); };
-  }, [loaded]);
+  }, [loaded, bossAlerts.loaded, setCompletions]);
 
   // ── GW2 API auto-completion for zone Hero's Choice Chests (see mapChestApiIds.js
   // for exactly which events this covers and why several zones are deliberately
   // left out — same poll/dedup pattern as the world-boss effect above, just against
   // /v2/account/mapchests instead of /v2/account/worldbosses. ──
   useEffect(() => {
-    if (!loaded || !AUTO_COMPLETION_ENABLED) return;
+    if (!loaded || !bossAlerts.loaded || !AUTO_COMPLETION_ENABLED) return;
     let cancelled = false;
     const poll = async () => {
       let claimed;
@@ -731,7 +779,10 @@ export default function BossTimersTab({ bossAlerts, ownedMap = {} }) {
       if (cancelled || !Array.isArray(claimed)) return;
       const reported = new Set(claimed.map(id => MAP_CHEST_ID_TO_NAME[id]).filter(Boolean));
       const periodMs = currentPeriod(Date.now());
-      const { next, shouldReconcile } = evaluateApiFreshness(apiFreshnessRef.current.mapchests, reported, periodMs, Date.now());
+      const goldConfirmed = goldDivergedAtRef.current?.period === periodMs
+        && (Date.now() - goldDivergedAtRef.current.ts) >= GOLD_CONFIRM_BUFFER_MS;
+      const activeConfirmed = goldConfirmed || drfConfirmedPeriodRef.current === periodMs;
+      const { next, shouldReconcile } = evaluateApiFreshness(apiFreshnessRef.current.mapchests, reported, periodMs, activeConfirmed);
       apiFreshnessRef.current = { ...apiFreshnessRef.current, mapchests: next };
       saveApiFreshness({
         mapchests: next && { period: next.period, names: [...next.names], confirmed: next.confirmed },
@@ -739,58 +790,12 @@ export default function BossTimersTab({ bossAlerts, ownedMap = {} }) {
       });
       setApiUnconfirmed(prev => (prev.mapchests === !next.confirmed ? prev : { ...prev, mapchests: !next.confirmed }));
       if (!shouldReconcile) return; // still might be yesterday's list — leave completions as the reset sweep left them
-      setCompletions(prev => {
-        const nextCompletions = reconcileApiCompletions(prev, Object.keys(MAP_CHEST_API_IDS), reported, periodMs);
-        if (nextCompletions !== prev) saveCompletions(nextCompletions);
-        return nextCompletions;
-      });
+      setCompletions(prev => reconcileApiCompletions(prev, Object.keys(MAP_CHEST_API_IDS), reported, periodMs));
     };
     poll();
     const t = setInterval(poll, MAP_CHEST_POLL_MS);
     return () => { cancelled = true; clearInterval(t); };
-  }, [loaded]);
-
-  // ── Heuristic auto-completion via material-count delta (see
-  // MATERIAL_REWARD_TRACKERS above for what this covers and its tradeoffs) ──
-  // Re-evaluated on every `now` tick (cheap — a handful of comparisons against
-  // a one-entry array today) AND whenever `ownedMap` itself changes (a fresh
-  // materials/inventory fetch from App.jsx's normal refresh cycle). No network
-  // call of its own — it only reacts to data the app is already fetching.
-  const materialBaselineRef = useRef({}); // eventName -> { occurrenceSpawnMs, baselineCount, confirmed }
-  useEffect(() => {
-    if (!AUTO_COMPLETION_ENABLED) return;
-    for (const tracker of MATERIAL_REWARD_TRACKERS) {
-      const occSpawnMs = getMostRecentOccurrenceForName(tracker.eventName, now);
-      if (occSpawnMs == null) continue; // this event isn't in (or seasonally active in) the schedule at all
-      const durationMin = getEventDurationMin(tracker.eventName);
-      const windowEndMs = occSpawnMs + durationMin * 60_000 + tracker.graceMinutes * 60_000;
-      if (now > windowEndMs) continue; // too late for this occurrence — leave it manual-only, wait for the next one
-      const curCount = ownedMap[tracker.itemId] || 0;
-      const existing = materialBaselineRef.current[tracker.eventName];
-      if (!existing || existing.occurrenceSpawnMs !== occSpawnMs) {
-        // First time we've observed this occurrence — baseline against
-        // whatever we currently own. Same "capture baseline the moment we
-        // notice a new period started" approach dailyCrafting.js's
-        // recordManualDailyBaseline already uses for other count-delta
-        // tracking, with the same accepted caveat: if the app only starts
-        // polling partway into the window, a reward collected in the gap
-        // before this first observation won't be caught.
-        materialBaselineRef.current[tracker.eventName] = { occurrenceSpawnMs: occSpawnMs, baselineCount: curCount, confirmed: false };
-        continue;
-      }
-      if (existing.confirmed) continue; // already marked done for this occurrence
-      if (curCount > existing.baselineCount) {
-        existing.confirmed = true;
-        setCompletions(prev => {
-          const period = currentPeriod(Date.now());
-          if (prev[tracker.eventName]?.period === period) return prev; // already done today via some other path
-          const next = { ...prev, [tracker.eventName]: { period, auto: true } };
-          saveCompletions(next);
-          return next;
-        });
-      }
-    }
-  }, [now, ownedMap]);
+  }, [loaded, bossAlerts.loaded, setCompletions]);
 
   const allExpansions = useMemo(() => getAllPossibleExpansions(), []);
   const effectiveSelectedAreas = selectedAreas || new Set(allExpansions);
@@ -844,41 +849,10 @@ export default function BossTimersTab({ bossAlerts, ownedMap = {} }) {
   // occurrence done marks it done for every zone that shares the name
   // (matches alerts/collections' name-only identity).
   const currentPeriodStr = useMemo(() => currentPeriod(now), [now]);
-  const handleToggleComplete = useCallback((name) => {
-    setCompletions(prev => {
-      const key = bossKey(name);
-      const next = { ...prev };
-      if (next[key]?.period === currentPeriod(Date.now())) {
-        delete next[key]; // un-check
-      } else {
-        next[key] = { period: currentPeriod(Date.now()) };
-      }
-      saveCompletions(next);
-      return next;
-    });
-  }, []);
-
-  // Reset sweep. Whenever the period rolls over (00:00 UTC), or on load if the saved data is
-  // from an earlier period, drop every completion that isn't for the current period. Display
-  // already ignores stale periods; this also removes them from storage. While auto-completion
-  // is off it also drops any leftover auto-stamped entries (from the API polls / heuristic),
-  // so a wrongly-checked box from before this change clears itself.
-  useEffect(() => {
-    if (!loaded) return;
-    setCompletions(prev => {
-      const stale = Object.keys(prev).filter(k =>
-        prev[k]?.period !== currentPeriodStr || (!AUTO_COMPLETION_ENABLED && prev[k]?.auto));
-      if (stale.length === 0) return prev;
-      const next = { ...prev };
-      stale.forEach(k => delete next[k]);
-      saveCompletions(next);
-      return next;
-    });
-  }, [loaded, currentPeriodStr]);
 
   const cellProps = {
-    now, alerts, setAlertLead, collections, onToggleMember: handleToggleMember, onCreateCollection: handleCreateCollection,
-    completions, currentPeriodStr, onToggleComplete: handleToggleComplete,
+    now, alerts, setAlertLead, setAlertAlways, collections, onToggleMember: handleToggleMember, onCreateCollection: handleCreateCollection,
+    completions, currentPeriodStr, onToggleComplete: toggleComplete,
   };
 
   // ── Countdown view data ──
@@ -922,7 +896,7 @@ export default function BossTimersTab({ bossAlerts, ownedMap = {} }) {
       : []
   ), [activeList, origin, windowEnd]);
 
-  if (!loaded) return <div className="empty">Loading boss timers…</div>;
+  if (!loaded || !bossAlerts.loaded) return <div className="empty">Loading boss timers…</div>;
 
   const headerCols = viewMode === "timeline" ? Array.from({ length: SLOT_COUNT }, (_, i) => {
     const t = origin + i * INTERVAL_MS;
@@ -940,9 +914,9 @@ export default function BossTimersTab({ bossAlerts, ownedMap = {} }) {
           👁 View: {viewMode === "countdown" ? "Countdown" : "Timeline"} ▾
         </button>
         <div style={{ marginLeft: "auto", fontSize: 11, color: "var(--text3)", fontFamily: "Cinzel,serif", letterSpacing: 1 }}>
-          ✓ marks done until reset ({new Date(currentPeriodStr + 86400000).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}) · 🔔 sets an alert · ⭐ saves to a collection{AUTO_COMPLETION_ENABLED && " · 🔗 auto-tracked via API"}
+          ✓ marks done until reset ({new Date(currentPeriodStr + 86400000).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}) · 🔔 sets an alert (skipped for already-done events unless "alert every time" is checked) · ⭐ saves to a collection{AUTO_COMPLETION_ENABLED && " · 🔗 auto-tracked"}
           {AUTO_COMPLETION_ENABLED && (apiUnconfirmed.worldbosses || apiUnconfirmed.mapchests) && (
-            <span style={{ color: "var(--gold2)", marginLeft: 10 }} title="GW2's API can briefly keep reporting yesterday's completions after the daily reset — auto-checks are held back until it reports something different, or up to 20 minutes, whichever comes first.">
+            <span style={{ color: "var(--gold2)", marginLeft: 10 }} title="GW2's API can keep reporting yesterday's completions until you actually log into the game — auto-checks are held back until it reports something different, or your gold visibly changes since today's reset (proof you're actually active), whichever comes first.">
               ⏳ verifying today's API completions…
             </span>
           )}

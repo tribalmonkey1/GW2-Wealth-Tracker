@@ -10,6 +10,10 @@
  * What a "drop" event patches, instantly, with no network round-trip:
  *   - data.goldCopper           (currency id 1 = Coin)
  *   - forgeWallet.{spirit_shards,volatile_magic,unbound_magic,karma,laurels}
+ *   - data.extraCurrencies      (any OTHER wallet currency a tracker cares about —
+ *     currently just Tyrian Defense Seal, id 60, for the Dragonstorm dual-threshold
+ *     auto-completion tracker in useBossAlerts.js. Add more IDs to
+ *     TRACKED_EXTRA_CURRENCY_IDS below as new trackers need them.)
  *   - cacheRef.current.ownedMap + data.materialRows (for any item DRF reports
  *     a change for that we already have itemMap/priceMap data for)
  *   - a debounced recompute of craftItems/byDisc (via the same worker path
@@ -29,6 +33,12 @@ const GOLD_CURRENCY_ID = 1;
 const CURRENCY_ID_TO_WALLET_FIELD = Object.fromEntries(
   Object.entries(CURRENCY_IDS).map(([field, id]) => [id, field])
 );
+
+// Wallet currencies tracked into data.extraCurrencies (keyed by numeric currency id,
+// same convention as ownedMap/priceMap) purely for auto-completion heuristics that
+// need a currency reading rather than an item count — see DUAL_THRESHOLD_TRACKERS in
+// bossTimerStorage.js. 60 = Tyrian Defense Seal (Dragonstorm's guaranteed reward).
+const TRACKED_EXTRA_CURRENCY_IDS = new Set([60]);
 
 // Batches a burst of drop events (e.g. an AoE farm pull triggering many
 // pickups in under a second) into one worker recompute instead of one per event.
@@ -99,15 +109,17 @@ export function useDrfLiveFeed({ cacheRef, setData, setForgeWallet, token, enabl
 
     let goldDelta = 0;
     const walletDeltas = {};
+    const extraCurrencyDeltas = {};
     for (const [idStr, delta] of Object.entries(evt.currencies || {})) {
       const id = Number(idStr);
       if (!delta) continue;
       if (id === GOLD_CURRENCY_ID) { goldDelta += delta; continue; }
       const field = CURRENCY_ID_TO_WALLET_FIELD[id];
-      if (field) walletDeltas[field] = (walletDeltas[field] || 0) + delta;
-      // Unrecognized currency ids (guild commendations, WvW tickets, etc.) are
-      // silently ignored here — this feed only drives gold + the 5 Mystic
-      // Forge wallet currencies; everything else stays GW2-API-sourced.
+      if (field) { walletDeltas[field] = (walletDeltas[field] || 0) + delta; continue; }
+      if (TRACKED_EXTRA_CURRENCY_IDS.has(id)) extraCurrencyDeltas[id] = (extraCurrencyDeltas[id] || 0) + delta;
+      // Any other currency id (guild commendations, WvW tickets, etc.) is silently
+      // ignored here — this feed only drives gold, the 5 Mystic Forge wallet
+      // currencies, and whatever's listed in TRACKED_EXTRA_CURRENCY_IDS.
     }
 
     if (goldDelta !== 0 || Object.keys(matRowPatches).length > 0) {
@@ -136,6 +148,18 @@ export function useDrfLiveFeed({ cacheRef, setData, setForgeWallet, token, enabl
         const next = { ...prev };
         for (const [field, delta] of Object.entries(walletDeltas)) next[field] = (next[field] || 0) + delta;
         return next;
+      });
+    }
+
+    if (Object.keys(extraCurrencyDeltas).length > 0) {
+      setData(prev => {
+        if (!prev) return prev;
+        const next = { ...(prev.extraCurrencies || {}) };
+        for (const [idStr, delta] of Object.entries(extraCurrencyDeltas)) {
+          const id = Number(idStr);
+          next[id] = (next[id] || 0) + delta;
+        }
+        return { ...prev, extraCurrencies: next };
       });
     }
 

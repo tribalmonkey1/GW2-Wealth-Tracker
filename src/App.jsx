@@ -59,10 +59,24 @@ const UNLEARNED_REFRESH_MS = 7 * 24 * 60 * 60_000; // weekly — full-catalog re
 const AUTO_UNLOCKED_RESCAN_MS = 4 * 60 * 60_000; // every 4h — background check for recipes newly usable purely from a discipline level crossing a threshold (see rescanAutoUnlockedRecipes)
 const FRIEND_REFRESH_MS = 24 * 60 * 60_000; // daily — friend recipes-known rarely changes, no need for tighter polling
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+// Extra wallet currencies tracked into data.extraCurrencies alongside goldCopper/
+// forgeWallet, keyed by numeric GW2 currency id (same convention as ownedMap/
+// priceMap) — currently just Tyrian Defense Seal (60), needed by the Dragonstorm
+// dual-threshold auto-completion tracker in useBossAlerts.js. See drfClient.js for
+// how DRF pushes live deltas for these same ids.
+const EXTRA_CURRENCY_IDS = [60];
+const extractExtraCurrencies = (walletArr) => {
+  const map = {};
+  for (const id of EXTRA_CURRENCY_IDS) map[id] = walletArr.find(w => w.id === id)?.value || 0;
+  return map;
+};
 
 export default function App() {
   const [loadState, setLoadState] = useState({ phase: "loading", pct: 0, msg: "Initializing..." });
   const [data, setData] = useState(null);
+  // Flips true once the staged startup load has produced a full owned-items map (bags
+  // included) — gates the boss-timer auto-completion trackers, see useBossAlerts.js.
+  const [dataSettled, setDataSettled] = useState(false);
   const [error, setError] = useState(null);
   const [dbStats, setDbStats] = useState(null);
   const [showMigration, setShowMigration] = useState(false);
@@ -163,10 +177,15 @@ export default function App() {
   const [friendActionMsg, setFriendActionMsg] = useState(null); // {ok, text}
   const [showDeleteFriendConfirm, setShowDeleteFriendConfirm] = useState(null); // friend id pending delete confirmation
 
-  const bossAlerts = useBossAlerts(customSoundPath, piperVoiceFile, piperSpeakerId); // global — fires boss/event alerts regardless of active tab
+  // Global — fires boss/event alerts, and runs every DRF-driven auto-completion
+  // heuristic, regardless of which tab is active. ownedMap/goldCopper/extraCurrencies
+  // are passed straight from live data so the trackers see drops without any polling
+  // of their own; see useBossAlerts.js and bossTimerStorage.js for what each one does.
+  const bossAlerts = useBossAlerts(customSoundPath, piperVoiceFile, piperSpeakerId, data?.ownedMap, data?.goldCopper, data?.extraCurrencies, dataSettled);
   // DRF (Drop Research Facilities) live feed — optional. When a token is set, patches
-  // goldCopper/materialRows/ownedMap/forgeWallet the instant a drop/consume/salvage
-  // event comes in, on top of (never instead of) the normal GW2 API polling below.
+  // goldCopper/materialRows/ownedMap/forgeWallet/extraCurrencies the instant a drop/
+  // consume/salvage event comes in, on top of (never instead of) the normal GW2 API
+  // polling below.
   const { status: drfStatus, statusDetail: drfStatusDetail } = useDrfLiveFeed({
     cacheRef, setData, setForgeWallet, token: drfToken, enabled: !!drfToken,
   });
@@ -242,7 +261,7 @@ export default function App() {
         const craftItemsPromise = computeCraftItems(cachedAllRecipes, cachedResolvedRecipes, cachedItemMap, cachedPriceMap, cachedOwnedMap);
 
         // Render shell immediately
-        setData({ goldCopper: cachedGold, totalMaterialValue: 0, materialRows: [], craftItems: [], byDisc: {}, itemMap: cachedItemMap, priceMap: cachedPriceMap, ownedMap: cachedOwnedMap, charInventoryByChar: {}, charDisciplines: {}, timegatedList: [] });
+        setData({ goldCopper: cachedGold, totalMaterialValue: 0, materialRows: [], craftItems: [], byDisc: {}, itemMap: cachedItemMap, priceMap: cachedPriceMap, ownedMap: cachedOwnedMap, charInventoryByChar: {}, charDisciplines: {}, timegatedList: [], extraCurrencies: {} });
         setLoadState({ phase: "refreshing", pct: 100, msg: "Updating live data..." });
 
         // Material rows populated when worker finishes
@@ -304,6 +323,7 @@ export default function App() {
                                                                                                                          fetchSoldHistory().catch(() => []),
       ]);
       const goldCopper = wallet.find(w => w.id === 1)?.value || 0;
+      const extraCurrencies = extractExtraCurrencies(wallet);
       setForgeWallet(extractForgeWallet(wallet));
       // dailycrafting returns array of item name strings like "glob_of_elder_spirit_residue"
       // We'll store as a raw array and look up against recipe output IDs via the API's item IDs
@@ -469,18 +489,17 @@ export default function App() {
         const spNet = Math.floor(sp * 0.85);
         return { id: m.id, name: item?.name || `Item ${m.id}`, icon: item?.icon, rarity: item?.rarity, count: m.count, sellPrice: sp, sellPriceNet: spNet, buyPrice: price?.buys?.unit_price || 0, totalValue: spNet * m.count };
       }).filter(r => {
-        // Exclude items that are untradeable, have no recipe, and no known name — these are
-        // permanent contracts, infinite tools, account-bound junk from character inventories
-        if (r.name.startsWith("Item ")) return false; // unknown item, not in API
-        const item = itemMap[r.id];
+        // Show anything genuinely worth something — TP-sellable or an ingredient in a
+        // known recipe — even if its name hasn't resolved in itemMap yet. Previously this
+        // hard-dropped ANY row whose name hadn't resolved regardless of value, which
+        // silently hid tradeable items (e.g. Unidentified Gear pieces) and undercounted
+        // Total Wealth whenever item-detail resolution simply hadn't caught up yet. Only
+        // genuinely worthless AND still-unresolved rows are dropped now — nothing useful
+        // to show, and nothing lost by not counting them.
         const hasTP = r.sellPrice > 0;
         const hasCraft = !!resolvedRecipes[r.id];
-        const flags = item?.flags || [];
-        const isAccountBound = flags.includes("AccountBound") || flags.includes("MonsterOnly");
-        const isTool = item?.type === "Tool" || item?.type === "Container";
-        // Keep if tradeable or craftable; drop if account-bound tool/container with no TP value
-        if (isAccountBound && isTool && !hasTP && !hasCraft) return false;
-        return true;
+        if (hasTP || hasCraft) return true;
+        return !r.name.startsWith("Item ");
       });
       const totalMaterialValue = materialRows.reduce((s, r) => s + r.totalValue, 0);
 
@@ -546,7 +565,8 @@ export default function App() {
       }
       setLivePricesReady(true);
       cacheRef.current.craftItems = craftItems;
-      setData({ goldCopper, totalMaterialValue, materialRows, craftItems, byDisc, itemMap, priceMap, ownedMap, charInventoryByChar, charDisciplines, timegatedList });
+      setData({ goldCopper, totalMaterialValue, materialRows, craftItems, byDisc, itemMap, priceMap, ownedMap, charInventoryByChar, charDisciplines, timegatedList, extraCurrencies });
+      setDataSettled(true);
       setLastPrice(now); setLastRecipe(now);
       setNextPriceIn(PRICE_REFRESH_MS); setNextRecipeIn(RECIPE_REFRESH_MS);
       setSecsAgo(0);
@@ -592,6 +612,7 @@ export default function App() {
       setLegendaryAchievements(achMap);
     }
     const goldCopper = wallet.find(w => w.id === 1)?.value || 0;
+    const extraCurrencies = extractExtraCurrencies(wallet);
     setForgeWallet(extractForgeWallet(wallet));
     const nowDate = new Date();
     setDailyCrafted(buildDailyCraftedSet(rawDailyCrafted, itemMap));
@@ -619,10 +640,10 @@ export default function App() {
       const sp = price?.sells?.unit_price || 0; const spNet = Math.floor(sp * 0.85);
       return { id: m.id, name: item?.name || `Item ${m.id}`, icon: item?.icon, rarity: item?.rarity, count: m.count, sellPrice: sp, sellPriceNet: spNet, buyPrice: price?.buys?.unit_price || 0, totalValue: spNet * m.count };
     }).filter(r => {
-      if (r.name.startsWith("Item ")) return false;
-      const item = itemMap[r.id]; const flags = item?.flags || [];
-      if (flags.includes("AccountBound") && (item?.type === "Tool" || item?.type === "Container") && !r.sellPrice && !resolvedRecipes[r.id]) return false;
-      return true;
+      const hasTP = r.sellPrice > 0;
+      const hasCraft = !!resolvedRecipes[r.id];
+      if (hasTP || hasCraft) return true;
+      return !r.name.startsWith("Item ");
     });
     const partialTotalMat = partialMatRows.reduce((s, r) => s + r.totalValue, 0);
     const partialCraftItems = buildCraftItems(allRecipes, resolvedRecipes, itemMap, freshPrices, partialOwnedMap);
@@ -640,7 +661,7 @@ export default function App() {
     // Show partial data immediately — gold, mat storage prices, crafting profits
     cacheRef.current.ownedMap = partialOwnedMap;
     setLivePricesReady(true);
-    setData(prev => ({ ...prev, goldCopper, totalMaterialValue: partialTotalMat, materialRows: partialMatRows, craftItems: partialCraftItems, byDisc: partialByDisc, priceMap: freshPrices, ownedMap: partialOwnedMap }));
+    setData(prev => ({ ...prev, goldCopper, totalMaterialValue: partialTotalMat, materialRows: partialMatRows, craftItems: partialCraftItems, byDisc: partialByDisc, priceMap: freshPrices, ownedMap: partialOwnedMap, extraCurrencies }));
 
     // Save price snapshot and cache immediately
     // NAS collector handles price snapshots
@@ -716,10 +737,10 @@ export default function App() {
         const sp = price?.sells?.unit_price || 0; const spNet = Math.floor(sp * 0.85);
         return { id: m.id, name: item?.name || `Item ${m.id}`, icon: item?.icon, rarity: item?.rarity, count: m.count, sellPrice: sp, sellPriceNet: spNet, buyPrice: price?.buys?.unit_price || 0, totalValue: spNet * m.count };
       }).filter(r => {
-        if (r.name.startsWith("Item ")) return false;
-        const item = itemMap[r.id]; const flags = item?.flags || [];
-        if (flags.includes("AccountBound") && (item?.type === "Tool" || item?.type === "Container") && !r.sellPrice && !resolvedRecipes[r.id]) return false;
-        return true;
+        const hasTP = r.sellPrice > 0;
+        const hasCraft = !!resolvedRecipes[r.id];
+        if (hasTP || hasCraft) return true;
+        return !r.name.startsWith("Item ");
       });
       const fullTotalMat = fullMatRows.reduce((s, r) => s + r.totalValue, 0);
       const fullCraftItems = buildCraftItems(allRecipes, resolvedRecipes, itemMap, freshPrices, fullOwnedMap);
@@ -741,6 +762,7 @@ export default function App() {
       // Cache the full ownedMap (with bags) for next fast-path load
       cacheSet("ownedMap", fullOwnedMap);
       setData(prev => ({ ...prev, totalMaterialValue: fullTotalMat, materialRows: fullMatRows, craftItems: fullCraftItems, byDisc: fullByDisc, ownedMap: fullOwnedMap, charInventoryByChar, charDisciplines, timegatedList }));
+      setDataSettled(true);
     }).catch(() => {});
   }, []);
 
@@ -856,6 +878,7 @@ export default function App() {
       const now2 = new Date();
       setUtcMidnightMs(Date.UTC(now2.getUTCFullYear(), now2.getUTCMonth(), now2.getUTCDate() + 1));
       const goldCopper = wallet.find(w => w.id === 1)?.value || 0;
+      const extraCurrencies = extractExtraCurrencies(wallet);
       setForgeWallet(extractForgeWallet(wallet));
       // Aggregate material storage + character bag inventories, deduplicate
       const matAgg2 = {};
@@ -959,13 +982,12 @@ export default function App() {
         const spNet = Math.floor(sp * 0.85);
         return { id: m.id, name: item?.name || `Item ${m.id}`, icon: item?.icon, rarity: item?.rarity, count: m.count, sellPrice: sp, sellPriceNet: spNet, buyPrice: price?.buys?.unit_price || 0, totalValue: spNet * m.count };
       }).filter(r => {
-        if (r.name.startsWith("Item ")) return false;
-        const item = itemMap[r.id];
-        const flags = item?.flags || [];
-        const isAccountBound = flags.includes("AccountBound") || flags.includes("MonsterOnly");
-        const isTool = item?.type === "Tool" || item?.type === "Container";
-        if (isAccountBound && isTool && !r.sellPrice && !resolvedRecipes[r.id]) return false;
-        return true;
+        // Show anything genuinely worth something — see the matching comment in
+        // fullLoad's materialRows filter for the full rationale.
+        const hasTP = r.sellPrice > 0;
+        const hasCraft = !!resolvedRecipes[r.id];
+        if (hasTP || hasCraft) return true;
+        return !r.name.startsWith("Item ");
       });
       const totalMaterialValue = materialRows.reduce((s, r) => s + r.totalValue, 0);
       const now = Date.now();
@@ -974,7 +996,8 @@ export default function App() {
       cacheRef.current.charInventoryByChar = charInventoryByChar2;
       cacheRef.current.charDisciplines = charDisciplines2;
       // Update UI immediately with gold/prices/materials — crafting items deferred
-      setData(prev => ({ ...prev, goldCopper, totalMaterialValue, materialRows, priceMap: freshPrices, ownedMap, charInventoryByChar: charInventoryByChar2, charDisciplines: charDisciplines2, timegatedList: cacheRef.current.timegatedList || prev.timegatedList }));
+      setData(prev => ({ ...prev, goldCopper, totalMaterialValue, materialRows, priceMap: freshPrices, ownedMap, charInventoryByChar: charInventoryByChar2, charDisciplines: charDisciplines2, timegatedList: cacheRef.current.timegatedList || prev.timegatedList, extraCurrencies }));
+      setDataSettled(true);
       setLastPrice(now); setNextPriceIn(PRICE_REFRESH_MS); setSecsAgo(0);
       // Persist latest data so next app launch loads fresh values immediately
       cacheSet("lastPriceMap", freshPrices);
@@ -1819,7 +1842,16 @@ export default function App() {
     // Tier 3: Storm + components
     75336, 72454, 70884, 76229,
     // Storm (precursor) item ID + Meteorlogicus legendary item ID
-    29176, 30695];
+    29176, 30695,
+    // Auto-completion tracker items (see bossTimerStorage.js) — resolved here so their
+    // names/icons are available wherever they might be surfaced, same as the legendary
+    // component convention above.
+    103842, // Convergence: Mount Balrior Commander's Choice Chest
+    110137, // Convergence: Nexus of Eternity Commander's Choice Chest
+    101185, // Convergence: Hero's Choice Chest (Outer Nayos)
+    92272,  // Eternal Ice Shard
+    92775, 92369, 92376, // Lost Large/Medium Chest of Resilience, Raven's Gift
+    ];
     const allDailyIds = [
       ...Object.values(MANUAL_DAILY_MAP).map(v => v.itemId),
       ...Object.values(DAILY_CRAFT_MAP).map(v => v.itemId),
@@ -1921,12 +1953,17 @@ export default function App() {
     resetCountdown, weeklyKeyDone, setWeeklyKeyDone, extraDailyItems,
   }), [data, dailyCrafted, manualDailyCrafted, mySoldHistory, resetCountdown, weeklyKeyDone, extraDailyItems]);
 
-  // ownedMap keyed narrowly on data?.ownedMap itself (not the whole data object,
-  // which changes on every unrelated update — prices, listings, gold, etc.) so
-  // BossTimersTab only re-renders when materials actually refresh. Feeds the
-  // Mystic Coin / Ley-Line Anomaly material-delta auto-completion heuristic —
-  // see MATERIAL_REWARD_TRACKERS in BossTimersTab.jsx.
-  const bossTimersTabProps = useMemo(() => ({ bossAlerts, ownedMap: data?.ownedMap }), [bossAlerts, data?.ownedMap]);
+  // Boss Timers now only needs the shared bossAlerts hook (completions, alerts, and
+  // every auto-completion tracker all live there now — see useBossAlerts.js, which
+  // reads ownedMap/goldCopper/extraCurrencies directly from the hook call above) plus
+  // its own copy of goldCopper and a live drfConnected flag. Both feed the
+  // "has the account actually synced today" check in evaluateApiFreshness
+  // (BossTimersTab.jsx): gold changing since today's reset is proof the account is
+  // active regardless of DRF, and DRF-connected is a faster secondary path for anyone
+  // who has that set up. Neither is required on its own — see that file for the logic.
+  const bossTimersTabProps = useMemo(() => ({
+    bossAlerts, goldCopper: data?.goldCopper, drfConnected: drfStatus === "connected",
+  }), [bossAlerts, data?.goldCopper, drfStatus]);
 
 
   // ── Render ───────────────────────────────────────────────────────────────────
