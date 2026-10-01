@@ -72,7 +72,8 @@ import {
   bossKey, loadFavoriteLists, saveFavoriteLists, nextDefaultFavoriteListName,
   migrateLocationKeyedMap, loadAreasSelection, saveAreasSelection, loadViewMode, saveViewMode,
   loadApiFreshness, saveApiFreshness, currentPeriod, AUTO_COMPLETION_ENABLED,
-  ITEM_COMPLETION_TRACKERS, MATERIAL_REWARD_TRACKERS, EXACT_COUNT_TRACKERS, DUAL_THRESHOLD_TRACKERS,
+  ITEM_COMPLETION_TRACKERS, MAP_CHEST_ITEM_TRACKERS, MATERIAL_REWARD_TRACKERS,
+  EXACT_COUNT_TRACKERS, DUAL_THRESHOLD_TRACKERS, PAIRED_ITEM_TRACKERS, RANGED_PAIR_TRACKERS,
 } from "../lib/bossTimerStorage.js";
 import { EXPANSION_ACCENT_COLORS, EXPANSION_ACCENT_FALLBACK, expansionSortKey } from "../lib/worldBossScheduleData.js";
 import { WORLD_BOSS_API_IDS, WORLD_BOSS_API_ID_TO_NAME } from "../lib/worldBossApiIds.js";
@@ -333,26 +334,40 @@ function findAutoTracker(name) {
   if (exact) return { kind: "exact", ...exact };
   const dual = DUAL_THRESHOLD_TRACKERS.find(t => t.eventName === name);
   if (dual) return { kind: "dual", ...dual };
+  const paired = PAIRED_ITEM_TRACKERS.find(t => t.eventName === name);
+  if (paired) return { kind: "paired", ...paired };
+  const ranged = RANGED_PAIR_TRACKERS.find(t => t.eventName === name);
+  if (ranged) return { kind: "ranged", ...ranged };
   return null;
 }
 
-function AutoTrackedBadge({ name }) {
+function AutoTrackedBadge({ name, drfConnected = false }) {
   if (!AUTO_COMPLETION_ENABLED) return null;
   const viaWorldBoss = !!WORLD_BOSS_API_IDS[name];
   const viaMapChest = !!MAP_CHEST_API_IDS[name];
+  // Every API-polled map-chest event also has a DRF mirror (MAP_CHEST_ITEM_TRACKERS) —
+  // when a token is connected, the DRF item-count feed can confirm it near-instantly
+  // instead of waiting on the API's own poll cadence.
+  const viaMapChestDrf = viaMapChest && drfConnected && MAP_CHEST_ITEM_TRACKERS.some(t => t.eventName === name);
   const tracker = viaWorldBoss || viaMapChest ? null : findAutoTracker(name);
   if (!viaWorldBoss && !viaMapChest && !tracker) return null;
   const title = viaWorldBoss
     ? "Marked done automatically once GW2's API reports this boss killed for the day"
     : viaMapChest
-    ? "Marked done automatically once GW2's API reports this zone's daily Hero's Choice Chest claimed"
+    ? (viaMapChestDrf
+        ? "Marked done automatically once GW2's API reports this zone's daily Hero's Choice Chest claimed — or, with your DRF token connected, as soon as that chest's count goes up in your inventory, whichever comes first"
+        : "Marked done automatically once GW2's API reports this zone's daily Hero's Choice Chest claimed. Connect a DRF token in Settings for a faster, near-instant version of this same check")
     : tracker.kind === "item"
     ? `Marked done automatically as soon as your "${tracker.itemName}" count goes up — that reward is exclusive to this event, so timing doesn't matter`
     : tracker.kind === "material"
     ? `Best-effort: marked done automatically if your ${tracker.itemName} count goes up during this event's window (+${tracker.graceMinutes} min grace) — not a guaranteed signal, since that material can come from other sources too`
     : tracker.kind === "exact"
     ? `Best-effort: marked done automatically if your ${tracker.itemName} count goes up by exactly ${tracker.exactCount} during this event's window (+${tracker.graceMinutes} min grace), unless a chest that also grants exactly ${tracker.exactCount} was looted first this occurrence`
-    : `Marked done automatically if both gold and ${tracker.currencyName} increase together (by the reward's guaranteed amounts) during this event's window (+${tracker.graceMinutes} min grace)`;
+    : tracker.kind === "paired"
+    ? `Marked done automatically once ${tracker.items.map(i => i.itemName).join(" and ")} have both increased during this event's window (+${tracker.graceMinutes} min grace) — that pairing is unique to this event`
+    : tracker.kind === "ranged"
+    ? `Marked done automatically if ${tracker.items.map(i => `${i.itemName} (${i.minDelta === i.maxDelta ? i.minDelta : `${i.minDelta}–${i.maxDelta}`})`).join(" and ")} are both gained together (within ${tracker.correlationSeconds}s of each other) during this event's window (+${tracker.graceMinutes} min grace)`
+    : `Marked done automatically if both gold and ${tracker.currencyName} increase together (by at least the reward's guaranteed amounts) during this event's window (+${tracker.graceMinutes} min grace)`;
   return <span title={title} style={{ fontSize: 9, opacity: .6, flexShrink: 0 }}>🔗</span>;
 }
 
@@ -386,7 +401,7 @@ function WaypointButton({ chatLink, name, fontSize = 13 }) {
 }
 
 // ── Countdown view: one occurrence line ──
-function CountdownLine({ occ, now, alerts, setAlertLead, setAlertAlways, collections, onToggleMember, onCreateCollection, completions, currentPeriodStr, onToggleComplete }) {
+function CountdownLine({ occ, now, alerts, setAlertLead, setAlertAlways, collections, onToggleMember, onCreateCollection, completions, currentPeriodStr, onToggleComplete, drfConnected }) {
   const msUntil = occ.spawnMs - now;
   const urgency = urgencyColor(msUntil);
   const key = bossKey(occ.name);
@@ -409,7 +424,7 @@ function CountdownLine({ occ, now, alerts, setAlertLead, setAlertAlways, collect
           <input type="checkbox" checked={done} title={done ? "Marked done for today" : "Mark done for today"}
             onChange={() => onToggleComplete(occ.name)} style={{ cursor: "pointer", flexShrink: 0 }} />
           <span className="bt-occ-name" title={occ.location} style={{ textDecoration: done ? "line-through" : "none", flex: 1, minWidth: 0 }}>{occ.name}</span>
-          <AutoTrackedBadge name={occ.name} />
+          <AutoTrackedBadge name={occ.name} drfConnected={drfConnected} />
         </div>
         <div className="bt-occ-actions">
           <button ref={bellRef} className={`bt-icon-btn${leadMinutes ? " on" : ""}`}
@@ -474,7 +489,7 @@ function CountdownSection({ expansion, rows, collapsed, onToggle, ...rest }) {
 }
 
 // ── Timeline view: one occurrence line inside a Gantt block ──
-function TimelineOccLine({ occ, alerts, setAlertLead, setAlertAlways, collections, onToggleMember, onCreateCollection, completions, currentPeriodStr, onToggleComplete }) {
+function TimelineOccLine({ occ, alerts, setAlertLead, setAlertAlways, collections, onToggleMember, onCreateCollection, completions, currentPeriodStr, onToggleComplete, drfConnected }) {
   const key = bossKey(occ.name);
   const done = completions[key]?.period === currentPeriodStr;
   const leadMinutes = alerts[key]?.lead;
@@ -493,7 +508,7 @@ function TimelineOccLine({ occ, alerts, setAlertLead, setAlertAlways, collection
       <span className="tl-occ-name" onClick={() => onToggleComplete(occ.name)}
         title={`${occ.name} · ${occ.durationMin || DEFAULT_DURATION_MIN} min`}
         style={{ textDecoration: done ? "line-through" : "none", cursor: "pointer" }}>{occ.name}</span>
-      <AutoTrackedBadge name={occ.name} />
+      <AutoTrackedBadge name={occ.name} drfConnected={drfConnected} />
       <div style={{ display: "flex", gap: 2, marginLeft: "auto", flexShrink: 0 }}>
         <button ref={bellRef} className={`bt-icon-btn${leadMinutes ? " on" : ""}`} style={{ fontSize: 11 }}
           title={leadMinutes ? `Alerting ${leadMinutes} min before` : "Set an alert"}
@@ -852,7 +867,7 @@ export default function BossTimersTab({ bossAlerts, goldCopper, drfConnected = f
 
   const cellProps = {
     now, alerts, setAlertLead, setAlertAlways, collections, onToggleMember: handleToggleMember, onCreateCollection: handleCreateCollection,
-    completions, currentPeriodStr, onToggleComplete: toggleComplete,
+    completions, currentPeriodStr, onToggleComplete: toggleComplete, drfConnected,
   };
 
   // ── Countdown view data ──

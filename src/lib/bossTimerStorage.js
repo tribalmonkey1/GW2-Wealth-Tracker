@@ -92,20 +92,73 @@ export function migrateLocationKeyedMap(map) {
 // actually being watched; "count going up" is what matters everywhere — a count going
 // down (used, sold, traded) never un-completes or double-completes anything.
 
+// Item identity below is itemId (a single numeric GW2 item id), itemIds (an array of
+// numeric ids that are all "the same reward" and whose counts should be summed — used
+// where GW2 issued a second id for an item when its loot table was rebalanced, leaving
+// old mail/inventory able to hold either), or itemName (a display-name fallback for the
+// small number of items whose numeric id wasn't confirmed). See resolveTrackerItemIds in
+// useBossAlerts.js, which looks itemName up in itemMap the same way legendary-data.js's
+// resolveLegendaryIds does — once itemMap has seen the item once, the name resolves
+// permanently and behaves exactly like an itemId entry from then on.
+
 // Category 1 — no timing at all: the item is exclusively obtainable from this one
 // event, so any increase in its owned count, whenever it happens, means the event was
-// just completed. Used for convergence "Commander's Choice"/"Hero's Choice" chests,
-// which sit in the inventory sometimes for a while before being opened.
+// just completed. Used for convergence "Commander's Choice"/"Hero's Choice" chests and
+// other single-source rewards that can sit in the inventory a while before being opened.
 export const ITEM_COMPLETION_TRACKERS = [
   { eventName: 'Mount Balrior', itemId: 103842, itemName: "Convergence: Mount Balrior Commander's Choice Chest" },
   { eventName: 'Nexus of Eternity (Public)', itemId: 110137, itemName: "Convergence: Nexus of Eternity Commander's Choice Chest" },
   { eventName: 'Outer Nayos', itemId: 101185, itemName: "Convergence: Hero's Choice Chest" },
+  { eventName: 'Depths of Cruelty', itemId: 110205, itemName: "Leyspring Hollows: Hero's Choice Chest" },
+  { eventName: 'Hammerhart Rumble!', itemId: 105700, itemName: "Hammerhart's \"Recovered\" Hoard" },
+  { eventName: 'Of Mists and Monsters', itemId: 102265, itemName: "Janthir Syntri: Hero's Choice Chest" },
+  { eventName: 'A Titanic Voyage', itemId: 104714, itemName: "Bava Nisos: Commander's Choice Chest" },
+  { eventName: "Unlocking the Wizard's Tower", itemId: 100547, itemName: "Skywatch Archipelago: Hero's Choice Chest" },
+  { eventName: 'Defense of Amnytas', itemId: 100193, itemName: "Amnytas: Hero's Choice Chest" },
+  { eventName: 'Kaineng Blackout', itemId: 97901, itemName: "New Kaineng City: Hero's Choice Chest" },
+  { eventName: 'Gang War', itemId: 97894, itemName: "Echovald Wilds: Hero's Choice Chest" },
+  { eventName: 'The Oil Floes', itemId: 89692, itemName: 'Light of Deldrimor Plate—Bottom Half' },
+  { eventName: 'Thunderhead Keep', itemId: 89828, itemName: 'Light of Deldrimor Plate—Top Half' },
+];
+
+// DRF-only mirror of MAP_CHEST_API_IDS (see that file): each of those events is already
+// API-tracked through its zone's daily Hero's Choice Chest, but the API only refreshes
+// on its own poll cadence (worldbosses/mapchests every 2 min — see BossTimersTab.jsx).
+// When a DRF token is connected, these give the SAME completion near-instantly off the
+// live item-count feed instead, using the same "does this chest item's count go up"
+// signal as every other Hero's/Commander's Choice Chest tracker above. Gated on
+// drfConnected in useBossAlerts.js — with no DRF token these are simply never checked,
+// and the API poll in BossTimersTab.jsx remains the only path, same as before this was
+// added. Item names are the zone's own display name + ": Hero's Choice Chest", matching
+// the confirmed pattern (Seitung Province, Leyspring Hollows, etc.) — unconfirmed per-zone,
+// same caveat as the rest of this file.
+export const MAP_CHEST_ITEM_TRACKERS = [
+  { eventName: 'Night Bosses', itemIds: [78171, 78743], itemName: "Verdant Brink: Hero's Choice Chest" },
+  { eventName: 'Octovine', itemIds: [78650, 78748], itemName: "Auric Basin: Hero's Choice Chest" },
+  { eventName: 'Chak Gerent', itemIds: [78332, 78751], itemName: "Tangled Depths: Hero's Choice Chest" },
+  { eventName: 'Advancing on the Blighting Towers', itemIds: [78617, 78783], itemName: "Dragon's Stand: Hero's Choice Chest" },
+  { eventName: 'Choya Pinata', itemId: 90958, itemName: "Crystal Oasis: Hero's Choice Chest" },
+  { eventName: 'Doppelganger', itemId: 91039, itemName: "Elon Riverlands: Hero's Choice Chest" },
+  { eventName: 'The Battle for the Jade Sea', itemId: 97896, itemName: "Dragon's End: Hero's Choice Chest" },
+  { eventName: 'Aetherblade Assault', itemId: 97895, itemName: "Seitung Province: Hero's Choice Chest" },
 ];
 
 // Category 2 — the item's count only needs to increase by ANY amount, but only counts
 // during that event's own scheduled window (+ a short grace period for API/DRF lag).
+// Forged with Fire / Serpents' Ire and Junundu Rising / Maws of Torment each share one
+// reward item between two events — safe because, per design, the two events in each pair
+// run at different hours of the day, so only one of the pair's windows is ever open at a
+// time, and the increase always lands inside the correct event's own window.
 export const MATERIAL_REWARD_TRACKERS = [
   { eventName: 'Ley-Line Anomaly', itemId: 19976, itemName: 'Mystic Coin', graceMinutes: 5 },
+  { eventName: 'Doomlore Shrine', itemId: 92037, itemName: 'Ash Legion Key', graceMinutes: 2 },
+  { eventName: 'Ooze Pits', itemId: 92052, itemName: 'Blood Legion Key', graceMinutes: 2 },
+  { eventName: 'Effigy', itemId: 92082, itemName: 'Flame Legion Key', graceMinutes: 2 },
+  { eventName: 'Metal Concert', itemId: 92077, itemName: 'Iron Legion Key', graceMinutes: 2 },
+  { eventName: 'Forged with Fire', itemId: 83035, itemName: "Domain of Vabbi: Hero's Choice Chest", graceMinutes: 2 },
+  { eventName: "Serpents' Ire", itemId: 83035, itemName: "Domain of Vabbi: Hero's Choice Chest", graceMinutes: 2 },
+  { eventName: 'Junundu Rising', itemId: 84360, itemName: "The Desolation: Hero's Choice Chest", graceMinutes: 2 },
+  { eventName: 'Maws of Torment', itemId: 84360, itemName: "The Desolation: Hero's Choice Chest", graceMinutes: 2 },
 ];
 
 // Category 3 — the item's count must increase by EXACTLY the given amount during the
@@ -127,15 +180,46 @@ export const EXACT_COUNT_TRACKERS = [
 ];
 
 // Category 4 — two independent thresholds (gold and a wallet currency) must BOTH be
-// crossed, observed together on the same check, during the window (+ grace). Modeled
-// as "gold delta >= threshold AND currency delta >= threshold since the window opened"
-// rather than needing sub-second correlation — the tick rate itself (1s) already keeps
-// the two readings close enough together to call them "the same reward drop".
+// crossed during the window (+ grace). Floor match ("at least"), not exact — an exact
+// match turned out to false-negative on a real Dragonstorm run (confirmed Sept 2026):
+// loot from the fight itself (vendor-sellable drops, other currencies) can push gold or
+// seals past the guaranteed amount in the same window, so "exactly 2g / exactly 25"
+// misses runs that genuinely completed the event. goldThresholdCopper/currencyThreshold
+// are the floor values (2 gold = 200 silver = 20,000 copper; 25 Tyrian Defense Seals).
 export const DUAL_THRESHOLD_TRACKERS = [
   {
     eventName: 'Dragonstorm', graceMinutes: 2,
-    goldThresholdCopper: 2 * 10000, // 2 gold
+    goldThresholdCopper: 2 * 100 * 100,
     currencyId: 60, currencyName: 'Tyrian Defense Seal', currencyThreshold: 25,
+  },
+];
+
+// Category 5 — two (or more) items that must each increase at least once during the
+// event's window (+ grace), with no required amount — a simultaneous-reward pairing
+// unique to one event. Used when a single meta event hands out two different items in
+// the same reward drop, so neither alone is a unique-enough signal but the pair is.
+export const PAIRED_ITEM_TRACKERS = [
+  {
+    eventName: 'Secrets of the Weald', graceMinutes: 2,
+    items: [
+      { itemId: 105822, itemName: "Castora: Hero's Choice Chest" },
+      { itemId: 106445, itemName: 'Starlit Weald Renown Token' },
+    ],
+  },
+];
+
+// Category 6 — like Category 5, but each item must land within a specific delta RANGE
+// (or exact amount, when min equals max) of the SAME reward drop, and both deltas must
+// land within a short correlation window of each other — not just "sometime during the
+// event" — since the quantities alone (a range of ore, a handful of a common material)
+// aren't a unique enough signal without also requiring them to arrive together.
+export const RANGED_PAIR_TRACKERS = [
+  {
+    eventName: 'Death-Branded Shatterer', graceMinutes: 2, correlationSeconds: 2,
+    items: [
+      { itemId: 46733, itemName: 'Dragonite Ore', minDelta: 15, maxDelta: 25 },
+      { itemId: 88955, itemName: 'Lump of Mistonium', minDelta: 5, maxDelta: 5 },
+    ],
   },
 ];
 

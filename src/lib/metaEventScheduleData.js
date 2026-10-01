@@ -23,10 +23,10 @@
  * applied there.
  *
  * Convergences are grouped under a "Public Instance" expansion / "Convergence"
- * zone (Mount Balrior, Outer Nayos, Nexus of Eternity) rather than filed
- * under whichever expansion introduced them — see that section below. The
- * original SotO Convergence ("Convergences (Public)" at Amnytas) hasn't been
- * moved into that bucket, only these three.
+ * zone (Mount Balrior, Outer Nayos, Nexus of Eternity). The original SotO
+ * Convergence entry that used to sit under Amnytas as "Convergences (Public)"
+ * was a leftover duplicate of Outer Nayos and has been removed — Outer Nayos
+ * itself lives only in the Public Instance bucket below.
  *
  * Special Events (seasonal festivals) still need real-world active windows:
  * Dragon Bash now has confirmed 2026 dates (June 2–23, verified via GW2
@@ -127,7 +127,6 @@ export const META_EVENT_SCHEDULE = [
   { eventName: 'Target Practice & Fly by Night', zoneName: "Wizard's Tower", expansion: 'Secrets of the Obscure', cycleLengthMin: TWO_HOUR, offsetMin: 100, chatLink: '[&BB8OAAA=]', durationMin: 15 },
   { eventName: 'Fly by Night', zoneName: "Wizard's Tower", expansion: 'Secrets of the Obscure', cycleLengthMin: TWO_HOUR, offsetMin: 115, chatLink: '[&BB8OAAA=]', durationMin: 25 },
   { eventName: 'Defense of Amnytas', zoneName: 'Amnytas', expansion: 'Secrets of the Obscure', cycleLengthMin: TWO_HOUR, offsetMin: 0, chatLink: '[&BDQOAAA=]', durationMin: 25 },
-  { eventName: 'Convergences (Public)', zoneName: 'Amnytas', expansion: 'Secrets of the Obscure', cycleLengthMin: THREE_HOUR, offsetMin: 90, chatLink: '[&BB8OAAA=]', durationMin: 10 },
 
   // ── Janthir Wilds ──
   { eventName: 'Of Mists and Monsters', zoneName: 'Janthir Syntri', expansion: 'Janthir Wilds', cycleLengthMin: TWO_HOUR, offsetMin: 40, chatLink: '[&BCoPAAA=]', durationMin: 25 },
@@ -136,8 +135,17 @@ export const META_EVENT_SCHEDULE = [
   // ── Visions of Eternity ──
   { eventName: 'Hammerhart Rumble!', zoneName: 'Shipwreck Strand', expansion: 'Visions of Eternity', cycleLengthMin: TWO_HOUR, offsetMin: 40, chatLink: '[&BJEPAAA=]', durationMin: 20 },
   { eventName: 'Secrets of the Weald', zoneName: 'Starlit Weald', expansion: 'Visions of Eternity', cycleLengthMin: TWO_HOUR, offsetMin: 100, chatLink: '[&BJ4PAAA=]', durationMin: 35 },
-  // Shackles of the Ancients: starts 8:05 AM UTC-7 (= 15:05 UTC), every 2 hours, 25 min duration.
-  { eventName: 'Shackles of the Ancients', zoneName: "Eternity's Garden", expansion: 'Visions of Eternity', cycleLengthMin: TWO_HOUR, offsetMin: 905, chatLink: '[&BPwPAAA=]', durationMin: 25 },
+  // Shackles of the Ancients: starts 8:05 AM UTC-7 (= 15:05 UTC), every 2 hours, 25 min
+  // duration. offsetMin is minutes INTO the 2-hour cycle grid anchored at CYCLE_EPOCH_MS
+  // (which sits at 00:00 UTC), not minutes-since-midnight — this was previously written
+  // as 905 (15:05 expressed as minutes since midnight), which is larger than the
+  // 120-minute cycle length itself. getNextOccurrence adds offsetMin directly onto a
+  // 2-hour-aligned cycle start, so an offsetMin bigger than the cycle length pushed every
+  // computed occurrence ~13 hours further into the future than the real one, which is why
+  // this event never showed as "in progress" on the Timeline even while it was actually
+  // running. Corrected to 905 mod 120 = 65 (15:05 UTC is 65 minutes past the 14:00 UTC
+  // cycle boundary), which still recurs at the same real times — 15:05, 17:05, 19:05, ...
+  { eventName: 'Shackles of the Ancients', zoneName: "Eternity's Garden", expansion: 'Visions of Eternity', cycleLengthMin: TWO_HOUR, offsetMin: 65, chatLink: '[&BPwPAAA=]', durationMin: 25 },
   // Depths of Cruelty: every 3 hours, UTC-7 start times 19:00/22:00/01:00/04:00/07:00/10:00/13:00/16:00
   // (= 02:00 UTC anchor, offsetMin 120). Confirmed 30 min duration.
   { eventName: 'Depths of Cruelty', zoneName: 'Leyspring Hollows', expansion: 'Visions of Eternity', cycleLengthMin: THREE_HOUR, offsetMin: 120, chatLink: '[&BDYQAAA=]', durationMin: 30 },
@@ -147,8 +155,8 @@ export const META_EVENT_SCHEDULE = [
   // Convergence public instance; grouped under one "Public Instance"
   // expansion / "Convergence" zone bucket rather than filed under whichever
   // expansion happened to introduce it, since Derrick thinks of them as one
-  // family of content. (The original SotO one, "Convergences (Public)" at
-  // Amnytas above, hasn't been moved into this bucket — only these three.)
+  // family of content. The old "Convergences (Public)" entry under Amnytas
+  // was a leftover duplicate of Outer Nayos and has been removed.
   { eventName: 'Mount Balrior', zoneName: 'Convergence', expansion: 'Public Instance', cycleLengthMin: THREE_HOUR, offsetMin: 0, chatLink: '[&BK4OAAA=]', durationMin: 10 },
   // Opens every 3 hours at :30, UTC-7 anchor 18:30 (= 01:30 UTC) — offsetMin
   // 90 puts occurrences at 01:30, 04:30, 07:30, ... UTC. chatLink confirmed

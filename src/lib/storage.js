@@ -458,7 +458,7 @@ export function processStartupCache(allRecipes, itemMap, priceMap, ownedMap) {
       const sp = price?.sells?.unit_price || 0;
       const spNet = Math.floor(sp * 0.85);
       return { id, name: item?.name || `Item ${id}`, icon: item?.icon, rarity: item?.rarity, count, sellPrice: sp, sellPriceNet: spNet, buyPrice: price?.buys?.unit_price || 0, totalValue: spNet * count };
-    }).filter(r => r.name && !r.name.startsWith('Item ') && (r.sellPrice > 0 || resolvedRecipes[r.id]));
+    }).filter(r => r.sellPrice > 0 || resolvedRecipes[r.id]);
     const totalMatValue = matRows.reduce((s, r) => s + r.totalValue, 0);
     return Promise.resolve({ resolvedRecipes, matRows, totalMatValue });
   }

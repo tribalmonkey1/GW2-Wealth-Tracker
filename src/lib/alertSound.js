@@ -127,23 +127,44 @@ function getVoicesAsync(synth, timeoutMs = 250) {
   });
 }
 
+// Rough estimate of how long a given alert sentence takes to actually speak, used as a
+// safety-net floor below. Based on a conservative ~150 words/minute (400ms/word) spoken
+// rate — slower TTS voices (robotic espeak-ng especially) tend to run slower than this,
+// not faster, so this errs toward UNDER-estimating overlap risk rather than cutting a
+// real utterance off early.
+function estimateSpeechMs(text) {
+  const words = (text || "").trim().split(/\s+/).filter(Boolean).length;
+  return Math.max(1200, words * 400);
+}
+
 // Confirmed (Sept 2026): stock webkit2gtk builds — Arch's included — are not
 // compiled with Web Speech Synthesis support at all (it requires building
 // WebKitGTK yourself with -DUSE_SPIEL=ON). `window.speechSynthesis` being
 // undefined there is not a missing-backend problem installing
 // speech-dispatcher/espeak-ng can fix — the frontend API itself doesn't
 // exist. In that case, shell out to espeak-ng directly via a Tauri command
-// instead of going through the (absent) browser API. Returns a Promise that
-// resolves once the native command's playback has finished (or, on failure,
-// once the beep fallback has finished) — the Tauri `speak_text` command
-// blocks until the spoken audio actually completes, so awaiting its own
-// promise is enough; no extra timing guess needed here.
+// instead of going through the (absent) browser API. The `speak_text` Tauri
+// command is DOCUMENTED to block until playback finishes, but in practice it's
+// been observed returning almost immediately regardless of the audio's real
+// length — which is exactly what made queued alerts sound like they were firing
+// every ~300ms (the queue's own gap) instead of waiting for each one to finish.
+// Rather than trust that promise alone, this also times how long the invoke()
+// call actually took and, if it came back faster than the sentence could
+// plausibly have been spoken (estimateSpeechMs), pads the remaining difference
+// with a plain setTimeout before letting the queue move on. Harmless if the
+// command genuinely does block — the "remaining" pad is just 0 in that case.
 function speakNative(text, settings, volume = 1) {
+  const startedAt = Date.now();
   return invoke("speak_text", {
     text,
     voiceFile: settings?.piperVoiceFile || null,
     speakerId: settings?.piperSpeakerId ?? null,
     volume,
+  }).then(() => {
+    const elapsedMs = Date.now() - startedAt;
+    const estimatedMs = estimateSpeechMs(text);
+    const remaining = estimatedMs - elapsedMs;
+    if (remaining > 0) return new Promise(resolve => setTimeout(resolve, remaining));
   }).catch((e) => {
     console.warn("[alertSound] native speak_text failed, falling back to beep:", e);
     return playBeep(volume);

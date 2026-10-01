@@ -5,7 +5,7 @@
  * original — kept narrow so this doesn't recompute on unrelated App state
  * changes, e.g. switching tabs or opening a chart elsewhere.)
  */
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { Gold } from "../components/Gold.jsx";
 import { TrendBadge } from "../components/TrendBadge.jsx";
 import { BestCraftingUseCell } from "../components/BestCraftingUseCell.jsx";
@@ -17,6 +17,9 @@ export function MaterialsTab({
   priceAlerts, alertSort, setAlertSort, trendSummary, velocitySummary,
   historyItem, setHistoryItem, PAGE_SIZE,
 }) {
+  // Collapsed by default once there's something to show — the list can get long, and
+  // the person doesn't need it open every time they land on this tab.
+  const [alertsCollapsed, setAlertsCollapsed] = useState(false);
   const content = useMemo(() => {
     if (!data) return null;
     const rows = sortBy(
@@ -49,11 +52,14 @@ export function MaterialsTab({
       </div>
       {priceAlerts.length > 0 && (
         <div className="alert-banner">
-        <div style={{ display: "flex", alignItems: "center", marginBottom: 10, gap: 16 }}>
-        <strong style={{ flex: 1 }}>📈 PRICE NEAR 7-DAY HIGH — GOOD TIME TO SELL</strong>
+        <div style={{ display: "flex", alignItems: "center", marginBottom: alertsCollapsed ? 0 : 10, gap: 16, cursor: "pointer" }}
+          onClick={() => setAlertsCollapsed(c => !c)}>
+        <span style={{ fontSize: 12, color: "var(--text3)", flexShrink: 0 }}>{alertsCollapsed ? "▶" : "▼"}</span>
+        <strong style={{ flex: 1 }}>📈 PRICE NEAR 90-DAY HIGH — GOOD TIME TO SELL <span style={{ fontWeight: 400, fontSize: 11, color: "var(--text3)" }}>({priceAlerts.length})</span></strong>
+        {!alertsCollapsed && <>
         <span style={{ fontSize: 11, color: "var(--text3)", fontFamily: "Cinzel,serif", letterSpacing: 1 }}>SORT:</span>
-        {[["totalNet","Total Profit"],["cur","Unit Price"],["pctOfMax","% of 7d Max"]].map(([k, label]) => (
-          <span key={k} onClick={() => setAlertSort(k)}
+        {[["totalNet","Total Profit"],["cur","Unit Price"],["pctOfMax","% of 90d Max"]].map(([k, label]) => (
+          <span key={k} onClick={e => { e.stopPropagation(); setAlertSort(k); }}
           style={{ cursor: "pointer", fontSize: 11, padding: "2px 8px", borderRadius: 3, fontFamily: "Cinzel,serif", letterSpacing: 1,
             border: `1px solid ${alertSort === k ? "var(--gold)" : "var(--border)"}`,
                                                                                                             color: alertSort === k ? "var(--gold2)" : "var(--text3)",
@@ -61,6 +67,11 @@ export function MaterialsTab({
                                                                                                             {label}
                                                                                                             </span>
         ))}
+        </>}
+        </div>
+        {!alertsCollapsed && <>
+        <div style={{ fontSize: 11, color: "var(--text3)", fontStyle: "italic", margin: "0 0 8px" }}>
+        Looks at the last 90 days · items whose price never actually moves (flat/stale) are excluded — a fixed 2c vendor-floor price isn't a "new high"
         </div>
         {/* Column headers */}
         <div style={{ display: "grid", gridTemplateColumns: "28px 1fr 70px 130px 130px 130px 110px", gap: "0 12px", alignItems: "center",
@@ -70,7 +81,7 @@ export function MaterialsTab({
           <span style={{ fontSize: 10, color: "var(--text3)", fontFamily: "Cinzel,serif", letterSpacing: 1 }}>COUNT</span>
           <span style={{ fontSize: 10, color: "var(--text3)", fontFamily: "Cinzel,serif", letterSpacing: 1 }}>UNIT PRICE</span>
           <span style={{ fontSize: 10, color: "var(--text3)", fontFamily: "Cinzel,serif", letterSpacing: 1 }}>TOTAL NET</span>
-          <span style={{ fontSize: 10, color: "var(--text3)", fontFamily: "Cinzel,serif", letterSpacing: 1 }}>7D HIGH</span>
+          <span style={{ fontSize: 10, color: "var(--text3)", fontFamily: "Cinzel,serif", letterSpacing: 1 }}>90D HIGH</span>
           <span style={{ fontSize: 10, color: "var(--text3)", fontFamily: "Cinzel,serif", letterSpacing: 1 }}>STATUS</span>
           </div>
           {[...priceAlerts].sort((a, b) => b[alertSort] - a[alertSort]).map(a => (
@@ -80,7 +91,7 @@ export function MaterialsTab({
             <span style={{ fontSize: 13, color: "var(--text2)" }}>×{a.count.toLocaleString()}</span>
             <span><Gold v={a.cur} size={14} /></span>
             <span><Gold v={a.totalNet} size={14} /></span>
-            <span><Gold v={a.sevenDayMax} size={13} /></span>
+            <span><Gold v={a.periodMax} size={13} /></span>
             <span style={{
               fontSize: 11, padding: "2px 8px", borderRadius: 3, textAlign: "center",
               background: a.isNewHigh ? "rgba(90,200,90,0.15)" : "rgba(200,150,42,0.15)",
@@ -91,8 +102,10 @@ export function MaterialsTab({
             </span>
             </div>
           ))}
+          </>}
           </div>
       )}
+
       {rows.length > PAGE_SIZE && (
         <div style={{ display:"flex", alignItems:"center", gap:8, padding:"8px 0", fontSize:12, fontFamily:"Cinzel,serif", letterSpacing:1, color:"var(--text3)" }}>
         <button className="rbtn" disabled={matPage === 0} onClick={() => setMatPage(p => p-1)}>← Prev</button>
@@ -163,7 +176,7 @@ export function MaterialsTab({
       </div>
       </div>
     );
-  }, [data, searchMat, sortMat, historyItem, priceAlerts, trendSummary, matPage]);
+  }, [data, searchMat, sortMat, historyItem, priceAlerts, trendSummary, matPage, alertsCollapsed, alertSort]);
 
   return content;
 }

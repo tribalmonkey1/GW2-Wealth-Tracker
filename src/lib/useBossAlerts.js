@@ -56,13 +56,47 @@ import { playAlertsSequentially } from "./alertSound.js";
 import {
   bossKey, loadBossTimerPrefs, saveAlerts, saveSoundSettings, saveCompletions,
   DEFAULT_SOUND_SETTINGS, migrateLocationKeyedMap, migrateAlertsShape, currentPeriod,
-  AUTO_COMPLETION_ENABLED, ITEM_COMPLETION_TRACKERS, MATERIAL_REWARD_TRACKERS,
-  EXACT_COUNT_TRACKERS, DUAL_THRESHOLD_TRACKERS,
+  AUTO_COMPLETION_ENABLED, ITEM_COMPLETION_TRACKERS, MAP_CHEST_ITEM_TRACKERS,
+  MATERIAL_REWARD_TRACKERS, EXACT_COUNT_TRACKERS, DUAL_THRESHOLD_TRACKERS,
+  PAIRED_ITEM_TRACKERS, RANGED_PAIR_TRACKERS,
 } from "./bossTimerStorage.js";
 
 const TICK_MS = 1000;
 
-export function useBossAlerts(customSoundPath, piperVoiceFile, piperSpeakerId, ownedMap, goldCopper, extraCurrencies, dataSettled) {
+// Resolves a tracker entry's item(s) to an array of numeric ids: entry.itemIds verbatim
+// if given (multiple ids that are "the same reward" and should be summed — see the
+// itemIds comment in bossTimerStorage.js), [entry.itemId] if it has a single confirmed
+// id, otherwise a by-name lookup against itemMap (same idea as legendary-data.js's
+// resolveLegendaryIds/resolveForgeIds). Name lookups are cached so this is O(1) after
+// the first successful resolution instead of rescanning itemMap every tick; unresolved
+// name entries are retried every tick until they resolve, since itemMap keeps growing as
+// new items are encountered. Returns [] when nothing has resolved yet.
+function resolveTrackerItemIds(entry, itemMap, cache) {
+  if (entry.itemIds) return entry.itemIds;
+  if (entry.itemId) return [entry.itemId];
+  if (!entry.itemName || !itemMap) return [];
+  if (cache.has(entry.itemName)) {
+    const cached = cache.get(entry.itemName);
+    return cached == null ? [] : [cached];
+  }
+  for (const idStr of Object.keys(itemMap)) {
+    if (itemMap[idStr]?.name === entry.itemName) {
+      const id = Number(idStr);
+      cache.set(entry.itemName, id);
+      return [id];
+    }
+  }
+  return [];
+}
+
+// Sums an entry's owned count across every id resolveTrackerItemIds returned for it —
+// the itemIds-as-alternatives case (see above) needs "either id's count going up" to
+// register the same as a single-id entry's count going up.
+function sumOwned(ids, owned) {
+  return ids.reduce((sum, id) => sum + (owned[id] || 0), 0);
+}
+
+export function useBossAlerts(customSoundPath, piperVoiceFile, piperSpeakerId, ownedMap, goldCopper, extraCurrencies, dataSettled, itemMap, drfConnected) {
   const [alerts, setAlerts] = useState({}); // event name -> { lead, always }
   const [soundSettings, setSoundSettingsState] = useState(DEFAULT_SOUND_SETTINGS);
   const [completions, setCompletions] = useState({}); // event name -> { period, auto? }
@@ -77,6 +111,9 @@ export function useBossAlerts(customSoundPath, piperVoiceFile, piperSpeakerId, o
   const ownedMapRef = useRef(ownedMap || {});
   const goldRef = useRef(goldCopper || 0);
   const extraCurrenciesRef = useRef(extraCurrencies || {});
+  const itemMapRef = useRef(itemMap || {});
+  const drfConnectedRef = useRef(!!drfConnected);
+  const nameToIdCacheRef = useRef(new Map()); // itemName -> resolved id, see resolveTrackerItemIds
   // False until App.jsx has finished its staged startup load (cached map -> storage-only
   // map -> full map incl. bags). Auto-completion trackers must not read counts before
   // then, or items already sitting in a bag look like a fresh "increase" when bag data
@@ -95,10 +132,12 @@ export function useBossAlerts(customSoundPath, piperVoiceFile, piperSpeakerId, o
 
   // Per-tracker running state for the four auto-completion categories — see the
   // big interval effect below for how each is used.
-  const itemBaselineRef = useRef({});           // Category 1: eventName -> last known count
+  const itemBaselineRef = useRef({});           // Category 1 (+ DRF map-chest mirror): eventName -> last known count
   const materialBaselineRef = useRef({});       // Category 2: eventName -> { occurrenceSpawnMs, baselineCount, confirmed }
   const exactCountTrackerRef = useRef({});      // Category 3: eventName -> { occurrenceSpawnMs, baselineCount, invalidBaseline, invalidated, confirmed }
-  const dualThresholdTrackerRef = useRef({});   // Category 4: eventName -> { occurrenceSpawnMs, baselineGold, baselineCurrency, confirmed }
+  const dualThresholdTrackerRef = useRef({});   // Category 4: eventName -> { occurrenceSpawnMs, baselineGold, baselineCurrency, goldHitAt, currencyHitAt, confirmed }
+  const pairedItemTrackerRef = useRef({});      // Category 5: eventName -> { occurrenceSpawnMs, baselines:[count,...], confirmed }
+  const rangedPairTrackerRef = useRef({});      // Category 6: eventName -> { occurrenceSpawnMs, baselines:[count,...], hitAt:[ms|null,...], confirmed }
 
   useEffect(() => { alertsRef.current = alerts; }, [alerts]);
   useEffect(() => { soundRef.current = soundSettings; }, [soundSettings]);
@@ -110,6 +149,8 @@ export function useBossAlerts(customSoundPath, piperVoiceFile, piperSpeakerId, o
   useEffect(() => { goldRef.current = goldCopper || 0; }, [goldCopper]);
   useEffect(() => { extraCurrenciesRef.current = extraCurrencies || {}; }, [extraCurrencies]);
   useEffect(() => { settledRef.current = !!dataSettled; }, [dataSettled]);
+  useEffect(() => { itemMapRef.current = itemMap || {}; }, [itemMap]);
+  useEffect(() => { drfConnectedRef.current = !!drfConnected; }, [drfConnected]);
 
   useEffect(() => {
     let cancelled = false;
@@ -211,10 +252,16 @@ export function useBossAlerts(customSoundPath, piperVoiceFile, piperSpeakerId, o
         const owned = ownedMapRef.current || {};
         const gold = goldRef.current || 0;
         const extra = extraCurrenciesRef.current || {};
+        const itemMapNow = itemMapRef.current;
+        const nameCache = nameToIdCacheRef.current;
+        const drfOn = drfConnectedRef.current;
+        const idsFor = (entry) => resolveTrackerItemIds(entry, itemMapNow, nameCache);
 
         // Category 1 — no timing: any increase in a uniquely-sourced item's count.
         for (const t of ITEM_COMPLETION_TRACKERS) {
-          const cur = owned[t.itemId] || 0;
+          const ids = idsFor(t);
+          if (ids.length === 0) continue; // not yet resolvable (itemName never seen) — retried every tick
+          const cur = sumOwned(ids, owned);
           const baseline = itemBaselineRef.current[t.eventName];
           if (baseline === undefined) { itemBaselineRef.current[t.eventName] = cur; continue; }
           if (cur > baseline) {
@@ -225,14 +272,36 @@ export function useBossAlerts(customSoundPath, piperVoiceFile, piperSpeakerId, o
           }
         }
 
+        // DRF mirror of the API-polled map-chest events (see MAP_CHEST_ITEM_TRACKERS in
+        // bossTimerStorage.js) — same "count goes up, no timing" logic as Category 1
+        // above, just gated on a DRF token being connected, and sharing the same
+        // itemBaselineRef map so a completion from either path (API poll or this) sticks.
+        if (drfOn) {
+          for (const t of MAP_CHEST_ITEM_TRACKERS) {
+            const ids = idsFor(t);
+            if (ids.length === 0) continue;
+            const cur = sumOwned(ids, owned);
+            const baseline = itemBaselineRef.current[t.eventName];
+            if (baseline === undefined) { itemBaselineRef.current[t.eventName] = cur; continue; }
+            if (cur > baseline) {
+              itemBaselineRef.current[t.eventName] = cur;
+              markAutoComplete(t.eventName, period);
+            } else if (cur !== baseline) {
+              itemBaselineRef.current[t.eventName] = cur;
+            }
+          }
+        }
+
         // Category 2 — any increase during the event's own window + grace.
         for (const t of MATERIAL_REWARD_TRACKERS) {
+          const ids = idsFor(t);
+          if (ids.length === 0) continue;
           const occSpawnMs = getMostRecentOccurrenceForName(t.eventName, now);
           if (occSpawnMs == null) continue;
           const durationMin = getEventDurationMin(t.eventName);
           const windowEndMs = occSpawnMs + durationMin * 60_000 + t.graceMinutes * 60_000;
           if (now > windowEndMs) continue;
-          const cur = owned[t.itemId] || 0;
+          const cur = sumOwned(ids, owned);
           const existing = materialBaselineRef.current[t.eventName];
           if (!existing || existing.occurrenceSpawnMs !== occSpawnMs) {
             materialBaselineRef.current[t.eventName] = { occurrenceSpawnMs: occSpawnMs, baselineCount: cur, confirmed: false };
@@ -247,6 +316,8 @@ export function useBossAlerts(customSoundPath, piperVoiceFile, piperSpeakerId, o
 
         // Category 3 — exact-delta with invalidation.
         for (const t of EXACT_COUNT_TRACKERS) {
+          const ids = idsFor(t);
+          if (ids.length === 0) continue;
           const occSpawnMs = getMostRecentOccurrenceForName(t.eventName, now);
           if (occSpawnMs == null) continue;
           const durationMin = getEventDurationMin(t.eventName);
@@ -256,7 +327,7 @@ export function useBossAlerts(customSoundPath, piperVoiceFile, piperSpeakerId, o
             if (state && state.occurrenceSpawnMs === occSpawnMs) delete exactCountTrackerRef.current[t.eventName];
             continue;
           }
-          const cur = owned[t.itemId] || 0;
+          const cur = sumOwned(ids, owned);
           if (!state || state.occurrenceSpawnMs !== occSpawnMs) {
             state = { occurrenceSpawnMs: occSpawnMs, baselineCount: cur, invalidBaseline: null, invalidated: false, confirmed: false };
             exactCountTrackerRef.current[t.eventName] = state;
@@ -278,7 +349,10 @@ export function useBossAlerts(customSoundPath, piperVoiceFile, piperSpeakerId, o
           }
         }
 
-        // Category 4 — dual threshold (gold + a currency), read together each tick.
+        // Category 4 — dual threshold (gold + a currency). Floor match ("at least") in
+        // every case — see the comment on DUAL_THRESHOLD_TRACKERS for why an exact match
+        // was reverted (it false-negatived on a real run: other loot from the fight can
+        // push gold/seals past the guaranteed amount in the same window).
         for (const t of DUAL_THRESHOLD_TRACKERS) {
           const occSpawnMs = getMostRecentOccurrenceForName(t.eventName, now);
           if (occSpawnMs == null) continue;
@@ -303,6 +377,73 @@ export function useBossAlerts(customSoundPath, piperVoiceFile, piperSpeakerId, o
           if (goldDelta >= t.goldThresholdCopper && currencyDelta >= t.currencyThreshold) {
             state.confirmed = true;
             markAutoComplete(t.eventName, period);
+          }
+        }
+
+        // Category 5 — paired items, no amount requirement, each must increase at least
+        // once during the window + grace.
+        for (const t of PAIRED_ITEM_TRACKERS) {
+          const idSets = t.items.map(idsFor);
+          if (idSets.some(ids => ids.length === 0)) continue; // wait until every item in the pair resolves
+          const occSpawnMs = getMostRecentOccurrenceForName(t.eventName, now);
+          if (occSpawnMs == null) continue;
+          const durationMin = getEventDurationMin(t.eventName);
+          const windowEndMs = occSpawnMs + durationMin * 60_000 + t.graceMinutes * 60_000;
+          const state = pairedItemTrackerRef.current[t.eventName];
+          if (now > windowEndMs) {
+            if (state && state.occurrenceSpawnMs === occSpawnMs) delete pairedItemTrackerRef.current[t.eventName];
+            continue;
+          }
+          const curCounts = idSets.map(ids => sumOwned(ids, owned));
+          if (!state || state.occurrenceSpawnMs !== occSpawnMs) {
+            pairedItemTrackerRef.current[t.eventName] = { occurrenceSpawnMs: occSpawnMs, baselines: curCounts, confirmed: false };
+            continue;
+          }
+          if (state.confirmed) continue;
+          const allIncreased = curCounts.every((c, i) => c > state.baselines[i]);
+          if (allIncreased) {
+            state.confirmed = true;
+            markAutoComplete(t.eventName, period);
+          }
+        }
+
+        // Category 6 — ranged pair: each item's delta must land in its own [minDelta,
+        // maxDelta] range (minDelta === maxDelta means an exact amount), and both hits
+        // must land within correlationSeconds of each other.
+        for (const t of RANGED_PAIR_TRACKERS) {
+          const idSets = t.items.map(idsFor);
+          if (idSets.some(ids => ids.length === 0)) continue;
+          const occSpawnMs = getMostRecentOccurrenceForName(t.eventName, now);
+          if (occSpawnMs == null) continue;
+          const durationMin = getEventDurationMin(t.eventName);
+          const windowEndMs = occSpawnMs + durationMin * 60_000 + t.graceMinutes * 60_000;
+          let state = rangedPairTrackerRef.current[t.eventName];
+          if (now > windowEndMs) {
+            if (state && state.occurrenceSpawnMs === occSpawnMs) delete rangedPairTrackerRef.current[t.eventName];
+            continue;
+          }
+          const curCounts = idSets.map(ids => sumOwned(ids, owned));
+          if (!state || state.occurrenceSpawnMs !== occSpawnMs) {
+            state = { occurrenceSpawnMs: occSpawnMs, baselines: curCounts, hitAt: t.items.map(() => null), confirmed: false };
+            rangedPairTrackerRef.current[t.eventName] = state;
+            continue;
+          }
+          if (state.confirmed) continue;
+          const correlationMs = (t.correlationSeconds || 2) * 1000;
+          t.items.forEach((spec, i) => {
+            if (state.hitAt[i] != null) return; // already hit once this occurrence — first hit wins
+            const delta = curCounts[i] - state.baselines[i];
+            if (delta >= spec.minDelta && delta <= spec.maxDelta) state.hitAt[i] = now;
+          });
+          if (state.hitAt.every(h => h != null)) {
+            const spread = Math.max(...state.hitAt) - Math.min(...state.hitAt);
+            if (spread <= correlationMs) {
+              state.confirmed = true;
+              markAutoComplete(t.eventName, period);
+            }
+            // else: both hit their target amounts, but too far apart in time to be the
+            // same drop — leave unconfirmed; hitAt values stay set so this doesn't
+            // re-trigger on every later tick for the same (now-timed-out) occurrence.
           }
         }
       }
