@@ -18,6 +18,7 @@ import { FlipMarketTab } from "./tabs/FlipMarketTab.jsx";
 import { TradingPostTab } from "./tabs/TradingPostTab.jsx";
 import { TimeGatedTab } from "./tabs/TimeGatedTab.jsx";
 import BossTimersTab from "./tabs/BossTimersTab.jsx";
+import { CharactersTab } from "./tabs/CharactersTab.jsx";
 
 import { getRecipeDisciplines, dedupeRecipesById, DISCIPLINES, buildCraftItems } from "./lib/craftingCalc.js";
 import {
@@ -59,34 +60,6 @@ const UNLEARNED_REFRESH_MS = 7 * 24 * 60 * 60_000; // weekly — full-catalog re
 const AUTO_UNLOCKED_RESCAN_MS = 4 * 60 * 60_000; // every 4h — background check for recipes newly usable purely from a discipline level crossing a threshold (see rescanAutoUnlockedRecipes)
 const FRIEND_REFRESH_MS = 24 * 60 * 60_000; // daily — friend recipes-known rarely changes, no need for tighter polling
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
-// Price-alert look-back. Was 7 days, which flagged far too many items as "near high".
-const PRICE_ALERT_WINDOW_MS = 90 * 24 * 60 * 60 * 1000;
-
-// Makes sure EVERY owned item id has a resolved name/icon and (if tradeable) a TP price.
-// Previously names were only fetched for owned ids that also lacked a price, and prices
-// only for ids in the cached id list — so items newly picked up in a bag (Piece of
-// Unidentified Gear, etc.) stayed "Item 12345" or priced at 0 and never showed up in
-// search or Total Wealth. Ids already tried and returned nothing are remembered so
-// unresolvable/untradeable ids aren't re-requested every 60s.
-const _triedNameIds = new Set();
-const _triedPriceIds = new Set();
-async function ensureOwnedResolved(ownedIds, itemMap, priceMap) {
-  const missingNames = ownedIds.filter(id => !itemMap[id] && !_triedNameIds.has(id));
-  let namesChanged = false;
-  if (missingNames.length) {
-    missingNames.forEach(id => _triedNameIds.add(id));
-    const items = await fetchIds("/items", missingNames);
-    items.forEach(i => { itemMap[i.id] = i; });
-    namesChanged = items.length > 0;
-  }
-  const missingPrices = filterTradeable(ownedIds.filter(id => !priceMap[id] && !_triedPriceIds.has(id)), itemMap);
-  if (missingPrices.length) {
-    missingPrices.forEach(id => _triedPriceIds.add(id));
-    Object.assign(priceMap, await fetchPrices(missingPrices));
-  }
-  if (namesChanged) persistItemMapCache(itemMap);
-  return namesChanged;
-}
 // Extra wallet currencies tracked into data.extraCurrencies alongside goldCopper/
 // forgeWallet, keyed by numeric GW2 currency id (same convention as ownedMap/
 // priceMap) — currently just Tyrian Defense Seal (60), needed by the Dragonstorm
@@ -148,8 +121,6 @@ export default function App() {
   const prevOrdersRef = useRef({}); // itemId -> { buyQty, sellQty } for delta tracking
   const velocityRef = useRef({}); // itemId -> { sellFills, buyFills } this refresh
   const cacheRef = useRef({});
-  const flipSummaryRef = useRef({}); // mirrors flipSummary state for refreshPrices (no-deps callback)
-  const alertThresholdRef = useRef(85); // same — refreshPrices used to capture the initial 85% forever
   const doLiveUpdateRef = useRef(null);
   const refreshingRef = useRef(false);
 
@@ -207,6 +178,11 @@ export default function App() {
   const [friendActionMsg, setFriendActionMsg] = useState(null); // {ok, text}
   const [showDeleteFriendConfirm, setShowDeleteFriendConfirm] = useState(null); // friend id pending delete confirmation
 
+  // Global — fires boss/event alerts, and runs every DRF-driven auto-completion
+  // heuristic, regardless of which tab is active. ownedMap/goldCopper/extraCurrencies
+  // are passed straight from live data so the trackers see drops without any polling
+  // of their own; see useBossAlerts.js and bossTimerStorage.js for what each one does.
+  const bossAlerts = useBossAlerts(customSoundPath, piperVoiceFile, piperSpeakerId, data?.ownedMap, data?.goldCopper, data?.extraCurrencies, dataSettled);
   // DRF (Drop Research Facilities) live feed — optional. When a token is set, patches
   // goldCopper/materialRows/ownedMap/forgeWallet/extraCurrencies the instant a drop/
   // consume/salvage event comes in, on top of (never instead of) the normal GW2 API
@@ -214,15 +190,6 @@ export default function App() {
   const { status: drfStatus, statusDetail: drfStatusDetail } = useDrfLiveFeed({
     cacheRef, setData, setForgeWallet, token: drfToken, enabled: !!drfToken,
   });
-
-  // Global — fires boss/event alerts, and runs every DRF-driven auto-completion
-  // heuristic, regardless of which tab is active. ownedMap/goldCopper/extraCurrencies
-  // are passed straight from live data so the trackers see drops without any polling
-  // of their own; see useBossAlerts.js and bossTimerStorage.js for what each one does.
-
-  // drfConnected switches Dragonstorm's tracker to exact-amount matching (see useBossAlerts.js);
-  // itemMap lets trackers resolve chest/key items by NAME.
-  const bossAlerts = useBossAlerts(customSoundPath, piperVoiceFile, piperSpeakerId, data?.ownedMap, data?.goldCopper, data?.extraCurrencies, dataSettled, data?.itemMap, drfStatus === "connected");
 
   const prog = (pct, msg) => setLoadState({ phase: "loading", pct, msg });
   const fullLoadInProgressRef = useRef(false);
@@ -759,18 +726,12 @@ export default function App() {
     setLoadState({ phase: "done", pct: 100, msg: "" });
 
     // ── Wave 3: character inventory (slow) — updates bag items on top of mat storage ──
-    charPromise.then(async characters_startup => {
+    charPromise.then(characters_startup => {
       if (!characters_startup?.length) return;
       const charItems = extractCharacterItems(characters_startup);
       const fullMatAgg = { ...matAgg };
       for (const [id, count] of Object.entries(charItems)) { fullMatAgg[id] = (fullMatAgg[id] || 0) + count; }
       const fullOwnedMap = fullMatAgg;
-      // Resolve names + prices for everything actually in bags before building rows.
-      try {
-        await ensureOwnedResolved(Object.keys(fullOwnedMap).map(Number), itemMap, freshPrices);
-        if (cacheRef.current.itemMap !== itemMap) Object.assign(itemMap, cacheRef.current.itemMap);
-        cacheRef.current.itemMap = itemMap;
-      } catch (e) { console.warn("[owned resolve] wave 3 failed:", e.message); }
       const fullMaterials = Object.entries(fullOwnedMap).map(([id, count]) => ({ id: Number(id), count }));
       const fullMatRows = fullMaterials.map(m => {
         const item = itemMap[m.id]; const price = freshPrices[m.id];
@@ -807,8 +768,6 @@ export default function App() {
   }, []);
 
   useEffect(() => { doLiveUpdateRef.current = doLiveUpdate; }, [doLiveUpdate]);
-  useEffect(() => { flipSummaryRef.current = flipSummary; }, [flipSummary]);
-  useEffect(() => { alertThresholdRef.current = alertThreshold; }, [alertThreshold]);
   useEffect(() => {
     // Load API key first — don't start data load until we have it
     invoke("cache_get", { key: "api_key" }).then(e => {
@@ -931,11 +890,19 @@ export default function App() {
       }
       const dedupedMats = Object.entries(matAgg2).map(([id, count]) => ({ id: Number(id), count }));
       const ownedMap = Object.fromEntries(dedupedMats.map(m => [m.id, m.count]));
-      // Resolve names + prices for every owned id (bags, storage) — see ensureOwnedResolved.
-      const ownedIds = Object.keys(ownedMap).map(Number);
-      await ensureOwnedResolved(ownedIds, itemMap, freshPrices);
-      cacheRef.current.allItemIds = [...new Set([...allItemIds, ...ownedIds])];
-      cacheRef.current.itemMap = itemMap;
+      // Fetch prices and item details for any bag items not in allItemIds
+      // (e.g. high-value containers like Permanent Hair Stylist Contract id:38507)
+      const missingPriceIds = Object.keys(ownedMap).map(Number).filter(id => !freshPrices[id]);
+      if (missingPriceIds.length > 0) {
+        const [extraPrices, extraItems] = await Promise.all([
+          fetchPrices(filterTradeable(missingPriceIds, itemMap)),
+          fetchIds("/items", missingPriceIds.filter(id => !itemMap[id])),
+        ]);
+        Object.assign(freshPrices, extraPrices);
+        extraItems.forEach(i => { itemMap[i.id] = i; });
+        cacheRef.current.allItemIds = [...new Set([...allItemIds, ...missingPriceIds])];
+        cacheRef.current.itemMap = itemMap;
+      }
       cacheRef.current.priceMap = freshPrices;
       cacheRef.current.ownedMap = ownedMap;
 
@@ -983,35 +950,29 @@ export default function App() {
           buyNowWindowRef.current = newBuyNow;
         }).catch(() => {});
       } // end market summary throttle
-      // Price alert scanning — throttled to every 15 min (heavy query on large DB).
-      // Looks at the last 90 days (was 7). Waits until flip/market-summary data exists,
-      // because that data doubles as the "does this price actually move?" test: flipSummary
-      // only contains items whose 90-day price range swings >= 10%, so an item parked at a
-      // fixed price (e.g. 2c forever) never appears there and is never flagged as a "high".
-      const haveFlips = Object.keys(flipSummaryRef.current).length > 0;
-      if (haveFlips && Date.now() - (cacheRef.current.lastAlertScan || 0) >= 15 * 60 * 1000) {
+      // Price alert scanning — throttled to every 15 min (heavy query on large DB)
+      if (Date.now() - (cacheRef.current.lastAlertScan || 0) >= 15 * 60 * 1000) {
         cacheRef.current.lastAlertScan = Date.now();
-        const _alertSinceTs = Date.now() - PRICE_ALERT_WINDOW_MS;
+        const _alertSevenDaysAgo = Date.now() - SEVEN_DAYS_MS;
+        // Send all owned material IDs — file filters to tracked items with sufficient history
         const alertItemIds = dedupedMats.map(mat => mat.id);
-        const thresholdPct = alertThresholdRef.current;
-        getPriceAlertData(alertItemIds, _alertSinceTs).then(rows => {
+        getPriceAlertData(alertItemIds, _alertSevenDaysAgo).then(rows => {
           const alertMap = {};
           for (const row of rows) {
+            // row_count already filtered to >=5 by collector when writing price_alerts.json
             const id = row.item_id;
             const cur = freshPrices[id]?.sells?.unit_price;
             if (!cur) continue;
-            if (!flipSummaryRef.current[id]) continue; // flat / stale price — not a real high
-            const periodMax = row.seven_day_max; // field name is the backend's; window is whatever sinceTs asked for
-            if (cur < periodMax * (thresholdPct / 100)) continue;
+            if (cur < row.seven_day_max * (alertThreshold / 100)) continue;
             const item = itemMap[id];
             const mat = dedupedMats.find(m => m.id === id);
             const count = mat?.count || 0;
-            const pctOfMax = Math.round((cur / periodMax) * 100);
+            const pctOfMax = Math.round((cur / row.seven_day_max) * 100);
             alertMap[id] = { id, name: item?.name || `Item ${id}`, icon: item?.icon, cur,
-            periodMax, pctOfMax, isNewHigh: cur >= periodMax,
+            sevenDayMax: row.seven_day_max, pctOfMax, isNewHigh: cur >= row.seven_day_max,
             count, totalNet: Math.floor(cur * count * 0.85) };
           }
-          setPriceAlerts(Object.values(alertMap).sort((a, b) => b.totalNet - a.totalNet));
+          if (Object.keys(alertMap).length) setPriceAlerts(Object.values(alertMap).sort((a, b) => b.totalNet - a.totalNet));
         }).catch(() => {});
       } // end alert throttle
 
@@ -2126,7 +2087,7 @@ export default function App() {
       <div style={{ width: "100%", maxWidth: 500, background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: 6, padding: 24, display: "flex", flexDirection: "column", gap: 12 }}>
       <div style={{ fontSize: 12, color: "var(--text2)", lineHeight: 1.6 }}>
       Generate an API key at <span style={{ color: "var(--gold2)", fontFamily: "monospace" }}>account.arena.net</span> {"\u2192"} Applications.<br/>
-      Required permissions: <span style={{ color: "var(--gold2)" }}>account, characters, inventories, progression, tradingpost, unlocks, wallet</span>
+      Required permissions: <span style={{ color: "var(--gold2)" }}>account, builds, characters, inventories, progression, tradingpost, unlocks, wallet</span>
       </div>
       <input
       value={settingsApiKey}
@@ -2223,6 +2184,9 @@ export default function App() {
       <button className={`ntab${activeTab === "bosstimers" ? " on" : ""}`} onClick={() => setActiveTab("bosstimers")}>
       ⏱ Boss Timers
       </button>
+      <button className={`ntab${activeTab === "characters" ? " on" : ""}`} onClick={() => setActiveTab("characters")}>
+      Characters
+      </button>
       </div>
 
       {activeTab === "materials" && data && <MaterialsTab {...materialsTabProps} />}
@@ -2244,6 +2208,7 @@ export default function App() {
       {activeTab === "listings" && data && <TradingPostTab {...tradingPostTabProps} />}
       {activeTab === "daily" && data && <TimeGatedTab {...timeGatedTabProps} />}
       {activeTab === "bosstimers" && data && <BossTimersTab {...bossTimersTabProps} />}
+      {activeTab === "characters" && data && <CharactersTab data={data} />}
       </>
     )}
     </div>
