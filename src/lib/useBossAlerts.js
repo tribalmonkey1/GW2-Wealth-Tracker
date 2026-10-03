@@ -134,7 +134,7 @@ export function useBossAlerts(customSoundPath, piperVoiceFile, piperSpeakerId, o
   // big interval effect below for how each is used.
   const itemBaselineRef = useRef({});           // Category 1 (+ DRF map-chest mirror): eventName -> last known count
   const materialBaselineRef = useRef({});       // Category 2: eventName -> { occurrenceSpawnMs, baselineCount, confirmed }
-  const exactCountTrackerRef = useRef({});      // Category 3: eventName -> { occurrenceSpawnMs, baselineCount, invalidBaseline, invalidated, confirmed }
+  const exactCountTrackerRef = useRef({});      // Category 3: eventName -> { occurrenceSpawnMs, lastCount, recent:[{ts,amount}], invalidLast, invalidAt:[ts], confirmed }
   const dualThresholdTrackerRef = useRef({});   // Category 4: eventName -> { occurrenceSpawnMs, baselineGold, baselineCurrency, goldHitAt, currencyHitAt, confirmed }
   const pairedItemTrackerRef = useRef({});      // Category 5: eventName -> { occurrenceSpawnMs, baselines:[count,...], confirmed }
   const rangedPairTrackerRef = useRef({});      // Category 6: eventName -> { occurrenceSpawnMs, baselines:[count,...], hitAt:[ms|null,...], confirmed }
@@ -330,21 +330,41 @@ export function useBossAlerts(customSoundPath, piperVoiceFile, piperSpeakerId, o
           }
           const cur = sumOwned(ids, owned);
           if (!state || state.occurrenceSpawnMs !== occSpawnMs) {
-            state = { occurrenceSpawnMs: occSpawnMs, baselineCount: cur, invalidBaseline: null, invalidated: false, confirmed: false };
+            const invalidLast = {};
+            for (const invId of t.invalidatedByItemIds) invalidLast[invId] = owned[invId] || 0;
+            state = { occurrenceSpawnMs: occSpawnMs, lastCount: cur, recent: [], invalidLast, invalidAt: [], confirmed: false };
             exactCountTrackerRef.current[t.eventName] = state;
             continue;
           }
           if (state.confirmed) continue;
-          if (!state.invalidBaseline) {
-            state.invalidBaseline = {};
-            for (const invId of t.invalidatedByItemIds) state.invalidBaseline[invId] = owned[invId] || 0;
-          } else if (!state.invalidated) {
-            for (const invId of t.invalidatedByItemIds) {
-              if ((owned[invId] || 0) > state.invalidBaseline[invId]) { state.invalidated = true; break; }
-            }
+
+          // Short-window, per-tick detection — NOT a running total since the event began.
+          // The old version compared the current count to a baseline taken when the window
+          // opened, so every other shard gained anywhere in the ~37 min window (opened
+          // chests, other sources) was added in, and an exact-N match could only ever land
+          // if nothing else touched the count first. Now each tick records only what was
+          // GAINED since the previous tick, and the match is the sum of gains within the
+          // last few seconds — one reward drop, not the whole window's worth.
+          const windowMs = (t.correlationSeconds || 3) * 1000;
+
+          // Any change (up OR down) to a source-chest count marks the shards of that moment
+          // as suspect: picking a chest up raises its count, and opening one lowers it while
+          // handing out shards at the same instant — the old check only caught pickups.
+          for (const invId of t.invalidatedByItemIds) {
+            const c = owned[invId] || 0;
+            if (c !== state.invalidLast[invId]) { state.invalidAt.push(now); state.invalidLast[invId] = c; }
           }
-          const delta = cur - state.baselineCount;
-          if (!state.invalidated && delta === t.exactCount) {
+          if (cur > state.lastCount) {
+            state.recent.push({ ts: now, amount: cur - state.lastCount });
+            console.log("[autocomplete] exact", t.eventName, "+" + (cur - state.lastCount), "recent",
+              state.recent.map(r => r.amount), "chest activity", state.invalidAt.length > 0);
+          }
+          state.lastCount = cur;
+          state.recent = state.recent.filter(r => now - r.ts <= windowMs);
+          state.invalidAt = state.invalidAt.filter(ts => now - ts <= windowMs);
+
+          const gainedRecently = state.recent.reduce((sum, r) => sum + r.amount, 0);
+          if (gainedRecently === t.exactCount && state.invalidAt.length === 0) {
             state.confirmed = true;
             markAutoComplete(t.eventName, period);
           }

@@ -161,12 +161,12 @@ export const MATERIAL_REWARD_TRACKERS = [
   { eventName: 'Maws of Torment', itemId: 84360, itemName: "The Desolation: Hero's Choice Chest", graceMinutes: 2 },
 ];
 
-// Category 3 — the item's count must increase by EXACTLY the given amount during the
-// window (+ grace) — not more, not less. Invalidated for that occurrence the moment any
-// of `invalidatedByItemIds` (the other, container-based sources of the same material)
-// is seen increasing first, since that means the shards likely came from one of those
-// instead. A container looted AFTER the exact-20 delta already confirmed doesn't
-// retroactively undo the completion — only "before" matters.
+// Category 3 — the item's count must increase by EXACTLY the given amount within a
+// short window (correlationSeconds, default 3s) during the event's window (+ grace) —
+// a single reward drop, not a running total of everything gained since the event began.
+// Rejected whenever any of `invalidatedByItemIds` (the other, container-based sources of
+// the same material) changes — up (picked up) or down (opened) — in that same short
+// window, since the shards then likely came from that container instead.
 export const EXACT_COUNT_TRACKERS = [
   {
     eventName: 'Drakkar and Spirits of the Wild', itemId: 92272, itemName: 'Eternal Ice Shard',

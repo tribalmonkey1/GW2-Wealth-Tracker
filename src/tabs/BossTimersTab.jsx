@@ -365,7 +365,7 @@ function AutoTrackedBadge({ name, drfConnected = false }) {
     : tracker.kind === "material"
     ? `Best-effort: marked done automatically if your ${tracker.itemName} count goes up during this event's window (+${tracker.graceMinutes} min grace) — not a guaranteed signal, since that material can come from other sources too`
     : tracker.kind === "exact"
-    ? `Best-effort: marked done automatically if your ${tracker.itemName} count goes up by exactly ${tracker.exactCount} during this event's window (+${tracker.graceMinutes} min grace), unless a chest that also grants exactly ${tracker.exactCount} was looted first this occurrence`
+    ? `Best-effort: marked done automatically if your ${tracker.itemName} count goes up by exactly ${tracker.exactCount} in one go (within a few seconds) during this event's window (+${tracker.graceMinutes} min grace), unless a chest that also grants shards was picked up or opened at the same moment`
     : tracker.kind === "paired"
     ? `Marked done automatically once ${tracker.items.map(i => i.itemName).join(" and ")} have both increased during this event's window (+${tracker.graceMinutes} min grace) — that pairing is unique to this event`
     : tracker.kind === "ranged"
