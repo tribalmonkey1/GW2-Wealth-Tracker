@@ -178,18 +178,24 @@ export default function App() {
   const [friendActionMsg, setFriendActionMsg] = useState(null); // {ok, text}
   const [showDeleteFriendConfirm, setShowDeleteFriendConfirm] = useState(null); // friend id pending delete confirmation
 
-  // Global — fires boss/event alerts, and runs every DRF-driven auto-completion
-  // heuristic, regardless of which tab is active. ownedMap/goldCopper/extraCurrencies
-  // are passed straight from live data so the trackers see drops without any polling
-  // of their own; see useBossAlerts.js and bossTimerStorage.js for what each one does.
-  const bossAlerts = useBossAlerts(customSoundPath, piperVoiceFile, piperSpeakerId, data?.ownedMap, data?.goldCopper, data?.extraCurrencies, dataSettled);
   // DRF (Drop Research Facilities) live feed — optional. When a token is set, patches
   // goldCopper/materialRows/ownedMap/forgeWallet/extraCurrencies the instant a drop/
   // consume/salvage event comes in, on top of (never instead of) the normal GW2 API
-  // polling below.
+  // polling below. Must be called before useBossAlerts, which needs drfStatus.
   const { status: drfStatus, statusDetail: drfStatusDetail } = useDrfLiveFeed({
     cacheRef, setData, setForgeWallet, token: drfToken, enabled: !!drfToken,
   });
+
+  // Global — fires boss/event alerts, and runs every DRF-driven auto-completion
+  // heuristic, regardless of which tab is active. ownedMap/goldCopper/extraCurrencies
+  // are passed straight from live data so the trackers see drops without any polling
+  // of their own; itemMap and drfConnected enable name-based item resolution and the
+  // DRF map-chest mirror. See useBossAlerts.js and bossTimerStorage.js.
+  const bossAlerts = useBossAlerts(
+    customSoundPath, piperVoiceFile, piperSpeakerId,
+    data?.ownedMap, data?.goldCopper, data?.extraCurrencies, dataSettled,
+    data?.itemMap, drfStatus === "connected",
+  );
 
   const prog = (pct, msg) => setLoadState({ phase: "loading", pct, msg });
   const fullLoadInProgressRef = useRef(false);

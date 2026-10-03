@@ -122,7 +122,14 @@ export function useDrfLiveFeed({ cacheRef, setData, setForgeWallet, token, enabl
       // currencies, and whatever's listed in TRACKED_EXTRA_CURRENCY_IDS.
     }
 
-    if (goldDelta !== 0 || Object.keys(matRowPatches).length > 0) {
+    // touchedAnyItem is required here, not just matRowPatches: an item that isn't in
+    // itemMap yet (e.g. a zone Hero's Choice Chest, Lump of Mistonium the first time you
+    // get one) produces NO matRowPatch, so without this the patched ownedMap stayed in
+    // cacheRef only and data.ownedMap — which useBossAlerts' auto-completion trackers
+    // read — never saw the drop until the next GW2 API refresh (the /characters
+    // endpoint is cached up to ~5 min server-side). Gold changes masked this for
+    // events like Dragonstorm, since goldDelta always triggered the setData below.
+    if (goldDelta !== 0 || touchedAnyItem || Object.keys(matRowPatches).length > 0) {
       setData(prev => {
         if (!prev) return prev;
         let materialRows = prev.materialRows;

@@ -210,5 +210,5 @@ export const META_EVENT_SCHEDULE = [
   // recommended (real historical 2026 dates were closer to Oct 13 – Nov 3)
   // rather than the exact confirmed dates, since exact per-year dates
   // aren't nailed down — widen/narrow once the actual 2026 dates are known.
-  { eventName: 'Your Mad King Says...', zoneName: "Lion's Arch", expansion: 'Shadow of the Mad King', cycleLengthMin: TWO_HOUR, offsetMin: 0, chatLink: null, durationMin: 10, activeFrom: '2026-10-01', activeTo: '2026-11-15' },
+  { eventName: 'Your Mad King Says...', zoneName: "Lion's Arch", expansion: 'Shadow of the Mad King', cycleLengthMin: TWO_HOUR, offsetMin: 0, chatLink: '[&BBEEAAA=]', durationMin: 10, activeFrom: '2026-10-01', activeTo: '2026-11-15' },
 ];

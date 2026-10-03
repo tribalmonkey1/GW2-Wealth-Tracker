@@ -64,7 +64,7 @@
  */
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
-  getUpcomingRowSeries, getUpcomingOccurrencesFor, getAllPossibleExpansions,
+  getUpcomingRowSeries, getUpcomingOccurrencesFor, getAllPossibleExpansions, getMaxEventDurationMin,
   formatCountdown, urgencyColor, ALERT_LEAD_OPTIONS_MIN, DEFAULT_DURATION_MIN,
   slotVisibleInWindow,
 } from "../lib/bossTimerCalc.js";
@@ -106,6 +106,9 @@ const ROW_LABEL_WIDTH = 150;
 // a busy list. Set high enough that even a Favorites list with many frequently-cycling
 // members can't exhaust it before reaching the end of the visible window.
 const FETCH_CYCLES = 60;
+// How far back before the Timeline's left edge to generate occurrences, so events that
+// started before it but are still running stay on screen. Longest event in the schedule.
+const LOOKBACK_MIN = getMaxEventDurationMin();
 const MIN_BLOCK_WIDTH = 95; // floor so very short events (5-9 min) still fit their checkbox/name/icons legibly
 // Single shared gap value used BOTH horizontally (the visual gap you see
 // between two back-to-back blocks, carved out of block width below) and
@@ -539,7 +542,13 @@ function TimelineRow({ row, origin, windowEnd, ...rest }) {
   // own positioned item, and assignLanes naturally pushes same-start-time
   // occurrences into separate lanes — vertically shifted — since they fully
   // overlap in time, exactly like any other colliding pair already does.
-  const positioned = rawSlots.flatMap(s => s.occurrences.map(occ => {
+  // Per-occurrence end check: slotVisibleInWindow keeps a stacked slot visible while its
+  // LONGEST occurrence is still running, so a shorter occurrence stacked into the same slot
+  // that has already ended would otherwise still render — as a 1px sliver the legibility
+  // pass below then widens into a full ghost block.
+  const positioned = rawSlots.flatMap(s => s.occurrences
+    .filter(occ => occ.spawnMs + (occ.durationMin || DEFAULT_DURATION_MIN) * 60_000 > origin)
+    .map(occ => {
     const durationMin = occ.durationMin || DEFAULT_DURATION_MIN;
     let left = ((s.time - origin) / INTERVAL_MS) * COL_WIDTH + BLOCK_INSET_PX;
     // TRUE, time-accurate width — deliberately NOT floored to MIN_BLOCK_WIDTH
@@ -892,7 +901,7 @@ export default function BossTimersTab({ bossAlerts, goldCopper, drfConnected = f
   const windowEnd = origin + SLOT_COUNT * INTERVAL_MS;
   const nowLineLeft = ((now - origin) / INTERVAL_MS) * COL_WIDTH;
 
-  const timelineAllRows = useMemo(() => getUpcomingRowSeries(origin, FETCH_CYCLES), [origin]);
+  const timelineAllRows = useMemo(() => getUpcomingRowSeries(origin, FETCH_CYCLES, LOOKBACK_MIN), [origin]);
   const timelineSectionsByExpansion = useMemo(() => {
     const map = new Map();
     for (const row of timelineAllRows) {
@@ -907,7 +916,7 @@ export default function BossTimersTab({ bossAlerts, goldCopper, drfConnected = f
 
   const timelineCollectionSlots = useMemo(() => (
     activeList
-      ? getUpcomingOccurrencesFor(activeList.members, origin, FETCH_CYCLES).filter(s => slotVisibleInWindow(s, origin, windowEnd))
+      ? getUpcomingOccurrencesFor(activeList.members, origin, FETCH_CYCLES, LOOKBACK_MIN).filter(s => slotVisibleInWindow(s, origin, windowEnd))
       : []
   ), [activeList, origin, windowEnd]);
 

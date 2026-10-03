@@ -170,7 +170,15 @@ export function slotVisibleInWindow(slot, windowStart, windowEnd) {
 }
 
 // ── Main row-series builder (the "All" tab's data source) ──────────────────
-export function getUpcomingRowSeries(nowMs, cyclesAhead) {
+// lookbackMin: also emit occurrences that STARTED up to this many minutes before nowMs.
+// getNextSpawn/getNextOccurrence only ever return occurrences at or after the time they're
+// given, so without a lookback an event that began before the Timeline's left edge (origin)
+// simply isn't in the data at all — slotVisibleInWindow's "still running" branch can never
+// fire for it, and it vanishes the instant origin ticks past its start even though it's
+// still going. Pass at least the longest event duration (see getMaxEventDurationMin).
+// Countdown callers leave it at 0 — they only want things that haven't started yet.
+export function getUpcomingRowSeries(nowMs, cyclesAhead, lookbackMin = 0) {
+  const startMs = nowMs - lookbackMin * ONE_MIN_MS;
   const fetchCount = cyclesAhead * OCCURRENCE_FETCH_MULTIPLIER;
   const rows = [];
 
@@ -185,7 +193,7 @@ export function getUpcomingRowSeries(nowMs, cyclesAhead) {
   for (const [key, members] of worldGroups) {
     const [expansion, bossType] = key.split("|");
     const occurrences = members.flatMap(boss =>
-      getUpcomingSpawns(boss.dailySpawnTimesUtc, nowMs, fetchCount).map(spawnMs => ({
+      getUpcomingSpawns(boss.dailySpawnTimesUtc, startMs, fetchCount).map(spawnMs => ({
         name: boss.bossName, location: boss.location, chatLink: boss.chatLink, spawnMs,
         durationMin: boss.durationMin || DEFAULT_DURATION_MIN,
       }))
@@ -205,7 +213,7 @@ export function getUpcomingRowSeries(nowMs, cyclesAhead) {
   for (const [key, members] of metaGroups) {
     const [zoneName, expansion] = key.split("|");
     const occurrences = members.flatMap(schedule =>
-      getUpcomingOccurrences(schedule, nowMs, fetchCount).map(spawnMs => ({
+      getUpcomingOccurrences(schedule, startMs, fetchCount).map(spawnMs => ({
         name: schedule.eventName, location: schedule.zoneName, chatLink: schedule.chatLink, spawnMs,
         durationMin: schedule.durationMin || DEFAULT_DURATION_MIN,
       }))
@@ -224,15 +232,16 @@ export function getUpcomingRowSeries(nowMs, cyclesAhead) {
 // an alert or saving to a collection from any one zone's occurrence applies
 // to every zone that event appears in — matches how the player thinks about
 // "the event", not the specific instance they happened to click on.
-export function getUpcomingOccurrencesFor(identities, nowMs, cyclesAhead) {
+export function getUpcomingOccurrencesFor(identities, nowMs, cyclesAhead, lookbackMin = 0) {
   if (identities.length === 0) return [];
+  const startMs = nowMs - lookbackMin * ONE_MIN_MS; // see getUpcomingRowSeries
   const nameSet = new Set(identities.map(i => i.name));
   const fetchCount = cyclesAhead * OCCURRENCE_FETCH_MULTIPLIER;
   const occurrences = [];
 
   for (const boss of WORLD_BOSS_SCHEDULE) {
     if (!nameSet.has(boss.bossName)) continue;
-    occurrences.push(...getUpcomingSpawns(boss.dailySpawnTimesUtc, nowMs, fetchCount).map(spawnMs => ({
+    occurrences.push(...getUpcomingSpawns(boss.dailySpawnTimesUtc, startMs, fetchCount).map(spawnMs => ({
       name: boss.bossName, location: boss.location, chatLink: boss.chatLink, spawnMs,
       durationMin: boss.durationMin || DEFAULT_DURATION_MIN,
     })));
@@ -240,13 +249,22 @@ export function getUpcomingOccurrencesFor(identities, nowMs, cyclesAhead) {
   for (const schedule of META_EVENT_SCHEDULE) {
     if (!nameSet.has(schedule.eventName)) continue;
     if (!isMetaEventActive(schedule, nowMs)) continue;
-    occurrences.push(...getUpcomingOccurrences(schedule, nowMs, fetchCount).map(spawnMs => ({
+    occurrences.push(...getUpcomingOccurrences(schedule, startMs, fetchCount).map(spawnMs => ({
       name: schedule.eventName, location: schedule.zoneName, chatLink: schedule.chatLink, spawnMs,
       durationMin: schedule.durationMin || DEFAULT_DURATION_MIN,
     })));
   }
 
   return buildStackedSlots(occurrences, cyclesAhead);
+}
+
+// Longest durationMin across every schedule entry — used as the Timeline's lookback so
+// no still-running event can start earlier than the window the data was generated from.
+export function getMaxEventDurationMin() {
+  let max = DEFAULT_DURATION_MIN;
+  for (const b of WORLD_BOSS_SCHEDULE) max = Math.max(max, b.durationMin || DEFAULT_DURATION_MIN);
+  for (const m of META_EVENT_SCHEDULE) max = Math.max(max, m.durationMin || DEFAULT_DURATION_MIN);
+  return max;
 }
 
 export function getAllPossibleExpansions() {

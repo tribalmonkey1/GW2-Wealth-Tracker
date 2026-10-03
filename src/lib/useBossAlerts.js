@@ -283,6 +283,7 @@ export function useBossAlerts(customSoundPath, piperVoiceFile, piperSpeakerId, o
             const cur = sumOwned(ids, owned);
             const baseline = itemBaselineRef.current[t.eventName];
             if (baseline === undefined) { itemBaselineRef.current[t.eventName] = cur; continue; }
+            if (cur !== baseline) console.log("[autocomplete] map-chest", t.eventName, "ids", ids, baseline, "->", cur);
             if (cur > baseline) {
               itemBaselineRef.current[t.eventName] = cur;
               markAutoComplete(t.eventName, period);
@@ -429,6 +430,11 @@ export function useBossAlerts(customSoundPath, piperVoiceFile, piperSpeakerId, o
             continue;
           }
           if (state.confirmed) continue;
+          const sig = curCounts.map((c, i) => c - state.baselines[i]).join(",");
+          if (sig !== state.lastSig && sig.split(",").some(d => d !== "0")) {
+            state.lastSig = sig;
+            console.log("[autocomplete] ranged", t.eventName, "deltas", sig, "hitAt", state.hitAt);
+          }
           const correlationMs = (t.correlationSeconds || 2) * 1000;
           t.items.forEach((spec, i) => {
             if (state.hitAt[i] != null) return; // already hit once this occurrence — first hit wins
