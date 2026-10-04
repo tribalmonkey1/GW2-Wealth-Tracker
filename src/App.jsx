@@ -22,7 +22,7 @@ import { CharactersTab } from "./tabs/CharactersTab.jsx";
 
 import { getRecipeDisciplines, dedupeRecipesById, DISCIPLINES, buildCraftItems } from "./lib/craftingCalc.js";
 import {
-  apiFetch, publicFetch, fetchIds, fetchPrices, fetchSoldHistory, chunk,
+  apiFetch, publicFetch, fetchIds, fetchPrices, fetchSoldHistory, fetchAccountSlotItems, chunk,
   filterTradeable, resolveLockedCatalogCoverage, persistItemMapCache, BASE,
 } from "./lib/gw2Api.js";
 import {
@@ -71,6 +71,19 @@ const extractExtraCurrencies = (walletArr) => {
   for (const id of EXTRA_CURRENCY_IDS) map[id] = walletArr.find(w => w.id === id)?.value || 0;
   return map;
 };
+
+// Bank + shared inventory slots, folded into ownedMap alongside material storage and
+// character bags so every owned-count consumer (Materials tab, wealth, crafting, the
+// auto-completion trackers) sees one consistent account-wide total. On a failed fetch
+// the last good result is reused — a transient error must never look like items leaving.
+async function loadAccountSlotItems(cacheRef) {
+  const fresh = await fetchAccountSlotItems();
+  if (fresh) cacheRef.current.accountSlotItems = fresh;
+  return cacheRef.current.accountSlotItems || {};
+}
+function addCounts(target, counts) {
+  for (const [id, count] of Object.entries(counts)) target[id] = (target[id] || 0) + count;
+}
 
 export default function App() {
   const [loadState, setLoadState] = useState({ phase: "loading", pct: 0, msg: "Initializing..." });
@@ -350,6 +363,7 @@ export default function App() {
       for (const [id, count] of Object.entries(charItems)) {
         matAgg[id] = (matAgg[id] || 0) + count;
       }
+      addCounts(matAgg, await loadAccountSlotItems(cacheRef));
       const materials = Object.entries(matAgg).map(([id, count]) => ({ id: Number(id), count }));
 
       let disciplineLevels, knownRecipeIds, allRecipes, resolvedRecipes, itemMap, allItemIds;
@@ -634,6 +648,7 @@ export default function App() {
 
     // ── Wave 2: slow character fetch (runs in parallel with price fetch) ──
     const charPromise = apiFetch(`${BASE}/characters?ids=all`).catch(() => []);
+    const slotPromise = loadAccountSlotItems(cacheRef); // bank + shared slots, never rejects
 
     // Wait for prices first — update UI as soon as prices + mat storage are ready
     const freshPrices = await pricePromise;
@@ -732,11 +747,12 @@ export default function App() {
     setLoadState({ phase: "done", pct: 100, msg: "" });
 
     // ── Wave 3: character inventory (slow) — updates bag items on top of mat storage ──
-    charPromise.then(characters_startup => {
+    Promise.all([charPromise, slotPromise]).then(([characters_startup, slotItems]) => {
       if (!characters_startup?.length) return;
       const charItems = extractCharacterItems(characters_startup);
       const fullMatAgg = { ...matAgg };
       for (const [id, count] of Object.entries(charItems)) { fullMatAgg[id] = (fullMatAgg[id] || 0) + count; }
+      addCounts(fullMatAgg, slotItems);
       const fullOwnedMap = fullMatAgg;
       const fullMaterials = Object.entries(fullOwnedMap).map(([id, count]) => ({ id: Number(id), count }));
       const fullMatRows = fullMaterials.map(m => {
@@ -871,7 +887,7 @@ export default function App() {
     refreshingRef.current = true; setRefreshing(true); setRefreshError(null);
     try {
       const { itemMap, resolvedRecipes, recipes, allItemIds } = cacheRef.current;
-      const [wallet, rawMats, characters_refresh, freshPrices, rawDailyCrafted2, rawListings, rawSoldHistory] = await Promise.all([
+      const [wallet, rawMats, characters_refresh, freshPrices, rawDailyCrafted2, rawListings, rawSoldHistory, slotItems] = await Promise.all([
         apiFetch(`${BASE}/account/wallet`),
                                                                                                                                   apiFetch(`${BASE}/account/materials`),
                                                                                                                                   apiFetch(`${BASE}/characters?ids=all`),
@@ -879,6 +895,7 @@ export default function App() {
                                                                                                                                   apiFetch(`${BASE}/account/dailycrafting`).catch(() => []),
                                                                                                                                   apiFetch(`${BASE}/commerce/transactions/current/sells`).catch(() => null),
                                                                                                                                   fetchSoldHistory().catch(() => []),
+        loadAccountSlotItems(cacheRef),
       ]);
       const characters_data = characters_refresh || [];
       setDailyCrafted(buildDailyCraftedSet(rawDailyCrafted2, itemMap));
@@ -894,15 +911,25 @@ export default function App() {
       for (const [id, count] of Object.entries(charItems2)) {
         matAgg2[id] = (matAgg2[id] || 0) + count;
       }
+      // Bags + material storage only, kept separate so unpriced bank/shared-slot junk
+      // (soulbound gear etc.) doesn't flood the Materials tab — see the row filter below.
+      const bagMatCounts = { ...matAgg2 };
+      addCounts(matAgg2, slotItems);
       const dedupedMats = Object.entries(matAgg2).map(([id, count]) => ({ id: Number(id), count }));
       const ownedMap = Object.fromEntries(dedupedMats.map(m => [m.id, m.count]));
-      // Fetch prices and item details for any bag items not in allItemIds
-      // (e.g. high-value containers like Permanent Hair Stylist Contract id:38507)
-      const missingPriceIds = Object.keys(ownedMap).map(Number).filter(id => !freshPrices[id]);
-      if (missingPriceIds.length > 0) {
+      // Fetch prices and item details for any owned items not already known
+      // (e.g. high-value containers like Permanent Hair Stylist Contract id:38507).
+      // Prices and names are checked independently: an owned item can already have a
+      // price but no itemMap entry (cached price list, or an earlier names fetch that
+      // failed), and the old unpriced-only check never revisited it — it stayed an
+      // unnamed "Item N" row forever, invisible to name search.
+      const ownedIds = Object.keys(ownedMap).map(Number);
+      const missingPriceIds = ownedIds.filter(id => !freshPrices[id]);
+      const missingItemIds = ownedIds.filter(id => !itemMap[id]);
+      if (missingPriceIds.length > 0 || missingItemIds.length > 0) {
         const [extraPrices, extraItems] = await Promise.all([
           fetchPrices(filterTradeable(missingPriceIds, itemMap)),
-          fetchIds("/items", missingPriceIds.filter(id => !itemMap[id])),
+          fetchIds("/items", missingItemIds),
         ]);
         Object.assign(freshPrices, extraPrices);
         extraItems.forEach(i => { itemMap[i.id] = i; });
@@ -994,9 +1021,27 @@ export default function App() {
         const hasTP = r.sellPrice > 0;
         const hasCraft = !!resolvedRecipes[r.id];
         if (hasTP || hasCraft) return true;
-        return !r.name.startsWith("Item ");
+        // Unpriced items only show if actually held in bags/material storage — not when
+        // they exist only in the bank/shared slots, which would otherwise list every
+        // soulbound piece of gear you've ever stashed.
+        return !r.name.startsWith("Item ") && (bagMatCounts[r.id] || 0) > 0;
       });
       const totalMaterialValue = materialRows.reduce((s, r) => s + r.totalValue, 0);
+      // Diagnostic (logs only when it changes): owned bag/storage items that didn't make
+      // it into the Materials rows, and rows still showing as an unnamed "Item N".
+      {
+        const shownIds = new Set(materialRows.map(r => r.id));
+        const hidden = dedupedMats.filter(m => !shownIds.has(m.id) && (bagMatCounts[m.id] || 0) > 0);
+        const unnamed = materialRows.filter(r => r.name.startsWith("Item "));
+        const sig = hidden.map(m => m.id).join(",") + "|" + unnamed.map(r => r.id).join(",");
+        if (sig !== cacheRef.current.materialsDiagSig) {
+          cacheRef.current.materialsDiagSig = sig;
+          if (hidden.length || unnamed.length) {
+            console.warn("[materials] hidden (owned, unpriced, unnamed):", hidden.map(m => `${m.id}x${m.count}`),
+              "| unnamed rows:", unnamed.map(r => `${r.id}x${r.count}`));
+          }
+        }
+      }
       const now = Date.now();
       const charInventoryByChar2 = extractCharacterItemsByChar(characters_data);
       const charDisciplines2 = extractCharacterDisciplines(characters_data);

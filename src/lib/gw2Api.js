@@ -116,3 +116,21 @@ export function persistItemMapCache(itemMap) {
     }])
   ));
 }
+
+// Bank + shared inventory slots as { itemId: totalCount }, or null if either call fails.
+// Callers keep the last good result on null (see loadAccountSlotItems in App.jsx) so a
+// transient API error never makes bank contents look like they were just removed.
+export async function fetchAccountSlotItems() {
+  try {
+    const [bank, shared] = await Promise.all([
+      apiFetch(`${BASE}/account/bank`),
+      apiFetch(`${BASE}/account/inventory`),
+    ]);
+    const counts = {};
+    for (const slot of [...(bank || []), ...(shared || [])]) {
+      if (!slot || !slot.id || !(slot.count > 0)) continue;
+      counts[slot.id] = (counts[slot.id] || 0) + slot.count;
+    }
+    return counts;
+  } catch { return null; }
+}
