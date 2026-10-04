@@ -173,7 +173,9 @@ export function useBossAlerts(customSoundPath, piperVoiceFile, piperSpeakerId, o
     setCompletions(prev => {
       const key = bossKey(name);
       if (prev[key]?.period === period) return prev;
-      const next = { ...prev, [key]: { period, auto: true } };
+      // src: "drf" marks this as a DRF/item-tracker completion so the API poll's
+      // reconcile (BossTimersTab.jsx) won't un-stamp it just because the API is lagging.
+      const next = { ...prev, [key]: { period, auto: true, src: "drf" } };
       saveCompletions(next);
       return next;
     });

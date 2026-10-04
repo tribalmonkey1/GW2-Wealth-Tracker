@@ -159,16 +159,22 @@ function snapToLocalInterval(nowMs, intervalMin) {
 
 // Applies one API poll's result to the completions map. Stamps every reported name as
 // done for the current period, and un-stamps any API-managed name that was AUTO-stamped
-// for this period but is no longer reported — so a stale or wrong earlier response can't
+// BY AN EARLIER API POLL for this period but is no longer reported — so a stale or wrong earlier response can't
 // leave a box stuck checked. Manual checks (no `auto` flag) are never touched.
 function reconcileApiCompletions(prev, managedNames, reportedNames, period) {
   const next = { ...prev };
   let changed = false;
   for (const name of reportedNames) {
-    if (next[name]?.period !== period) { next[name] = { period, auto: true }; changed = true; }
+    if (next[name]?.period !== period) { next[name] = { period, auto: true, src: "api" }; changed = true; }
   }
   for (const name of managedNames) {
-    if (!reportedNames.has(name) && next[name]?.auto && next[name].period === period) {
+    // Only un-stamp completions THIS poll's own earlier responses put there (src "api", or
+    // no src at all — entries saved before sources were tagged). A completion stamped by
+    // the DRF item-count tracker (src "drf") is independent evidence the chest was
+    // received: the API lagging behind it (these endpoints are cached for minutes) just
+    // means it hasn't caught up yet, not that the completion was wrong — un-stamping it
+    // here is what made Chak Gerent complete, then un-complete a poll later.
+    if (!reportedNames.has(name) && next[name]?.auto && next[name].src !== "drf" && next[name].period === period) {
       delete next[name]; changed = true;
     }
   }
