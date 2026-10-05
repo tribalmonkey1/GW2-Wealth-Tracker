@@ -360,8 +360,11 @@ function AutoTrackedBadge({ name, drfConnected = false }) {
   const viaMapChestDrf = viaMapChest && drfConnected && MAP_CHEST_ITEM_TRACKERS.some(t => t.eventName === name);
   const tracker = viaWorldBoss || viaMapChest ? null : findAutoTracker(name);
   if (!viaWorldBoss && !viaMapChest && !tracker) return null;
+  const worldBossItemTracker = viaWorldBoss ? ITEM_COMPLETION_TRACKERS.find(t => t.eventName === name) : null;
   const title = viaWorldBoss
-    ? "Marked done automatically once GW2's API reports this boss killed for the day"
+    ? (worldBossItemTracker
+        ? `Marked done automatically once GW2's API reports this boss killed for the day — or, with your DRF token connected, as soon as your "${worldBossItemTracker.itemName}" count goes up, whichever comes first`
+        : "Marked done automatically once GW2's API reports this boss killed for the day")
     : viaMapChest
     ? (viaMapChestDrf
         ? "Marked done automatically once GW2's API reports this zone's daily Hero's Choice Chest claimed — or, with your DRF token connected, as soon as that chest's count goes up in your inventory, whichever comes first"
@@ -412,6 +415,8 @@ function WaypointButton({ chatLink, name, fontSize = 13 }) {
 // ── Countdown view: one occurrence line ──
 function CountdownLine({ occ, now, alerts, setAlertLead, setAlertAlways, collections, onToggleMember, onCreateCollection, completions, currentPeriodStr, onToggleComplete, drfConnected }) {
   const msUntil = occ.spawnMs - now;
+  const endMs = occ.spawnMs + (occ.durationMin || DEFAULT_DURATION_MIN) * 60_000;
+  const inProgress = msUntil <= 0; // started already, still running (see dropEnded in bossTimerCalc.js)
   const urgency = urgencyColor(msUntil);
   const key = bossKey(occ.name);
   const leadMinutes = alerts[key]?.lead;
@@ -445,7 +450,9 @@ function CountdownLine({ occ, now, alerts, setAlertLead, setAlertAlways, collect
         </div>
       </div>
       <div className="bt-occ-time">
-        <span style={URGENCY_STYLE[urgency]}>{formatCountdown(msUntil)}</span>
+        {inProgress
+          ? <span style={{ color: "var(--green2)", fontWeight: 600 }} title={`Started ${localTime}`}>In progress · {formatCountdown(endMs - now)} left</span>
+          : <span style={URGENCY_STYLE[urgency]}>{formatCountdown(msUntil)}</span>}
         <span className="bt-occ-local">{localTime}</span>
       </div>
 
@@ -886,7 +893,7 @@ export default function BossTimersTab({ bossAlerts, goldCopper, drfConnected = f
   };
 
   // ── Countdown view data ──
-  const allRows = useMemo(() => getUpcomingRowSeries(now, CYCLES_AHEAD), [now]);
+  const allRows = useMemo(() => getUpcomingRowSeries(now, CYCLES_AHEAD, LOOKBACK_MIN, now), [now]);
   const sectionsByExpansion = useMemo(() => {
     const map = new Map();
     for (const row of allRows) {
@@ -899,7 +906,7 @@ export default function BossTimersTab({ bossAlerts, goldCopper, drfConnected = f
 
   const activeList = collections.find(l => l.id === activeTabId);
   const collectionSlots = useMemo(() => (
-    activeList ? getUpcomingOccurrencesFor(activeList.members, now, CYCLES_AHEAD) : []
+    activeList ? getUpcomingOccurrencesFor(activeList.members, now, CYCLES_AHEAD, LOOKBACK_MIN, now) : []
   ), [activeList, now]);
 
   // ── Timeline view data ──

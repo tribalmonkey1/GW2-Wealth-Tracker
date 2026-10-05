@@ -53,6 +53,11 @@ import { useDrfLiveFeed } from "./lib/drfClient.js";
 
 // ── Timing / config constants ───────────────────────────────────────────────
 const PRICE_REFRESH_MS = 60_000;
+// With a DRF token connected, GW2-API gold/item/material/wallet data is only allowed to replace
+// the DRF-maintained counts after DRF has reported NO such change for this long. The API caches
+// account data for up to ~5 min, so after 10 quiet minutes it is guaranteed current — while
+// during active play it would just roll back recent pickups with stale numbers.
+const DRF_QUIET_MS = 10 * 60_000;
 const RECIPE_REFRESH_MS = 4 * 60 * 60_000;
 const UPDATE_CHECK_MS = 4 * 60 * 60_000; // 4h — GitHub Releases doesn't need aggressive polling
 const GEM_QUANTITY_COPPER = 4_000_000; // 400g sample — coins_per_gem is stable enough at this size to extrapolate ×400
@@ -195,9 +200,12 @@ export default function App() {
   // goldCopper/materialRows/ownedMap/forgeWallet/extraCurrencies the instant a drop/
   // consume/salvage event comes in, on top of (never instead of) the normal GW2 API
   // polling below. Must be called before useBossAlerts, which needs drfStatus.
+  const drfActivityRef = useRef(0);               // ms timestamp of the last DRF gold/item/material change
+  const drfStatusRef = useRef("disconnected");    // mirrors drfStatus for use inside refreshPrices ([] deps)
   const { status: drfStatus, statusDetail: drfStatusDetail } = useDrfLiveFeed({
-    cacheRef, setData, setForgeWallet, token: drfToken, enabled: !!drfToken,
+    cacheRef, setData, setForgeWallet, token: drfToken, enabled: !!drfToken, activityRef: drfActivityRef,
   });
+  useEffect(() => { drfStatusRef.current = drfStatus; }, [drfStatus]);
 
   // Global — fires boss/event alerts, and runs every DRF-driven auto-completion
   // heuristic, regardless of which tab is active. ownedMap/goldCopper/extraCurrencies
@@ -207,7 +215,7 @@ export default function App() {
   const bossAlerts = useBossAlerts(
     customSoundPath, piperVoiceFile, piperSpeakerId,
     data?.ownedMap, data?.goldCopper, data?.extraCurrencies, dataSettled,
-    data?.itemMap, drfStatus === "connected",
+    data?.itemMap, drfStatus === "connected", drfActivityRef,
   );
 
   const prog = (pct, msg) => setLoadState({ phase: "loading", pct, msg });
@@ -527,7 +535,7 @@ export default function App() {
       const charInventoryByChar = extractCharacterItemsByChar(characters_startup);
       const charDisciplines = extractCharacterDisciplines(characters_startup);
       const timegatedList = buildTimegatedInfo(itemMap, disciplineLevels);
-      cacheRef.current = { itemMap, priceMap, resolvedRecipes, recipes: allRecipes, knownRecipeIds, ownedMap, allItemIds, disciplineLevels, charInventoryByChar, charDisciplines, timegatedList };
+      cacheRef.current = { ownedFullySynced: true, itemMap, priceMap, resolvedRecipes, recipes: allRecipes, knownRecipeIds, ownedMap, allItemIds, disciplineLevels, charInventoryByChar, charDisciplines, timegatedList };
 
       prog(95, "Saving price snapshot (live prices only)...");
       // NAS collector handles price snapshots
@@ -779,6 +787,7 @@ export default function App() {
       const disciplineLevels = cacheRef.current.disciplineLevels || {};
       const timegatedList = buildTimegatedInfo(itemMap, disciplineLevels);
       cacheRef.current.ownedMap = fullOwnedMap;
+      cacheRef.current.ownedFullySynced = true;
       cacheRef.current.charInventoryByChar = charInventoryByChar;
       cacheRef.current.charDisciplines = charDisciplines;
       cacheRef.current.timegatedList = timegatedList;
@@ -903,7 +912,7 @@ export default function App() {
       setUtcMidnightMs(Date.UTC(now2.getUTCFullYear(), now2.getUTCMonth(), now2.getUTCDate() + 1));
       const goldCopper = wallet.find(w => w.id === 1)?.value || 0;
       const extraCurrencies = extractExtraCurrencies(wallet);
-      setForgeWallet(extractForgeWallet(wallet));
+      // (setForgeWallet(...) happens below, after the DRF gate decides whether API wallet data may apply)
       // Aggregate material storage + character bag inventories, deduplicate
       const matAgg2 = {};
       for (const m of rawMats) { if (m.count > 0) matAgg2[m.id] = (matAgg2[m.id] || 0) + m.count; }
@@ -915,15 +924,14 @@ export default function App() {
       // (soulbound gear etc.) doesn't flood the Materials tab — see the row filter below.
       const bagMatCounts = { ...matAgg2 };
       addCounts(matAgg2, slotItems);
-      const dedupedMats = Object.entries(matAgg2).map(([id, count]) => ({ id: Number(id), count }));
-      const ownedMap = Object.fromEntries(dedupedMats.map(m => [m.id, m.count]));
+      const apiOwnedMap = { ...matAgg2 }; // what the GW2 API says — only used if DRF isn't currently authoritative
       // Fetch prices and item details for any owned items not already known
       // (e.g. high-value containers like Permanent Hair Stylist Contract id:38507).
       // Prices and names are checked independently: an owned item can already have a
       // price but no itemMap entry (cached price list, or an earlier names fetch that
       // failed), and the old unpriced-only check never revisited it — it stayed an
       // unnamed "Item N" row forever, invisible to name search.
-      const ownedIds = Object.keys(ownedMap).map(Number);
+      const ownedIds = Object.keys({ ...apiOwnedMap, ...(cacheRef.current.ownedMap || {}) }).map(Number);
       const missingPriceIds = ownedIds.filter(id => !freshPrices[id]);
       const missingItemIds = ownedIds.filter(id => !itemMap[id]);
       if (missingPriceIds.length > 0 || missingItemIds.length > 0) {
@@ -936,8 +944,19 @@ export default function App() {
         cacheRef.current.allItemIds = [...new Set([...allItemIds, ...missingPriceIds])];
         cacheRef.current.itemMap = itemMap;
       }
+      // DRF gate — decided here, AFTER the awaited fetches above, so a drop that arrived
+      // mid-refresh counts. While DRF is connected and reported a gold/item/material change
+      // within DRF_QUIET_MS, keep the DRF-maintained counts/gold/wallet instead of the GW2
+      // API's (possibly ~5 min stale) values; prices, listings, history etc. still refresh.
+      // Never gates until a first full API sync has populated bags + storage (ownedFullySynced).
+      const drfHolds = drfStatusRef.current === "connected" && !!cacheRef.current.ownedFullySynced
+        && !!cacheRef.current.ownedMap && (Date.now() - drfActivityRef.current) < DRF_QUIET_MS;
+      const ownedMap = drfHolds ? { ...cacheRef.current.ownedMap } : apiOwnedMap;
+      const dedupedMats = Object.entries(ownedMap).filter(([, c]) => c > 0).map(([id, count]) => ({ id: Number(id), count }));
+      if (!drfHolds) setForgeWallet(extractForgeWallet(wallet));
       cacheRef.current.priceMap = freshPrices;
       cacheRef.current.ownedMap = ownedMap;
+      if (!drfHolds) cacheRef.current.ownedFullySynced = true;
 
       // Manual daily tracking: record baseline if needed, then check for count increases
       const resetTs = getDailyResetTs();
@@ -1048,12 +1067,12 @@ export default function App() {
       cacheRef.current.charInventoryByChar = charInventoryByChar2;
       cacheRef.current.charDisciplines = charDisciplines2;
       // Update UI immediately with gold/prices/materials — crafting items deferred
-      setData(prev => ({ ...prev, goldCopper, totalMaterialValue, materialRows, priceMap: freshPrices, ownedMap, charInventoryByChar: charInventoryByChar2, charDisciplines: charDisciplines2, timegatedList: cacheRef.current.timegatedList || prev.timegatedList, extraCurrencies }));
+      setData(prev => ({ ...prev, goldCopper: drfHolds ? prev.goldCopper : goldCopper, totalMaterialValue, materialRows, priceMap: freshPrices, ownedMap, charInventoryByChar: charInventoryByChar2, charDisciplines: charDisciplines2, timegatedList: cacheRef.current.timegatedList || prev.timegatedList, extraCurrencies: drfHolds ? prev.extraCurrencies : extraCurrencies }));
       setDataSettled(true);
       setLastPrice(now); setNextPriceIn(PRICE_REFRESH_MS); setSecsAgo(0);
       // Persist latest data so next app launch loads fresh values immediately
       cacheSet("lastPriceMap", freshPrices);
-      cacheSet("lastGold", goldCopper);
+      if (!drfHolds) cacheSet("lastGold", goldCopper);
       cacheSet("ownedMap", ownedMap);
       // Build craft items in worker — never blocks the main thread
       computeCraftItems(recipes, resolvedRecipes, itemMap, freshPrices, ownedMap)

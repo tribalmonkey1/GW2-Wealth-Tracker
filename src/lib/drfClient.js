@@ -44,7 +44,7 @@ const TRACKED_EXTRA_CURRENCY_IDS = new Set([60]);
 // pickups in under a second) into one worker recompute instead of one per event.
 const RECOMPUTE_DEBOUNCE_MS = 400;
 
-export function useDrfLiveFeed({ cacheRef, setData, setForgeWallet, token, enabled }) {
+export function useDrfLiveFeed({ cacheRef, setData, setForgeWallet, token, enabled, activityRef }) {
   const [status, setStatus] = useState("disconnected"); // connecting | connected | reconnecting | disconnected | error
   const [statusDetail, setStatusDetail] = useState(null);
   const recomputeTimerRef = useRef(null);
@@ -122,6 +122,13 @@ export function useDrfLiveFeed({ cacheRef, setData, setForgeWallet, token, enabl
       // currencies, and whatever's listed in TRACKED_EXTRA_CURRENCY_IDS.
     }
 
+    // Record that DRF just reported a gold / item / material / tracked-wallet change. App.jsx's
+    // refreshPrices uses this to stop the (up to ~5 min stale) GW2 API from overwriting these
+    // DRF-maintained counts while DRF is actively reporting — see DRF_QUIET_MS there.
+    if (activityRef && (touchedAnyItem || goldDelta !== 0 || Object.keys(walletDeltas).length > 0 || Object.keys(extraCurrencyDeltas).length > 0)) {
+      activityRef.current = Date.now();
+    }
+
     // touchedAnyItem is required here, not just matRowPatches: an item that isn't in
     // itemMap yet (e.g. a zone Hero's Choice Chest, Lump of Mistonium the first time you
     // get one) produces NO matRowPatch, so without this the patched ownedMap stayed in
@@ -171,7 +178,7 @@ export function useDrfLiveFeed({ cacheRef, setData, setForgeWallet, token, enabl
     }
 
     if (touchedAnyItem) scheduleRecompute();
-  }, [cacheRef, setData, setForgeWallet, scheduleRecompute]);
+  }, [cacheRef, setData, setForgeWallet, scheduleRecompute, activityRef]);
 
   useEffect(() => {
     if (!enabled || !token) {

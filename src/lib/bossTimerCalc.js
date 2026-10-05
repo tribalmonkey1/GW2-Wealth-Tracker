@@ -169,6 +169,15 @@ export function slotVisibleInWindow(slot, windowStart, windowEnd) {
   return slot.time + maxDurationMs > windowStart;
 }
 
+// Drops occurrences that had already finished by minEndMs (null = keep everything). The
+// Countdown view passes minEndMs = now together with a lookback, so an event that started
+// in the past but is still running is kept — shown as "in progress" — while ones that have
+// ended are dropped BEFORE stacking, so they can't eat into the cyclesAhead slot cap.
+function dropEnded(occurrences, minEndMs) {
+  if (minEndMs == null) return occurrences;
+  return occurrences.filter(o => o.spawnMs + (o.durationMin || DEFAULT_DURATION_MIN) * ONE_MIN_MS > minEndMs);
+}
+
 // ── Main row-series builder (the "All" tab's data source) ──────────────────
 // lookbackMin: also emit occurrences that STARTED up to this many minutes before nowMs.
 // getNextSpawn/getNextOccurrence only ever return occurrences at or after the time they're
@@ -177,7 +186,7 @@ export function slotVisibleInWindow(slot, windowStart, windowEnd) {
 // fire for it, and it vanishes the instant origin ticks past its start even though it's
 // still going. Pass at least the longest event duration (see getMaxEventDurationMin).
 // Countdown callers leave it at 0 — they only want things that haven't started yet.
-export function getUpcomingRowSeries(nowMs, cyclesAhead, lookbackMin = 0) {
+export function getUpcomingRowSeries(nowMs, cyclesAhead, lookbackMin = 0, minEndMs = null) {
   const startMs = nowMs - lookbackMin * ONE_MIN_MS;
   const fetchCount = cyclesAhead * OCCURRENCE_FETCH_MULTIPLIER;
   const rows = [];
@@ -198,7 +207,7 @@ export function getUpcomingRowSeries(nowMs, cyclesAhead, lookbackMin = 0) {
         durationMin: boss.durationMin || DEFAULT_DURATION_MIN,
       }))
     );
-    const slots = buildStackedSlots(occurrences, cyclesAhead);
+    const slots = buildStackedSlots(dropEnded(occurrences, minEndMs), cyclesAhead);
     if (slots.length > 0) rows.push({ rowLabel: rowLabelForBossType(bossType), expansion, slots });
   }
 
@@ -218,7 +227,7 @@ export function getUpcomingRowSeries(nowMs, cyclesAhead, lookbackMin = 0) {
         durationMin: schedule.durationMin || DEFAULT_DURATION_MIN,
       }))
     );
-    const slots = buildStackedSlots(occurrences, cyclesAhead);
+    const slots = buildStackedSlots(dropEnded(occurrences, minEndMs), cyclesAhead);
     if (slots.length > 0) rows.push({ rowLabel: zoneName, expansion, slots });
   }
 
@@ -232,7 +241,7 @@ export function getUpcomingRowSeries(nowMs, cyclesAhead, lookbackMin = 0) {
 // an alert or saving to a collection from any one zone's occurrence applies
 // to every zone that event appears in — matches how the player thinks about
 // "the event", not the specific instance they happened to click on.
-export function getUpcomingOccurrencesFor(identities, nowMs, cyclesAhead, lookbackMin = 0) {
+export function getUpcomingOccurrencesFor(identities, nowMs, cyclesAhead, lookbackMin = 0, minEndMs = null) {
   if (identities.length === 0) return [];
   const startMs = nowMs - lookbackMin * ONE_MIN_MS; // see getUpcomingRowSeries
   const nameSet = new Set(identities.map(i => i.name));
@@ -255,7 +264,7 @@ export function getUpcomingOccurrencesFor(identities, nowMs, cyclesAhead, lookba
     })));
   }
 
-  return buildStackedSlots(occurrences, cyclesAhead);
+  return buildStackedSlots(dropEnded(occurrences, minEndMs), cyclesAhead);
 }
 
 // Longest durationMin across every schedule entry — used as the Timeline's lookback so

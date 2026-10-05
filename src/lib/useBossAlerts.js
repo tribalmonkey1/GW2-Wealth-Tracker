@@ -96,7 +96,7 @@ function sumOwned(ids, owned) {
   return ids.reduce((sum, id) => sum + (owned[id] || 0), 0);
 }
 
-export function useBossAlerts(customSoundPath, piperVoiceFile, piperSpeakerId, ownedMap, goldCopper, extraCurrencies, dataSettled, itemMap, drfConnected) {
+export function useBossAlerts(customSoundPath, piperVoiceFile, piperSpeakerId, ownedMap, goldCopper, extraCurrencies, dataSettled, itemMap, drfConnected, drfActivityRef) {
   const [alerts, setAlerts] = useState({}); // event name -> { lead, always }
   const [soundSettings, setSoundSettingsState] = useState(DEFAULT_SOUND_SETTINGS);
   const [completions, setCompletions] = useState({}); // event name -> { period, auto? }
@@ -268,6 +268,11 @@ export function useBossAlerts(customSoundPath, piperVoiceFile, piperSpeakerId, o
           if (baseline === undefined) { itemBaselineRef.current[t.eventName] = cur; continue; }
           if (cur > baseline) {
             itemBaselineRef.current[t.eventName] = cur;
+            // drfActivityAgoMs: how long ago DRF last reported any gold/item change. A large
+            // number means this increase came from a GW2 API sync, not a live pickup — useful
+            // for diagnosing completions that fire without the event actually being done.
+            console.log("[autocomplete] item", t.eventName, "ids", ids, baseline, "->", cur,
+              "drfActivityAgoMs", drfActivityRef ? now - drfActivityRef.current : "n/a");
             markAutoComplete(t.eventName, period);
           } else if (cur !== baseline) {
             itemBaselineRef.current[t.eventName] = cur; // went down (used/traded) — just rebase, no effect on completion

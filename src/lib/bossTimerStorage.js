@@ -119,6 +119,9 @@ export const ITEM_COMPLETION_TRACKERS = [
   { eventName: 'Gang War', itemId: 97894, itemName: "Echovald Wilds: Hero's Choice Chest" },
   { eventName: 'The Oil Floes', itemId: 89692, itemName: 'Light of Deldrimor Plate—Bottom Half' },
   { eventName: 'Thunderhead Keep', itemId: 89828, itemName: 'Light of Deldrimor Plate—Top Half' },
+  // Tequatl's reward chest (the Exotic one of the four Dragon Chests). Tequatl is also
+  // API-tracked via /v2/account/worldbosses — this gives the same completion near-instantly.
+  { eventName: 'Tequatl the Sunless', itemId: 47836, itemName: 'Dragon Chest' },
 ];
 
 // DRF-only mirror of MAP_CHEST_API_IDS (see that file): each of those events is already
