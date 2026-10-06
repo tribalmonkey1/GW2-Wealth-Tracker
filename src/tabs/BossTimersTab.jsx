@@ -82,7 +82,9 @@ import { apiFetch, BASE } from "../lib/gw2Api.js";
 import { InteractivePopover } from "../components/InteractivePopover.jsx";
 import { copyWaypoint } from "../lib/clipboard.js";
 
-const CYCLES_AHEAD = 6;
+// Slots shown per row in the Countdown view — in-progress events now take some of these, so this
+// is sized to leave roughly 3 hours of upcoming events (matches the Timeline's HOURS_AHEAD).
+const CYCLES_AHEAD = 10;
 const TICK_MS = 1000;
 const WORLD_BOSS_POLL_MS = 2 * 60_000; // /v2/account/worldbosses only changes on kill or daily reset — no need to hammer it
 const MAP_CHEST_POLL_MS = 2 * 60_000; // /v2/account/mapchests — same reasoning, only changes on claim or daily reset
@@ -747,6 +749,33 @@ export default function BossTimersTab({ bossAlerts, goldCopper, drfConnected = f
     if (wrap && bar && wrap.scrollLeft !== bar.scrollLeft) wrap.scrollLeft = bar.scrollLeft;
   }, []);
 
+  // Countdown view: ONE shared horizontal scroller for every zone row, driven by the same
+  // sticky bottom scrollbar the Timeline uses (.tl-scroll-wrap hides the native bar,
+  // .tl-sticky-scroll is the visible one). Unlike the Timeline, the content width isn't a
+  // fixed constant — cells can grow (e.g. "In progress · 12m 30s left") — so the bar's
+  // spacer is sized from the measured width of the content.
+  const cdWrapRef = useRef(null);
+  const cdBarRef = useRef(null);
+  const cdInnerRef = useRef(null);
+  const [cdContentWidth, setCdContentWidth] = useState(0);
+  const handleCdWrapScroll = useCallback(() => {
+    const wrap = cdWrapRef.current, bar = cdBarRef.current;
+    if (wrap && bar && bar.scrollLeft !== wrap.scrollLeft) bar.scrollLeft = wrap.scrollLeft;
+  }, []);
+  const handleCdBarScroll = useCallback(() => {
+    const wrap = cdWrapRef.current, bar = cdBarRef.current;
+    if (wrap && bar && wrap.scrollLeft !== bar.scrollLeft) wrap.scrollLeft = bar.scrollLeft;
+  }, []);
+  useEffect(() => {
+    const el = cdInnerRef.current;
+    if (viewMode !== "countdown" || !el) return;
+    const update = () => setCdContentWidth(el.offsetWidth);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [viewMode, loaded, bossAlerts.loaded, activeTabId]);
+
   useEffect(() => {
     let cancelled = false;
     Promise.all([loadFavoriteLists(), loadAreasSelection(), loadViewMode(), loadApiFreshness()])
@@ -1050,7 +1079,10 @@ export default function BossTimersTab({ bossAlerts, goldCopper, drfConnected = f
       </InteractivePopover>
 
       {viewMode === "countdown" ? (
-        activeTabId === null ? (
+        <div>
+        <div className="tl-scroll-wrap" ref={cdWrapRef} onScroll={handleCdWrapScroll}>
+          <div ref={cdInnerRef} style={{ width: "max-content", minWidth: "100%" }}>
+        {activeTabId === null ? (
           sectionsByExpansion.length === 0
             ? <div className="empty">No areas selected.</div>
             : sectionsByExpansion.map(([expansion, rows]) => (
@@ -1073,7 +1105,13 @@ export default function BossTimersTab({ bossAlerts, goldCopper, drfConnected = f
                   </div></div>}
             </div>
           </div>
-        )
+        )}
+          </div>
+        </div>
+        <div className="tl-sticky-scroll" ref={cdBarRef} onScroll={handleCdBarScroll}>
+          <div style={{ width: cdContentWidth, height: 1 }} />
+        </div>
+        </div>
       ) : (
         // Single shared horizontal scroll for the ENTIRE timeline — header
         // row + every expansion section/collection row together, all sized

@@ -211,7 +211,9 @@ tbody td { padding:11px 14px; color:var(--text2); vertical-align:middle; }
 /* Countdown grid (BossTimersTab) */
 .bt-row { display: flex; align-items: stretch; margin-bottom: 6px; }
 .bt-row-label { width: 150px; flex-shrink: 0; font-size: 13px; color: var(--text2); padding: 8px 10px 8px 0; }
-.bt-row-scroll { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; flex: 1; }
+/* No overflow here: the Countdown view scrolls every row together via one shared wrapper +
+   the sticky .tl-sticky-scroll bar (see BossTimersTab.jsx), same as the Timeline. */
+.bt-row-scroll { display: flex; gap: 8px; padding-bottom: 4px; flex: 1; }
 .bt-cell { min-width: 190px; flex-shrink: 0; background: var(--bg3); border: 1px solid var(--border); border-radius: 5px; padding: 8px 10px; }
 .bt-cell-divider { border-top: 1px solid var(--border); margin: 6px 0; }
 .bt-occ-top { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
