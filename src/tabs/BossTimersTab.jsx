@@ -85,6 +85,29 @@ import { copyWaypoint } from "../lib/clipboard.js";
 // Slots shown per row in the Countdown view — in-progress events now take some of these, so this
 // is sized to leave roughly 3 hours of upcoming events (matches the Timeline's HOURS_AHEAD).
 const CYCLES_AHEAD = 10;
+// The data layer caps slots BEFORE the Countdown view regroups running events into one column
+// (see groupInProgress), and each running event can occupy its own slot there — so fetch extra
+// slots, then trim the upcoming ones back to CYCLES_AHEAD after regrouping.
+const COUNTDOWN_FETCH_SLOTS = CYCLES_AHEAD + 12;
+
+// Countdown view: pulls every in-progress occurrence out of its original start-time slot and
+// stacks them all in ONE leftmost column, soonest-to-finish first; the remaining (upcoming)
+// slots follow in time order, trimmed to CYCLES_AHEAD. Without this each running event sits
+// in its own column, because they all started at different minutes.
+function groupInProgress(slots, now) {
+  const running = [];
+  const upcoming = [];
+  for (const slot of slots) {
+    const rest = [];
+    for (const occ of slot.occurrences) (occ.spawnMs <= now ? running : rest).push(occ);
+    if (rest.length > 0) upcoming.push({ ...slot, occurrences: rest });
+  }
+  const trimmed = upcoming.slice(0, CYCLES_AHEAD);
+  if (running.length === 0) return trimmed;
+  const endMs = o => o.spawnMs + (o.durationMin || DEFAULT_DURATION_MIN) * 60_000;
+  running.sort((a, b) => endMs(a) - endMs(b));
+  return [{ time: now, occurrences: running }, ...trimmed];
+}
 const TICK_MS = 1000;
 const WORLD_BOSS_POLL_MS = 2 * 60_000; // /v2/account/worldbosses only changes on kill or daily reset — no need to hammer it
 const MAP_CHEST_POLL_MS = 2 * 60_000; // /v2/account/mapchests — same reasoning, only changes on claim or daily reset
@@ -922,7 +945,8 @@ export default function BossTimersTab({ bossAlerts, goldCopper, drfConnected = f
   };
 
   // ── Countdown view data ──
-  const allRows = useMemo(() => getUpcomingRowSeries(now, CYCLES_AHEAD, LOOKBACK_MIN, now), [now]);
+  const allRows = useMemo(() => getUpcomingRowSeries(now, COUNTDOWN_FETCH_SLOTS, LOOKBACK_MIN, now)
+    .map(row => ({ ...row, slots: groupInProgress(row.slots, now) })), [now]);
   const sectionsByExpansion = useMemo(() => {
     const map = new Map();
     for (const row of allRows) {
@@ -935,7 +959,7 @@ export default function BossTimersTab({ bossAlerts, goldCopper, drfConnected = f
 
   const activeList = collections.find(l => l.id === activeTabId);
   const collectionSlots = useMemo(() => (
-    activeList ? getUpcomingOccurrencesFor(activeList.members, now, CYCLES_AHEAD, LOOKBACK_MIN, now) : []
+    activeList ? groupInProgress(getUpcomingOccurrencesFor(activeList.members, now, COUNTDOWN_FETCH_SLOTS, LOOKBACK_MIN, now), now) : []
   ), [activeList, now]);
 
   // ── Timeline view data ──
