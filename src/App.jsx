@@ -621,13 +621,13 @@ export default function App() {
       apiFetch(`${BASE}/account/wallet`),
       apiFetch(`${BASE}/account/materials`),
       apiFetch(`${BASE}/account/dailycrafting`).catch(() => []),
-      apiFetch(`${BASE}/account/achievements?ids=3489,3522,2530,2500,2187,2483,2522,2296,2478,2606,2393,2564,2458,2502,2177,2291,2374,2389,2498,2524,2441,2391,2449`).catch(() => []),
+      apiFetch(`${BASE}/account/achievements?ids=3489,3522,2530,2500,2187,2483,2522,2296,2478,2606,2393,2564,2458,2502,2177,2291,2374,2389,2498,2524,2441,2391,2449,2438,2241,2468`).catch(() => []),
       apiFetch(`${BASE}/commerce/transactions/current/sells`).catch(() => null),
       fetchSoldHistory().catch(() => []),
     ]);
     // Process legendary achievement progress (Aurora II: Empowering = 3489, Aurora: Awakening = 3522)
     if (Array.isArray(rawAchievements)) {
-      const achMax = { 3489: 21, 3522: 7, 2530: null, 2500: null, 2187: null, 2483: 7, 2522: 9, 2296: null, 2478: 15, 2606: 12, 2393: 34, 2564: 18, 2458: 15, 2502: 24, 2177: 14, 2291: 14, 2374: 35, 2389: 16, 2498: 14, 2524: 36, 2441: 15, 2391: 12, 2449: 29 }; // null = use API bits count
+      const achMax = { 3489: 21, 3522: 7, 2530: null, 2500: null, 2187: null, 2483: 7, 2522: 9, 2296: null, 2478: 15, 2606: 12, 2393: 34, 2564: 18, 2458: 15, 2502: 24, 2177: 14, 2291: 14, 2374: 35, 2389: 16, 2498: 14, 2524: 36, 2441: 15, 2391: 12, 2449: 29, 2438: 32, 2241: 16, 2468: 32 }; // null = use API bits count
       const achMap = {};
       for (const ach of rawAchievements) {
         achMap[ach.id] = {
@@ -1833,6 +1833,9 @@ export default function App() {
   // Also fetches icons for legendary components (account-bound, never in priceMap/itemMap)
   useEffect(() => {
     if (!data?.itemMap) return;
+    // Legendary recipes price Memory of Battle, Shard of Glory and Silver Doubloon from the TP.
+    // Make sure the periodic price refresh always includes them even if no known recipe uses them.
+    cacheRef.current.allItemIds = [...new Set([...(cacheRef.current.allItemIds || []), 71581, 70820, 24502])];
     const LEGENDARY_ITEM_IDS = [19626, 19674, 19673, 19672, 19678, 19677, 19676, 70801, 75299, 71123, 75744, 71655, 71787, 73236, 73196, 76530, 70867, 19621, 19622, 19623, 19624, 19631, 19632, 19639, 19638, 19627, 19630, 19656, 19659, 19664, 19665, 19667, 19669, 19670, 19648, 19647, 19645, 29185, 29169, 29178, 29181, 29170, 29173, 29172, 29175, 29176, 29177, 29166, 29184, 29180, 29182, 29183, 29168, 88567, 88933, 73239, 86036, 74927, 76427, 70797, 74300, 77086, 79419, 79839, 72083, 90893, 89445, 85744, 71383, 72713, 76158, 78556, 79802, 79562, 81957, 86098, 87109, 90551, 89854, 81908, 81729, 81796, 81861, 71820, 46743, 46742, 82008, 70528, 71581, 73137, 71994, 73248, 70820, 20797, 46683, 81815, 82036, 79280, 80332, 81706, 81127, 79899, 79469, 91604, 91520, 91407, 91607, 91559, 91584, 91594, 91443, 91509, 91420, 91488, 91382, 19687, 19682, 19686, 19684,
     // Mystic Forge vendor items + unnamed flip market items
     20796, 20799, 97983, 71581,
@@ -1914,6 +1917,11 @@ export default function App() {
     75336, 72454, 70884, 76229,
     // Storm (precursor) item ID + Meteorlogicus legendary item ID
     29176, 30695,
+    // The Juggernaut / Colossus precursor chain + shared Gen 1 fixes — wiki verified Oct 2026
+    30690, 29170, 19633, 19649, 24584, 71008, 24502, 19688,
+    73535, 74643, 73817, 74163, 75296, 72403,       // Tier 1
+    76983, 73804, 74032, 76584, 71134,              // Tier 2
+    71376, 72331, 75207, 74435, 74207, 76843,       // Tier 3
     // Auto-completion tracker items (see bossTimerStorage.js) — resolved here so their
     // names/icons are available wherever they might be surfaced, same as the legendary
     // component convention above.

@@ -124,7 +124,7 @@ export const LEGENDARY_RECIPES_GEN2 = [
             inputs: [
               { name: 'Gift of Battle', itemId: 19678, count: 1, source: 'wvw', accountBound: true, note: 'WvW Skirmish reward track', inputs: [] },
               { name: 'Gift of Glory', itemId: 70528, count: 1, source: 'currency', note: 'Buy from Miyani for 250 Shard of Glory (PvP)', inputs: [{ name: 'Shard of Glory', itemId: 70820, count: 250, source: 'tp', inputs: [] }] },
-              { name: 'Gift of War', itemId: 71581, count: 1, source: 'currency', note: 'Buy from Miyani for 250 Memory of Battle (WvW)', inputs: [{ name: 'Memory of Battle', itemId: null, count: 250, source: 'wvw', note: 'WvW participation currency', inputs: [] }] },
+              { name: 'Gift of War', itemId: 71008, count: 1, source: 'currency', note: 'Buy from Miyani for 250 Memory of Battle (WvW) — tradeable, priced from the TP', inputs: [{ name: 'Memory of Battle', itemId: 71581, count: 250, source: 'tp', note: 'WvW reward-track currency — tradeable on the TP', inputs: [] }] },
               { name: 'Cube of Stabilized Dark Energy', itemId: 73137, count: 1, source: 'craft', inputs: [
                 { name: 'Ball of Dark Energy', itemId: 71994, count: 1, source: 'tp', note: 'Salvage ascended equipment with Black Lion Salvage Kit', inputs: [] },
                 { name: 'Stabilizing Matrix', itemId: 73248, count: 75, source: 'tp', inputs: [] },

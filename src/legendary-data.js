@@ -91,7 +91,7 @@ const ID = {
   GIFT_OF_ENTERTAINMENT:    19635,   // used by The Moot + Quip [wiki verified June 2026]; Armorsmith 400 crafted via Recipe: Gift of Entertainment (9628 from Miyani)
   GIFT_OF_WEATHER:          19637,   // used by Meteorlogicus — RESOLVED July 2026, previously null
   GIFT_OF_HISTORY:          null,    // used by The Flameseeker Prophecies
-  VIAL_OF_QUICKSILVER:      null,    // used by The Juggernaut — recipe uses Gift of the Forgeman [sub-ingredients TBD]
+  VIAL_OF_QUICKSILVER:      19633,   // used by The Juggernaut — Jeweler 400, wiki verified Oct 2026
   WOLF_STATUE:              null,    // used by Howler
   GIFT_OF_STEALTH:          null,    // used by The Predator
   UNICORN_STATUE:           null,    // used by The Dreamer
@@ -231,6 +231,36 @@ const ID = {
   GLOBE:                         70884, // crafted, recipe 10067, Artificer 500
   SPINNING_MECHANISM:            76229, // crafted, recipe 11448, Artificer 500
   BOX_OF_RECIPES_STORM_MAIN:     75923, // Box of Recipes: Storm — from Chest of Control
+
+  // ── The Colossus precursor chain (The Juggernaut) — wiki verified Oct 2026 ──
+  // Achievement IDs: Juggernaut I: 2438 (32 bits), II: 2241 (16 bits), III: 2468 (32 to complete; 33 bits listed)
+  THE_JUGGERNAUT:                30690,  // legendary hammer itself
+  // Tier 1 (Juggernaut I: The Experimental Hammer)
+  CHEST_OF_THE_COLOSSAL:         73535,  // Juggernaut I reward; also Hobbs 10,003 karma after achievement
+  ESSENCE_OF_THE_COLOSSAL:       74643,  // from Chest of the Colossal
+  BOX_OF_RECIPES_COLOSSUS_1:     73817,  // Box of Recipes: The Colossus (First Tier)
+  COLOSSUS_EXPERIMENT:           74163,  // crafted, recipe 10220, Weaponsmith 450 — salvage for Spirit
+  EXPERIMENTAL_HAMMER_HEAD:      75296,  // crafted, recipe 11184, Weaponsmith 450
+  EXPERIMENTAL_HAMMER_HAFT:      72403,  // crafted, recipe 11272, Weaponsmith 450
+  // Tier 2 (Juggernaut II: The Perfected Hammer)
+  TRICKS_AND_TIPS_HAMMER:        76983,  // Juggernaut II reward; also Hobbs 1g14s32c after achievement
+  EXPERTISE_IN_HAMMER_CRAFTING:  73804,  // from Tricks and Tips for Advanced Hammer Crafting
+  SPIRIT_OF_COLOSSUS_EXPERIMENT: 74032,  // salvage The Colossus Experiment
+  BOX_OF_RECIPES_COLOSSUS_2:     76584,  // Box of Recipes: The Colossus (Second Tier)
+  PERFECTED_HAMMER:              71134,  // crafted, recipe 10607, Weaponsmith 450 — salvage for Spirit
+  // Tier 3 (Juggernaut III: The Colossus)
+  CHEST_OF_THE_OOZE:             71376,  // Juggernaut III reward; also Hobbs 1g14s32c after achievement
+  ESSENCE_OF_THE_OOZE:           72331,  // from Chest of the Ooze
+  SPIRIT_OF_PERFECTED_HAMMER:    75207,  // salvage Perfected Hammer
+  BOX_OF_RECIPES_COLOSSUS_MAIN:  74435,  // Box of Recipes: The Colossus
+  OOZE_RESERVOIR:                74207,  // crafted, recipe 10681, Weaponsmith 500
+  COLOSSUS_STATUE:               76843,  // crafted, recipe 11618, Weaponsmith 500
+  // Materials / currencies priced from the TP (both tradeable — confirmed Oct 2026)
+  MEMORY_OF_BATTLE:              71581,
+  SHARD_OF_GLORY:                70820,
+  GIFT_OF_WAR:                   71008,  // [wiki verified Oct 2026] — 250 Memory of Battle from Miyani
+  STEEL_INGOT:                   19688,
+  SILVER_DOUBLOON:               24502,
 
   // Gen 1 precursors [API scan + wiki verified]
   DUSK:                     29185,   // Twilight
@@ -448,7 +478,7 @@ const ID = {
   SIGIL_OF_STAMINA:         24592,   // Quip
   SIGIL_OF_BATTLE:          24601,   // The Flameseeker Prophecies
   SIGIL_OF_ACCURACY:        91607,   // Howler
-  SIGIL_OF_BENEVOLENCE:     91382,   // The Juggernaut
+  SIGIL_OF_BENEVOLENCE:     24584,   // The Juggernaut [wiki verified Oct 2026 — was 91382, which was wrong]
   SIGIL_OF_CELERITY:        24865,   // Kudzu
   SIGIL_OF_FORCE:           24615,   // The Predator
   SIGIL_OF_PURITY:          91509,   // The Dreamer
@@ -500,60 +530,24 @@ function precursor(itemId, name) {
 
 // ── Shared components ──────────────────────────────────────────────────────────
 
-// Gift of Might [wiki verified]
+// Gift of Might [wiki verified Oct 2026 — ID 19672]
+// 250 each of the four top-tier (T6) materials. This is NOT the nested
+// Claws/Scales/Bones/Fangs structure — that belongs to Gift of Condensed Might
+// (Mystic Tribute / Gen 1 legendary armor), which was wrongly used here before.
 const GIFT_OF_MIGHT = forge(ID.GIFT_OF_MIGHT, 'Gift of Might', 1, [
-  forge(ID.GIFT_OF_CLAWS, 'Gift of Claws', 1, [
-    tp(ID.VICIOUS_CLAW, 'Vicious Claw', 100),
-    tp(ID.LARGE_CLAW,   'Large Claw',   250),
-    tp(ID.SHARP_CLAW,   'Sharp Claw',   50),
-    tp(ID.CLAW,         'Claw',         50),
-  ]),
-  forge(ID.GIFT_OF_SCALES, 'Gift of Scales', 1, [
-    tp(ID.ARMORED_SCALE, 'Armored Scale', 100),
-    tp(ID.LARGE_SCALE,   'Large Scale',   250),
-    tp(ID.SMOOTH_SCALE,  'Smooth Scale',  50),
-    tp(ID.SCALE,         'Scale',         50),
-  ]),
-  forge(ID.GIFT_OF_BONES, 'Gift of Bones', 1, [
-    tp(ID.ANCIENT_BONE, 'Ancient Bone', 100),
-    tp(ID.LARGE_BONE,   'Large Bone',   250),
-    tp(ID.HEAVY_BONE,   'Heavy Bone',   50),
-    tp(ID.BONE,         'Bone',         50),
-  ]),
-  forge(ID.GIFT_OF_FANGS, 'Gift of Fangs', 1, [
-    tp(ID.VICIOUS_FANG, 'Vicious Fang', 100),
-    tp(ID.LARGE_FANG,   'Large Fang',   250),
-    tp(ID.SHARP_FANG,   'Sharp Fang',   50),
-    tp(ID.FANG,         'Fang',         50),
-  ]),
+  tp(ID.VICIOUS_FANG,  'Vicious Fang',  250),
+  tp(ID.ARMORED_SCALE, 'Armored Scale', 250),
+  tp(ID.VICIOUS_CLAW,  'Vicious Claw',  250),
+  tp(ID.ANCIENT_BONE,  'Ancient Bone',  250),
 ]);
 
-// Gift of Magic [wiki verified]
+// Gift of Magic [wiki verified Oct 2026 — ID 19673]
+// 250 each of the four top-tier (T6) materials (same note as Gift of Might above).
 const GIFT_OF_MAGIC = forge(ID.GIFT_OF_MAGIC, 'Gift of Magic', 1, [
-  forge(ID.GIFT_OF_BLOOD, 'Gift of Blood', 1, [
-    tp(ID.VIAL_OF_POWERFUL_BLOOD, 'Vial of Powerful Blood', 100),
-    tp(ID.VIAL_OF_POTENT_BLOOD,   'Vial of Potent Blood',   250),
-    tp(ID.VIAL_OF_THICK_BLOOD,    'Vial of Thick Blood',    50),
-    tp(ID.VIAL_OF_BLOOD,          'Vial of Blood',          50),
-  ]),
-  forge(ID.GIFT_OF_VENOM, 'Gift of Venom', 1, [
-    tp(ID.POWERFUL_VENOM_SAC, 'Powerful Venom Sac', 100),
-    tp(ID.POTENT_VENOM_SAC,   'Potent Venom Sac',   250),
-    tp(ID.FULL_VENOM_SAC,     'Full Venom Sac',     50),
-    tp(ID.VENOM_SAC,          'Venom Sac',          50),
-  ]),
-  forge(ID.GIFT_OF_TOTEMS, 'Gift of Totems', 1, [
-    tp(ID.ELABORATE_TOTEM,  'Elaborate Totem',  100),
-    tp(ID.INTRICATE_TOTEM,  'Intricate Totem',  250),
-    tp(ID.ENGRAVED_TOTEM,   'Engraved Totem',   50),
-    tp(ID.TOTEM,            'Totem',            50),
-  ]),
-  forge(ID.GIFT_OF_DUST, 'Gift of Dust', 1, [
-    tp(ID.PILE_OF_CRYSTALLINE_DUST,  'Pile of Crystalline Dust',  100),
-    tp(ID.PILE_OF_INCANDESCENT_DUST, 'Pile of Incandescent Dust', 250),
-    tp(ID.PILE_OF_LUMINOUS_DUST,     'Pile of Luminous Dust',     50),
-    tp(ID.PILE_OF_RADIANT_DUST,      'Pile of Radiant Dust',      50),
-  ]),
+  tp(ID.VIAL_OF_POWERFUL_BLOOD, 'Vial of Powerful Blood', 250),
+  tp(ID.POWERFUL_VENOM_SAC,     'Powerful Venom Sac',     250),
+  tp(ID.ELABORATE_TOTEM,        'Elaborate Totem',        250),
+  tp(ID.PILE_OF_CRYSTALLINE_DUST, 'Pile of Crystalline Dust', 250),
 ]);
 
 // Gift of Fortune [wiki verified]
@@ -838,12 +832,25 @@ const GIFT_OF_HOWLER = forge(ID.GIFT_OF_HOWLER, 'Gift of Howler', 1, [
   tp(ID.SIGIL_OF_ACCURACY, 'Superior Sigil of Accuracy',  1),
 ]);
 
-// Gift of The Juggernaut [wiki verified — ID 19649]
+// Vial of Quicksilver [wiki verified Oct 2026 — ID 19633]
+// Jeweler 400 — recipe purchased from Miyani / any Mystic Forge vendor for 10 gold.
+const VIAL_OF_QUICKSILVER = {
+  itemId: ID.VIAL_OF_QUICKSILVER, name: 'Vial of Quicksilver', count: 1,
+  source: 'forge', accountBound: true,
+  note: 'Crafted (Jeweler 400) — Recipe: Vial of Quicksilver (10 gold from Miyani or any Mystic Forge vendor)',
+  inputs: [
+    collection(ID.GIFT_OF_THE_FORGEMAN, 'Gift of the Forgeman', 1,
+      "Purchase from dungeon vendor for 500 Tales of Dungeon Delving (Sorrow's Embrace tokens)"),
+    tp(ID.STEEL_INGOT,     'Steel Ingot',     250),
+    tp(ID.MOLTEN_LODESTONE,'Molten Lodestone',150),
+    tp(ID.SILVER_DOUBLOON, 'Silver Doubloon', 250),
+  ],
+};
+
+// Gift of The Juggernaut [wiki verified Oct 2026 — ID 19649]
 const GIFT_OF_THE_JUGGERNAUT = forge(ID.GIFT_OF_THE_JUGGERNAUT, 'Gift of The Juggernaut', 1, [
   { ...GIFT_OF_METAL },
-  { itemId: ID.VIAL_OF_QUICKSILVER, name: 'Vial of Quicksilver', count: 1,
-    source: 'collection', accountBound: true,
-    note: 'Account-bound crafted item — obtained via The Juggernaut collection chain', inputs: [] },
+  { ...VIAL_OF_QUICKSILVER },
   tp(ID.ICY_RUNESTONE,       'Icy Runestone',                100),
   tp(ID.SIGIL_OF_BENEVOLENCE,'Superior Sigil of Benevolence', 1),
 ]);
@@ -2315,10 +2322,186 @@ export const LEGENDARY_RECIPES = [
   {
     id: 'legendary_juggernaut',
     name: 'The Juggernaut',
-    itemId: null,
+    itemId: ID.THE_JUGGERNAUT,
     rarity: 'Legendary', weaponType: 'Hammer', generation: 1,
     inputs: [
-      precursor(ID.THE_COLOSSUS, 'The Colossus'),
+      // ── The Colossus precursor — 3-tier Legendary Crafting collection ─────
+      // Achievement chain: Juggernaut I (Experimental Hammer) → II (Perfected Hammer) → III (The Colossus)
+      {
+        itemId: ID.THE_COLOSSUS,
+        name: 'The Colossus',
+        count: 1,
+        source: 'collection',
+        accountBound: true,
+        achievementId: 2468,  // The Juggernaut III: The Colossus [wiki/API verified Oct 2026]
+        achievementBitCount: 32,
+        note: 'Crafted once per account via The Juggernaut III: The Colossus collection (Weaponsmith 500). Recipe from Box of Recipes: The Colossus.',
+        inputs: [
+          // ── Tier 3 ingredients (Juggernaut III: The Colossus) ────────────
+          {
+            itemId: ID.ESSENCE_OF_THE_OOZE,
+            name: 'Essence of the Ooze',
+            count: 1,
+            source: 'collection',
+            accountBound: true,
+            note: 'From Chest of the Ooze — reward for completing The Juggernaut III: The Colossus achievement',
+            inputs: [],
+          },
+          // Spirit of the Perfected Hammer — salvage Perfected Hammer
+          {
+            itemId: ID.SPIRIT_OF_PERFECTED_HAMMER,
+            name: 'Spirit of the Perfected Hammer',
+            count: 1,
+            source: 'collection',
+            accountBound: true,
+            note: 'Salvage Perfected Hammer (ID 71134) with any salvage kit',
+            inputs: [
+              // ── Perfected Hammer — Tier 2 (Juggernaut II: The Perfected Hammer) ─
+              {
+                itemId: ID.PERFECTED_HAMMER,
+                name: 'Perfected Hammer',
+                count: 1,
+                source: 'collection',
+                accountBound: true,
+                achievementId: 2241,  // The Juggernaut II: The Perfected Hammer [API verified Oct 2026]
+                achievementBitCount: 16,
+                note: 'Crafted via The Juggernaut II: The Perfected Hammer collection (Weaponsmith 450). Recipe from Box of Recipes: The Colossus (Second Tier).',
+                inputs: [
+                  {
+                    itemId: ID.EXPERTISE_IN_HAMMER_CRAFTING,
+                    name: 'Expertise in Hammer Crafting',
+                    count: 1,
+                    source: 'collection',
+                    accountBound: true,
+                    note: 'From Tricks and Tips for Advanced Hammer Crafting — reward for completing The Juggernaut II: The Perfected Hammer achievement',
+                    inputs: [],
+                  },
+                  {
+                    itemId: ID.SPIRIT_OF_COLOSSUS_EXPERIMENT,
+                    name: 'Spirit of The Colossus Experiment',
+                    count: 1,
+                    source: 'collection',
+                    accountBound: true,
+                    note: 'Salvage The Colossus Experiment (ID 74163) with any salvage kit',
+                    inputs: [
+                      // ── The Colossus Experiment — Tier 1 (Juggernaut I) ────
+                      {
+                        itemId: ID.COLOSSUS_EXPERIMENT,
+                        name: 'The Colossus Experiment',
+                        count: 1,
+                        source: 'collection',
+                        accountBound: true,
+                        achievementId: 2438,  // The Juggernaut I: The Experimental Hammer [API verified Oct 2026]
+                        achievementBitCount: 32,
+                        note: 'Crafted via The Juggernaut I: The Experimental Hammer collection (Weaponsmith 450). Recipe from Box of Recipes: The Colossus (First Tier).',
+                        inputs: [
+                          {
+                            itemId: ID.ESSENCE_OF_THE_COLOSSAL,
+                            name: 'Essence of the Colossal',
+                            count: 1,
+                            source: 'collection',
+                            accountBound: true,
+                            note: 'From Chest of the Colossal — reward for completing The Juggernaut I: The Experimental Hammer achievement',
+                            inputs: [],
+                          },
+                          {
+                            itemId: ID.EXPERIMENTAL_HAMMER_HEAD,
+                            name: 'Experimental Hammer Head',
+                            count: 1,
+                            source: 'forge',
+                            accountBound: true,
+                            note: 'Crafted (Weaponsmith 450) — recipe from Box of Recipes: The Colossus (First Tier)',
+                            inputs: [
+                              tp(ID.DELDRIMOR_STEEL_INGOT, 'Deldrimor Steel Ingot', 15),
+                              tp(ID.MEMORY_OF_BATTLE,      'Memory of Battle',     100),
+                              tp(ID.SHARD_OF_GLORY,        'Shard of Glory',       100),
+                            ],
+                          },
+                          {
+                            itemId: ID.EXPERIMENTAL_HAMMER_HAFT,
+                            name: 'Experimental Hammer Haft',
+                            count: 1,
+                            source: 'forge',
+                            accountBound: true,
+                            note: 'Crafted (Weaponsmith 450) — recipe from Box of Recipes: The Colossus (First Tier)',
+                            inputs: [
+                              tp(ID.SPIRITWOOD_PLANK, 'Spiritwood Plank',  10),
+                              tp(ID.MEMORY_OF_BATTLE, 'Memory of Battle', 100),
+                              tp(ID.SHARD_OF_GLORY,   'Shard of Glory',   100),
+                            ],
+                          },
+                          { ...LEGENDARY_INSCRIPTION_COMPONENT },
+                        ],
+                      },
+                    ],
+                  },
+                  // Jar of Luminesce Polish — shared Tier 2 component
+                  {
+                    itemId: ID.JAR_OF_LUMINESCE_POLISH,
+                    name: 'Jar of Luminesce Polish',
+                    count: 1,
+                    source: 'forge',
+                    accountBound: true,
+                    note: 'Crafted (Artificer/Huntsman/Weaponsmith 400) — recipe from Box of Recipes: The Colossus (Second Tier)',
+                    inputs: [
+                      tp(ID.PILE_OF_BLOODSTONE_DUST,  'Pile of Bloodstone Dust',  250),
+                      { itemId: null, name: 'Amalgamated Gemstone', count: 1, source: 'tp', inputs: [] },
+                      tp(ID.THERMOCATALYTIC_REAGENT,  'Thermocatalytic Reagent',   10),
+                      tp(ID.MASTER_MAINTENANCE_OIL,   'Master Maintenance Oil',    10),
+                    ],
+                  },
+                  // Prismatic Lodestone — shared Tier 2 component
+                  {
+                    itemId: ID.PRISMATIC_LODESTONE,
+                    name: 'Prismatic Lodestone',
+                    count: 1,
+                    source: 'forge',
+                    accountBound: true,
+                    note: 'Crafted (Artificer/Huntsman/Weaponsmith 400) — recipe from Box of Recipes: The Colossus (Second Tier). Combines 4 elemental lodestones.',
+                    inputs: [
+                      tp(ID.GLACIAL_LODESTONE,  'Glacial Lodestone',  1),
+                      tp(ID.MOLTEN_LODESTONE,   'Molten Lodestone',   1),
+                      tp(ID.ONYX_LODESTONE,     'Onyx Lodestone',     1),
+                      tp(ID.CHARGED_LODESTONE,  'Charged Lodestone',  1),
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+          // Ooze Reservoir — crafted Weaponsmith 500
+          {
+            itemId: ID.OOZE_RESERVOIR,
+            name: 'Ooze Reservoir',
+            count: 1,
+            source: 'forge',
+            accountBound: true,
+            note: 'Crafted (Weaponsmith 500) — recipe from Box of Recipes: The Colossus (from Chest of the Ooze)',
+            inputs: [
+              tp(ID.PILE_OF_CRYSTALLINE_DUST, 'Pile of Crystalline Dust', 10),
+              tp(ID.MOLTEN_LODESTONE,         'Molten Lodestone',          5),
+              tp(ID.PILE_OF_COARSE_SAND,      'Pile of Coarse Sand',      50),
+              tp(ID.THERMOCATALYTIC_REAGENT,  'Thermocatalytic Reagent',  10),
+            ],
+          },
+          // Colossus Statue — crafted Weaponsmith 500
+          {
+            itemId: ID.COLOSSUS_STATUE,
+            name: 'Colossus Statue',
+            count: 1,
+            source: 'forge',
+            accountBound: true,
+            note: "Crafted (Weaponsmith 500) — recipe from Box of Recipes: The Colossus. Sculptor's Tools: karma from Lord Joshua in Beetletun for 4,500 Karma.",
+            inputs: [
+              tp(ID.MITHRIL_INGOT,  'Mithril Ingot',  100),
+              { itemId: 74909, name: "Sculptor's Tools", count: 1, source: 'karma',
+                note: 'Purchased from Lord Joshua in Beetletun for 4,500 Karma — account-bound, NOT on TP', inputs: [] },
+              tp(ID.PLATINUM_INGOT, 'Platinum Ingot', 250),
+              tp(ID.ONYX_LODESTONE, 'Onyx Lodestone',   5),
+            ],
+          },
+        ],
+      },
       { ...GIFT_OF_THE_JUGGERNAUT },
       { ...GIFT_OF_FORTUNE },
       { ...GIFT_OF_MASTERY },
