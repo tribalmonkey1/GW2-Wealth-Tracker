@@ -440,7 +440,9 @@ function LegendaryIngredientNode({ node, priceMap, ownedMap, depth = 0, parentSh
 
   const tpSell = itemId ? (priceMap[itemId]?.sells?.unit_price || 0) : 0;
   const haveEnough = shortfall === 0;
-  const isNoGold = ['wvw', 'exploration', 'heroics', 'collection', 'karma'].includes(node.source);
+  // A collection node with crafted sub-ingredients can carry real gold cost — only label it
+  // "no gold cost" when nothing underneath it actually costs anything.
+  const isNoGold = ['wvw', 'exploration', 'heroics', 'collection', 'karma'].includes(node.source) && totalMissingCost === 0;
 
   // Color coding
   const nameColor = haveEnough ? 'var(--green2)'
