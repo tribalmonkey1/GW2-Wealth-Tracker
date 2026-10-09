@@ -88,7 +88,20 @@ function buildTreeSync(itemId, count, resolvedRecipes, depth = 0, rootRecipe = n
   const children = recipe.ingredients.map(ing =>
   buildTreeSync(ing.item_id, ing.count * runs, resolvedRecipes, depth + 1)
   );
-  return { itemId, count, outputCount, children, isLeaf: false };
+  // Wallet-currency ingredients (e.g. Research Notes) — not items, so they never become
+  // leaves; carried on the node so the card can show them (see treeCurrencyCosts).
+  const currencies = (recipe.currency_ingredients || []).map(c => ({ currencyId: c.currency_id, count: c.count * runs }));
+  return { itemId, count, outputCount, children, isLeaf: false, currencies };
+}
+
+// Total wallet-currency cost of a tree, skipping sub-trees you already own enough of
+// (same shortcut flatLeaves uses). Returns [{ currencyId, count }].
+function treeCurrencyCosts(node, ownedMap = {}, isRoot = true, acc = {}) {
+  if (!node || node.isLeaf) return Object.entries(acc).map(([id, count]) => ({ currencyId: Number(id), count }));
+  if (!isRoot && (ownedMap[node.itemId] || 0) >= node.count) return Object.entries(acc).map(([id, count]) => ({ currencyId: Number(id), count }));
+  for (const c of node.currencies || []) acc[c.currencyId] = (acc[c.currencyId] || 0) + c.count;
+  for (const child of node.children || []) treeCurrencyCosts(child, ownedMap, false, acc);
+  return Object.entries(acc).map(([id, count]) => ({ currencyId: Number(id), count }));
 }
 
 function flatLeaves(node, ownedMap = {}, needed = null, isRoot = true) {
@@ -255,7 +268,7 @@ function buildCraftItems(recipes, resolvedRecipes, itemMap, priceMap, ownedMap) 
     const matSellNet = Math.floor(matSellTotal * 0.85);
     const craftAdvantage = profitNet - matSellNet;
     const cheapAcquire = cheapestAcquire(outputId, 1, resolvedRecipes, priceMap, itemMap, ownedMap);
-    items.push({ recipeId: recipe.id, outputId, outputCount, name: itemMap[outputId]?.name || `Item ${outputId}`, icon: itemMap[outputId]?.icon, rarity: itemMap[outputId]?.rarity, disciplines: recipe.disciplines, canCraft, missingMats, matDetails, outSell, outBuy, totalMustBuyCostSell, profitGross, profitNet, matSellTotal, matSellNet, matSellPaths, craftAdvantage, cheapAcquire, tree });
+    items.push({ recipeId: recipe.id, outputId, outputCount, name: itemMap[outputId]?.name || `Item ${outputId}`, icon: itemMap[outputId]?.icon, rarity: itemMap[outputId]?.rarity, disciplines: recipe.disciplines, canCraft, missingMats, matDetails, outSell, outBuy, totalMustBuyCostSell, profitGross, profitNet, matSellTotal, matSellNet, matSellPaths, craftAdvantage, cheapAcquire, tree, currencyCosts: treeCurrencyCosts(tree, ownedMap) });
   }
   return items;
 }

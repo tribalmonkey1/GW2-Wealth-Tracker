@@ -17,6 +17,7 @@
  */
 
 import { evaluateLegendaryTree } from "./legendary-cost.js";
+import { GEN1_PRECURSOR_CHAINS, GEN1_GIFT_COMPONENTS } from "./legendary-precursors-gen1.js";
 
 // ── Verified Item IDs ─────────────────────────────────────────────────────────
 const ID = {
@@ -92,14 +93,14 @@ const ID = {
   // The following are account-bound collectibles with no TP listing:
   GIFT_OF_ENTERTAINMENT:    19635,   // used by The Moot + Quip [wiki verified June 2026]; Armorsmith 400 crafted via Recipe: Gift of Entertainment (9628 from Miyani)
   GIFT_OF_WEATHER:          19637,   // used by Meteorlogicus — RESOLVED July 2026, previously null
-  GIFT_OF_HISTORY:          null,    // used by The Flameseeker Prophecies
+  GIFT_OF_HISTORY:          19629,    // used by The Flameseeker Prophecies
   VIAL_OF_QUICKSILVER:      19633,   // used by The Juggernaut — Jeweler 400, wiki verified Oct 2026
-  WOLF_STATUE:              null,    // used by Howler
-  GIFT_OF_STEALTH:          null,    // used by The Predator
-  UNICORN_STATUE:           null,    // used by The Dreamer
-  GIFT_OF_WATER:            null,    // used by Frenzy
-  SHARK_STATUE:             null,    // used by Kamohoali'i Kotaki
-  EEL_STATUE:               null,    // used by Kraitkin — recipe verified June 2026 (Gift of Forgeman + 250 Orichalcum + 250 Cured Hardened Leather + 250 Armored Scale)
+  WOLF_STATUE:              19640,    // used by Howler
+  GIFT_OF_STEALTH:          19636,    // used by The Predator
+  UNICORN_STATUE:           19628,    // used by The Dreamer
+  GIFT_OF_WATER:            19643,    // used by Frenzy
+  SHARK_STATUE:             19641,    // used by Kamohoali'i Kotaki
+  EEL_STATUE:               19642,    // used by Kraitkin — recipe verified June 2026 (Gift of Forgeman + 250 Orichalcum + 250 Cured Hardened Leather + 250 Armored Scale)
 
   // Gen 2 mastery gifts [API scan]
   GIFT_OF_MAGUUMA_MASTERY:  73239,
@@ -471,21 +472,21 @@ const ID = {
   DESTROYER_LODESTONE:      24312,
 
   // Superior Sigils — used in weapon-specific gifts [wiki verified]
-  SIGIL_OF_BLOOD:           91604,   // Twilight
-  SIGIL_OF_AIR:             91520,   // Bolt, Meteorlogicus
-  SIGIL_OF_STRENGTH:        24548,   // Sunrise [wiki verified — screenshot June 2026]
-  SIGIL_OF_FIRE:            91559,   // Incinerator, Rodgort
+  SIGIL_OF_BLOOD:           24570,   // Twilight [API verified Oct 2026 — exotic sigil; previous ID was the account-bound legendary/wrong sigil]
+  SIGIL_OF_AIR:             24554,   // Bolt, Meteorlogicus [API verified Oct 2026 — exotic sigil; previous ID was the account-bound legendary/wrong sigil]
+  SIGIL_OF_STRENGTH:        24562,   // Sunrise [API verified Oct 2026 — exotic sigil; previous ID was the account-bound legendary/wrong sigil]
+  SIGIL_OF_FIRE:            24548,   // Incinerator, Rodgort [API verified Oct 2026 — exotic sigil; previous ID was the account-bound legendary/wrong sigil]
   SIGIL_OF_ICE:             24555,   // Frostfang
   SIGIL_OF_ENERGY:          24607,   // The Moot, The Minstrel
   SIGIL_OF_STAMINA:         24592,   // Quip
   SIGIL_OF_BATTLE:          24601,   // The Flameseeker Prophecies
-  SIGIL_OF_ACCURACY:        91607,   // Howler
+  SIGIL_OF_ACCURACY:        24618,   // Howler [API verified Oct 2026 — exotic sigil; previous ID was the account-bound legendary/wrong sigil]
   SIGIL_OF_BENEVOLENCE:     24584,   // The Juggernaut [wiki verified Oct 2026 — was 91382, which was wrong]
   SIGIL_OF_CELERITY:        24865,   // Kudzu
   SIGIL_OF_FORCE:           24615,   // The Predator
-  SIGIL_OF_PURITY:          91509,   // The Dreamer
+  SIGIL_OF_PURITY:          24571,   // The Dreamer [API verified Oct 2026 — exotic sigil; previous ID was the account-bound legendary/wrong sigil]
   SIGIL_OF_NULLIFICATION:   24572,   // The Bifrost
-  SIGIL_OF_RAGE:            91420,   // Frenzy
+  SIGIL_OF_RAGE:            24561,   // Frenzy [API verified Oct 2026 — exotic sigil; previous ID was the account-bound legendary/wrong sigil]
   SIGIL_OF_AGONY:           24612,   // Kamohoali'i Kotaki
   SIGIL_OF_VENOM:           24632,   // Kraitkin
 
@@ -576,7 +577,7 @@ const GIFT_OF_MASTERY = forge(ID.GIFT_OF_MASTERY, 'Gift of Mastery', 1, [
 // ── Shared weapon building-block gifts ────────────────────────────────────────
 
 // Gift of Metal [API verified]
-const GIFT_OF_METAL = forge(ID.GIFT_OF_METAL, 'Gift of Metal', 1, [
+export const GIFT_OF_METAL = forge(ID.GIFT_OF_METAL, 'Gift of Metal', 1, [
   tp(ID.ORICHALCUM_INGOT, 'Orichalcum Ingot', 250),
   tp(ID.MITHRIL_INGOT,    'Mithril Ingot',    250),
   tp(ID.DARKSTEEL_INGOT,  'Darksteel Ingot',  250),
@@ -584,7 +585,7 @@ const GIFT_OF_METAL = forge(ID.GIFT_OF_METAL, 'Gift of Metal', 1, [
 ]);
 
 // Gift of Wood [API verified]
-const GIFT_OF_WOOD = forge(ID.GIFT_OF_WOOD, 'Gift of Wood', 1, [
+export const GIFT_OF_WOOD = forge(ID.GIFT_OF_WOOD, 'Gift of Wood', 1, [
   tp(ID.ANCIENT_WOOD_PLANK,  'Ancient Wood Plank',  250),
   tp(ID.ELDER_WOOD_PLANK,    'Elder Wood Plank',    250),
   tp(ID.HARD_WOOD_PLANK,     'Hard Wood Plank',     250),
@@ -592,7 +593,7 @@ const GIFT_OF_WOOD = forge(ID.GIFT_OF_WOOD, 'Gift of Wood', 1, [
 ]);
 
 // Gift of Energy [API verified]
-const GIFT_OF_ENERGY = forge(ID.GIFT_OF_ENERGY, 'Gift of Energy', 1, [
+export const GIFT_OF_ENERGY = forge(ID.GIFT_OF_ENERGY, 'Gift of Energy', 1, [
   tp(ID.PILE_OF_CRYSTALLINE_DUST,  'Pile of Crystalline Dust',  250),
   tp(ID.PILE_OF_INCANDESCENT_DUST, 'Pile of Incandescent Dust', 250),
   tp(ID.PILE_OF_LUMINOUS_DUST,     'Pile of Luminous Dust',     250),
@@ -675,8 +676,8 @@ const VIAL_OF_LIQUID_FLAME = {
   accountBound: true,
   note: 'Chef 400 — crafted from 250 Ghost Pepper + 1 Gift of Baelfire + 100 Molten Lodestone + 100 Destroyer Lodestone',
   inputs: [
-    tp(null, 'Ghost Pepper', 250),
-    collection(null, 'Gift of Baelfire', 1, 'Account-bound — crafted via Legendary: Incinerator/Rodgort collection'),
+    tp(12544, 'Ghost Pepper', 250),   // [API verified Oct 2026]
+    collection(19668, 'Gift of Baelfire', 1, '500 Tales of Dungeon Delving from a dungeon vendor (requires 5 Citadel of Flame explorable completions) [API verified Oct 2026]'),
     tp(ID.MOLTEN_LODESTONE,    'Molten Lodestone',    100),
     tp(ID.DESTROYER_LODESTONE, 'Destroyer Lodestone', 100),
   ],
@@ -1109,7 +1110,8 @@ export const LEGENDARY_RECIPES = [
         count: 1,
         source: 'collection',
         accountBound: true,
-        achievementId: null,  // Bolt III: Zap — achievement ID TBD
+        achievementId: 2480,  // Bolt III: Zap [API verified Oct 2026]
+        achievementBitCount: 30,
         note: 'Crafted once per account via Bolt III: Zap collection (Weaponsmith 500). Recipe from Box of Recipes: Zap.',
         inputs: [
           // ── Tier 3 ingredients (Bolt III: Zap) ──────────────────────────
@@ -1136,6 +1138,8 @@ export const LEGENDARY_RECIPES = [
               {
                 itemId: ID.PERFECTED_SWORD_ZAP,
                 name: 'Perfected Sword',
+                achievementId: 2356,  // Bolt II: The Perfected Sword [API verified Oct 2026]
+                achievementBitCount: 13,
                 count: 1,
                 source: 'collection',
                 accountBound: true,
@@ -1164,6 +1168,8 @@ export const LEGENDARY_RECIPES = [
                       {
                         itemId: ID.ZAP_EXPERIMENT,
                         name: 'Zap Experiment',
+                        achievementId: 2355,  // Bolt I: The Experimental Sword [API verified Oct 2026]
+                        achievementBitCount: 21,
                         count: 1,
                         source: 'collection',
                         accountBound: true,
@@ -3019,6 +3025,27 @@ for (const r of LEGENDARY_RECIPES) {
   const name = PRECURSOR_ACHIEVEMENT_NAMES[r.id];
   const first = r.inputs?.[0];
   if (name && first && !first.achievementName) first.achievementName = name;
+}
+
+// ── Gen 1 precursor chains + weapon-gift components (generated, API verified) ──
+// Swaps the plain "buy from TP" precursor rows for the full Tier I-III collection
+// chain, and fills in the weapon-gift sub-components (Wolf Statue, Gift of Water…)
+// that used to be empty placeholders. See legendary-precursors-gen1.js.
+// Hand-built entries (Bolt, Juggernaut, Vial of Quicksilver…) are left untouched.
+{
+  const chainByItem = {};
+  for (const n of Object.values(GEN1_PRECURSOR_CHAINS)) chainByItem[n.itemId] = n;
+  const compByName = {};
+  for (const n of Object.values(GEN1_GIFT_COMPONENTS)) compByName[n.name] = n;
+  const patch = (node) => {
+    if (!node) return node;
+    if (node.isPrecursor && chainByItem[node.itemId]) return { ...chainByItem[node.itemId], count: node.count ?? 1 };
+    const comp = compByName[node.name];
+    if (comp && (node.itemId == null || node.itemId === comp.itemId) && node.source !== 'forge') return { ...comp, count: node.count ?? 1 };
+    if (node.inputs?.length) return { ...node, inputs: node.inputs.map(patch) };
+    return node;
+  };
+  for (const r of LEGENDARY_RECIPES) r.inputs = r.inputs.map(patch);
 }
 
 // ── Cost Calculation ───────────────────────────────────────────────────────────

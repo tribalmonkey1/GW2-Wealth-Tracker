@@ -5,14 +5,15 @@ import { buildForgeRecipeMap } from "./mystic-forge-data.js";
 import { LEGENDARY_RECIPES } from "./legendary-data.js";
 import { LEGENDARY_RECIPES_GEN2 } from "./legendary-data-gen2.js";
 import { LEGENDARY_RECIPES_GEN3 } from "./legendary-data-gen3.js";
+import { LEGENDARY_RECIPES_NEWER } from "./legendary-data-newer.js";
 import { LEGENDARY_ARMOR_RECIPES } from "./legendary-data-armor.js";
 import { LEGENDARY_OTHER_RECIPES } from "./legendary-data-other.js";
-import { collectAchievementIds, collectAchievementBitCounts } from "./legendary-cost.js";
+import { collectAchievementIds, collectAchievementBitCounts, collectLegendaryItemIds } from "./legendary-cost.js";
 
 // Every achievementId referenced by the legendary data, plus the ones App always tracked.
 // Adding an achievementId to a legendary data file is now enough for its progress to load.
 const ALL_LEGENDARY_RECIPE_LISTS = [
-  LEGENDARY_RECIPES, LEGENDARY_RECIPES_GEN2, LEGENDARY_RECIPES_GEN3, LEGENDARY_ARMOR_RECIPES,
+  LEGENDARY_RECIPES, LEGENDARY_RECIPES_GEN2, LEGENDARY_RECIPES_GEN3, LEGENDARY_RECIPES_NEWER, LEGENDARY_ARMOR_RECIPES,
   ...Object.values(LEGENDARY_OTHER_RECIPES),
 ];
 const LEGENDARY_ACHIEVEMENT_IDS = [...new Set([
@@ -21,6 +22,10 @@ const LEGENDARY_ACHIEVEMENT_IDS = [...new Set([
   ...collectAchievementIds(...ALL_LEGENDARY_RECIPE_LISTS),
 ])];
 const LEGENDARY_ACHIEVEMENT_BITS = collectAchievementBitCounts(...ALL_LEGENDARY_RECIPE_LISTS);
+// Every item the legendary cards reference: `all` for icon/name prefetch (gifts are
+// account-bound and never arrive via the normal item fetch), `priced` merged into
+// every TP price refresh so precursors (Dusk, Dawn…) and legendaries get real prices.
+const LEGENDARY_IDS = collectLegendaryItemIds(...ALL_LEGENDARY_RECIPE_LISTS);
 import "./styles/app.css";
 
 import { Gold } from "./components/Gold.jsx";
@@ -41,7 +46,7 @@ import { CharactersTab } from "./tabs/CharactersTab.jsx";
 
 import { getRecipeDisciplines, dedupeRecipesById, DISCIPLINES, buildCraftItems } from "./lib/craftingCalc.js";
 import {
-  apiFetch, publicFetch, fetchIds, fetchPrices, fetchSoldHistory, fetchAccountSlotItems, chunk,
+  apiFetch, publicFetch, fetchIds, fetchPrices, fetchSoldHistory, fetchAccountSlotItems, chunk, fetchRecipes, RECIPE_LIST_URL, loadCurrencyNames,
   filterTradeable, resolveLockedCatalogCoverage, persistItemMapCache, BASE,
 } from "./lib/gw2Api.js";
 import {
@@ -438,10 +443,10 @@ export default function App() {
         knownRecipeIds = await apiFetch(`${BASE}/account/recipes`);
 
         prog(22, "Fetching all recipe IDs...");
-        const allRecipeIds = await publicFetch(`${BASE}/recipes`);
+        const allRecipeIds = await publicFetch(RECIPE_LIST_URL);
 
         prog(30, "Loading recipe details...");
-        const knownRecipes = await fetchIds("/recipes", knownRecipeIds);
+        const knownRecipes = await fetchRecipes(knownRecipeIds);
 
         prog(38, "Scanning auto-unlocked recipes...");
         // Only fetch public recipe IDs that aren't already in knownRecipeIds to save requests
@@ -450,7 +455,7 @@ export default function App() {
         const allRecipeDetails = [];
         for (const ch of chunk(publicOnlyIds, 200)) {
           try {
-            const batch = await publicFetch(`${BASE}/recipes?ids=${ch.join(",")}`);
+            const batch = await fetchRecipes(ch);
             allRecipeDetails.push(...(Array.isArray(batch) ? batch : []));
           } catch {}
         }
@@ -510,7 +515,7 @@ export default function App() {
 
       // Prices always fetched live regardless of recipe/item cache
       prog(72, "Fetching live trading post prices...");
-      const priceMap = await fetchPrices(filterTradeable(allItemIds, itemMap));
+      const priceMap = await fetchPrices(filterTradeable([...allItemIds, ...LEGENDARY_IDS.priced], itemMap));
 
       prog(88, "Building crafting data...");
       const ownedMap = Object.fromEntries(materials.map(m => [m.id, m.count]));
@@ -671,7 +676,7 @@ export default function App() {
     for (const m of rawMaterials) { if (m.count > 0) matAgg[m.id] = (matAgg[m.id] || 0) + m.count; }
 
     // Fetch prices in parallel with character fetch (below)
-    const pricePromise = fetchPrices(filterTradeable(allItemIds, itemMap));
+    const pricePromise = fetchPrices(filterTradeable([...allItemIds, ...LEGENDARY_IDS.priced], itemMap));
 
     // ── Wave 2: slow character fetch (runs in parallel with price fetch) ──
     const charPromise = apiFetch(`${BASE}/characters?ids=all`).catch(() => []);
@@ -919,7 +924,7 @@ export default function App() {
         apiFetch(`${BASE}/account/wallet`),
                                                                                                                                   apiFetch(`${BASE}/account/materials`),
                                                                                                                                   apiFetch(`${BASE}/characters?ids=all`),
-                                                                                                                                  fetchPrices(filterTradeable(allItemIds, itemMap)),
+                                                                                                                                  fetchPrices(filterTradeable([...allItemIds, ...LEGENDARY_IDS.priced], itemMap)),
                                                                                                                                   apiFetch(`${BASE}/account/dailycrafting`).catch(() => []),
                                                                                                                                   apiFetch(`${BASE}/commerce/transactions/current/sells`).catch(() => null),
                                                                                                                                   fetchSoldHistory().catch(() => []),
@@ -1114,6 +1119,45 @@ export default function App() {
     finally { setRefreshing(false); refreshingRef.current = false; }
   }, []); // no deps — uses refs
 
+  // ── Name/icon back-fill for crafting cards ──────────────────────────────────
+  // Safety net, independent of which refresh path produced the cards: if any card (or one
+  // of its ingredients) is still a bare "Item 12345" with no icon, fetch those items once,
+  // save them, and patch the cards in place. Fixes recipes whose items never reached the
+  // item cache (e.g. the Research-Note recipes back-filled after the 2022 recipe-schema
+  // fix), even when a background worker recompute races the recipe refresh.
+  const nameBackfillTriedRef = useRef(new Set());
+  useEffect(() => {
+    const items = data?.craftItems;
+    if (!items?.length) return;
+    const bare = (name) => !name || /^Item \d+$/.test(name);
+    const need = new Set();
+    for (const ci of items) {
+      if (bare(ci.name) || !ci.icon) need.add(ci.outputId);
+      for (const m of ci.matDetails || []) if (bare(m.name)) need.add(m.itemId);
+    }
+    const ids = [...need].filter(id => id && !nameBackfillTriedRef.current.has(id));
+    if (!ids.length) return;
+    ids.forEach(id => nameBackfillTriedRef.current.add(id));
+    (async () => {
+      const got = await fetchIds("/items", ids);
+      if (!got.length) return;
+      const patch = Object.fromEntries(got.map(i => [i.id, i]));
+      cacheRef.current.itemMap = { ...(cacheRef.current.itemMap || {}), ...patch };
+      persistItemMapCache(cacheRef.current.itemMap);
+      const fix = (ci) => {
+        const out = patch[ci.outputId];
+        const matDetails = (ci.matDetails || []).map(m => patch[m.itemId] && bare(m.name) ? { ...m, name: patch[m.itemId].name, rarity: patch[m.itemId].rarity } : m);
+        return out ? { ...ci, name: out.name, icon: out.icon, rarity: out.rarity, matDetails } : { ...ci, matDetails };
+      };
+      if (cacheRef.current.craftItems) cacheRef.current.craftItems = cacheRef.current.craftItems.map(fix);
+      setData(prev => {
+        if (!prev) return prev;
+        const byDisc = Object.fromEntries(Object.entries(prev.byDisc || {}).map(([d, list]) => [d, list.map(fix)]));
+        return { ...prev, craftItems: (prev.craftItems || []).map(fix), byDisc, itemMap: { ...prev.itemMap, ...patch } };
+      });
+    })().catch(() => {});
+  }, [data?.craftItems]);
+
   // ── Recipe refresh ──────────────────────────────────────────────────────────
   // Some GW2 recipes (e.g. Piece of Dragon Jade, source: "Automatic") never need to be
   // "learned" — they're usable the moment any qualifying discipline hits the required
@@ -1127,6 +1171,30 @@ export default function App() {
   // between scans survives closing and reopening the app instead of restarting
   // the full window on every launch) — still manually re-triggerable any time via
   // the Settings button for an on-demand check.
+  // Shared by refreshRecipes + rescanAutoUnlockedRecipes when recipes are added mid-session.
+  // Previously only items missing from itemMap got a price fetch, and the new output /
+  // ingredient ids were never added to allItemIds — so the next live price refresh (which
+  // rebuilds priceMap from allItemIds) dropped them again and the cards showed a 0 sell
+  // price (e.g. Fine/Rare Rift Motivation, which are tradeable but often not owned).
+  const mergeNewRecipeItems = async (newRecipes, itemMap, priceMap) => {
+    const ids = [...new Set([
+      ...newRecipes.map(r => r.output_item_id),
+      ...newRecipes.flatMap(r => (r.ingredients || []).map(i => i.item_id)),
+    ])].filter(Boolean);
+    if (!ids.length) return;
+    cacheRef.current.allItemIds = [...new Set([...(cacheRef.current.allItemIds || []), ...ids])];
+    const missing = ids.filter(id => !itemMap[id]?.name);
+    if (missing.length) {
+      const ni = await fetchIds("/items", missing);
+      ni.forEach(i => { itemMap[i.id] = i; });
+      // Save names/icons too — recipes are persisted, so their items must be as well,
+      // otherwise the next launch shows "Item 100941" with no icon.
+      if (ni.length) persistItemMapCache(itemMap);
+    }
+    const np = await fetchPrices(filterTradeable(ids, itemMap));
+    Object.assign(priceMap, np);
+  };
+
   const [rescanningRecipes, setRescanningRecipes] = useState(false);
   const rescanningRecipesRef = useRef(false);
   useEffect(() => { rescanningRecipesRef.current = rescanningRecipes; }, [rescanningRecipes]);
@@ -1137,12 +1205,12 @@ export default function App() {
       const { itemMap, priceMap, ownedMap, resolvedRecipes, recipes, disciplineLevels, knownRecipeIds } = cacheRef.current;
       const existingIds = new Set(recipes.map(r => r.id));
       const knownSet = new Set(knownRecipeIds || []);
-      const allRecipeIds = await publicFetch(`${BASE}/recipes`);
+      const allRecipeIds = await publicFetch(RECIPE_LIST_URL);
       const candidateIds = allRecipeIds.filter(id => !existingIds.has(id) && !knownSet.has(id));
       const candidateDetails = [];
       for (const ch of chunk(candidateIds, 200)) {
         try {
-          const batch = await publicFetch(`${BASE}/recipes?ids=${ch.join(",")}`);
+          const batch = await fetchRecipes(ch);
           candidateDetails.push(...(Array.isArray(batch) ? batch : []));
         } catch {}
       }
@@ -1207,13 +1275,7 @@ export default function App() {
       }
       const allRecipes = dedupeRecipesById([...recipes, ...newlyEligible]);
       newlyEligible.forEach(r => { resolvedRecipes[r.output_item_id] = r; });
-      const newItemIds = [...new Set([...newlyEligible.map(r => r.output_item_id), ...newlyEligible.flatMap(r => r.ingredients.map(i => i.item_id))])].filter(id => !itemMap[id]);
-      if (newItemIds.length) {
-        const ni = await fetchIds("/items", newItemIds);
-        ni.forEach(i => { itemMap[i.id] = i; });
-        const np = await fetchPrices(filterTradeable(newItemIds, itemMap));
-        Object.assign(priceMap, np);
-      }
+      await mergeNewRecipeItems(newlyEligible, itemMap, priceMap);
       cacheRef.current = { ...cacheRef.current, itemMap, priceMap, resolvedRecipes, recipes: allRecipes, ownedMap };
       cacheSet("allRecipes", allRecipes);
       const craftItems = buildCraftItems(allRecipes, resolvedRecipes, itemMap, priceMap, ownedMap);
@@ -1239,23 +1301,41 @@ export default function App() {
     try {
       const { itemMap, priceMap, ownedMap, knownRecipeIds: oldIds, resolvedRecipes, recipes, disciplineLevels } = cacheRef.current;
       const newIds = await apiFetch(`${BASE}/account/recipes`);
-      const added = newIds.filter(id => !oldIds.includes(id));
+      // Known recipes that never made it into the cache — e.g. currency-cost recipes
+      // (Research Notes) that the old /v2/recipes schema silently dropped. Fetching them
+      // here self-heals existing caches without forcing a full reload.
+      const loadedIds = new Set(recipes.map(r => r.id));
+      const added = newIds.filter(id => !oldIds.includes(id) || !loadedIds.has(id));
       cacheRef.current.knownRecipeIds = newIds;
       const recipeNow = Date.now();
       setLastRecipe(recipeNow); setNextRecipeIn(RECIPE_REFRESH_MS);
       cacheSet("lastRecipeRefresh", recipeNow);
-      if (!added.length) return;
-      const newRecipes = await fetchIds("/recipes", added);
+      // Cached recipes whose output/ingredient items never got names/icons (a recipe was
+      // persisted before its items were) — fetch them and rebuild the cards.
+      const namelessRecipes = recipes.filter(r =>
+        !itemMap[r.output_item_id]?.name || (r.ingredients || []).some(i => !itemMap[i.item_id]?.name));
+      if (!added.length && !namelessRecipes.length) return;
+      if (!added.length) {
+        await mergeNewRecipeItems(namelessRecipes, itemMap, priceMap);
+        cacheRef.current = { ...cacheRef.current, itemMap, priceMap };
+        const craftItems = buildCraftItems(recipes, resolvedRecipes, itemMap, priceMap, ownedMap);
+        const byDisc = {};
+        const _byDiscSeen = {};
+        craftItems.forEach(ci => getRecipeDisciplines(ci).forEach(d => {
+          if (!byDisc[d]) { byDisc[d] = []; _byDiscSeen[d] = new Set(); }
+          if (!_byDiscSeen[d].has(ci.recipeId)) { _byDiscSeen[d].add(ci.recipeId); byDisc[d].push(ci); }
+        }));
+        setData(prev => ({ ...prev, craftItems, byDisc, itemMap: { ...itemMap }, priceMap: { ...priceMap } }));
+        return;
+      }
+      const newRecipes = await fetchRecipes(added);
       const allRecipes = dedupeRecipesById([...recipes, ...newRecipes]);
       newRecipes.forEach(r => { resolvedRecipes[r.output_item_id] = r; });
-      const newItemIds = [...new Set([...newRecipes.map(r => r.output_item_id), ...newRecipes.flatMap(r => r.ingredients.map(i => i.item_id))])].filter(id => !itemMap[id]);
-      if (newItemIds.length) {
-        const ni = await fetchIds("/items", newItemIds);
-        ni.forEach(i => { itemMap[i.id] = i; });
-        const np = await fetchPrices(filterTradeable(newItemIds, itemMap));
-        Object.assign(priceMap, np);
-      }
+      await mergeNewRecipeItems(newRecipes, itemMap, priceMap);
       cacheRef.current = { ...cacheRef.current, itemMap, priceMap, resolvedRecipes, recipes: allRecipes, ownedMap };
+      // Persist, so recipes found here (incl. the back-filled currency-cost ones) survive a restart.
+      cacheSet("allRecipes", allRecipes);
+      cacheSet("knownRecipeIds", newIds);
       // Update per-char inventory in data too
       const craftItems = buildCraftItems(allRecipes, resolvedRecipes, itemMap, priceMap, ownedMap);
       const byDisc = {};
@@ -1481,7 +1561,7 @@ export default function App() {
     try {
       const { recipes, knownRecipeIds } = cacheRef.current;
       const knownIds = new Set([...(recipes || []).map(r => r.id), ...(knownRecipeIds || [])]);
-      const freshIdList = await publicFetch(`${BASE}/recipes`);
+      const freshIdList = await publicFetch(RECIPE_LIST_URL);
       const [idsEntry, detailsEntry] = await cacheGetBulk(["allGameRecipeIds", "allGameRecipes"]);
       const cachedIds = new Set(idsEntry?.value || []);
       const cachedDetails = detailsEntry?.value || [];
@@ -1489,11 +1569,14 @@ export default function App() {
       // genuinely new since the last cached ID list AND not already known — GW2 patches
       // add recipes in batches, so after the first (expensive) run this is normally just
       // the 1 cheap ID-list request plus at most a couple of detail chunks.
-      const newIds = freshIdList.filter(id => !cachedIds.has(id) && !knownIds.has(id));
+      // Also re-fetch ids whose details never made it into the cache (currency-cost recipes
+      // the old /v2/recipes schema dropped — see RECIPE_SCHEMA in gw2Api.js).
+      const cachedDetailIds = new Set(cachedDetails.map(r => r.id));
+      const newIds = freshIdList.filter(id => (!cachedIds.has(id) || !cachedDetailIds.has(id)) && !knownIds.has(id));
       let newDetails = [];
       for (const ch of chunk(newIds, 200)) {
         try {
-          const batch = await publicFetch(`${BASE}/recipes?ids=${ch.join(",")}`);
+          const batch = await fetchRecipes(ch);
           newDetails.push(...(Array.isArray(batch) ? batch : []));
         } catch {}
       }
@@ -1552,6 +1635,11 @@ export default function App() {
     const waitForData = setInterval(() => {
       if (!dataReadyRef.current) return;
       clearInterval(waitForData);
+      // Run once at startup too: refreshRecipes now also back-fills known recipes that
+      // are missing from the cache (currency-cost recipes the old API schema dropped),
+      // so existing installs pick them up right away instead of 4 hours later.
+      loadCurrencyNames();
+      refreshRecipes();
       recipeInterval = setInterval(refreshRecipes, RECIPE_REFRESH_MS);
     }, 100);
     return () => { clearInterval(waitForData); clearInterval(recipeInterval); };
@@ -1863,7 +1951,7 @@ export default function App() {
     74378, 76891, 76027, 73809, 73875, 74301, 24572,
     // Resolved null IDs (June 2026): Spiritwood Plank, Pile of Bloodstone Dust, Master Maintenance Oil, Sculptor's Tools
     46736, 46731, 9461, 74909,
-    // Sigil of Strength (Sunrise) — corrected from Sigil of Air
+    // Superior Sigil of Fire (Incinerator, Rodgort) — was labelled Strength; Strength is 24562 (API verified Oct 2026)
     24548,
     // Bolt/Zap precursor chain (June 2026)
     74093, 75769, 76117, 73013, 71679, 73912,  // Tier 1: Zap Experiment + components
@@ -1956,6 +2044,7 @@ export default function App() {
       ...Object.values(MANUAL_DAILY_MAP).map(v => v.itemId),
       ...Object.values(DAILY_CRAFT_MAP).map(v => v.itemId),
       ...LEGENDARY_ITEM_IDS,
+      ...LEGENDARY_IDS.all,
     ];
     const missing = [...new Set(allDailyIds)].filter(id => id && !data.itemMap[id]);
     if (missing.length === 0) return;

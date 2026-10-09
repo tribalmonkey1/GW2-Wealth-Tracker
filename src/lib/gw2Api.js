@@ -8,6 +8,50 @@ import { cacheSet } from "./storage.js";
 const BASE = "https://api.guildwars2.com/v2";
 export { BASE };
 
+// ── Recipe schema ─────────────────────────────────────────────────────────────
+// /v2/recipes only returns recipes that cost a CURRENCY (e.g. 50 Research Notes for
+// Rare Rift Motivation, Amalgamated Rift Essence, most Secrets of the Obscure /
+// Wizard's Tower recipes) when the request asks for the 2022-03-09 schema or later —
+// under the default schema those recipes "appear as invalid" and are silently dropped
+// from ?ids= batches (API:2/recipes on the wiki). The newer schema changes the
+// ingredient shape to { type, id, count }; normalizeRecipe() converts it back to the
+// { item_id, count } shape the rest of the app uses and moves currencies to
+// recipe.currency_ingredients = [{ currency_id, count }].
+export const RECIPE_SCHEMA = "2022-03-09T02:00:00.000Z";
+export const RECIPE_LIST_URL = `${BASE}/recipes?v=${RECIPE_SCHEMA}`;
+
+// Names for currency ingredients shown in the crafting UI (wallet currency ids).
+export const CURRENCY_INGREDIENT_NAMES = {
+  61: "Research Note",
+  78: "Fine Rift Essence",       // wallet currency since SotO [API verified Oct 2026]
+  79: "Rare Rift Essence",
+  80: "Masterwork Rift Essence",
+};
+
+// Fill in names for every wallet currency once per session, so any new currency-cost
+// recipe shows a real name instead of "currency #N". Safe to call more than once.
+let _currencyNamesLoaded = false;
+export async function loadCurrencyNames() {
+  if (_currencyNamesLoaded) return;
+  try {
+    const list = await publicFetch(`${BASE}/currencies?ids=all`);
+    if (Array.isArray(list)) for (const c of list) if (c?.id && c.name) CURRENCY_INGREDIENT_NAMES[c.id] = c.name;
+    _currencyNamesLoaded = true;
+  } catch {}
+}
+
+export function normalizeRecipe(r) {
+  if (!r || !Array.isArray(r.ingredients)) return r;
+  if (!r.ingredients.some(i => i && i.type)) return r; // already old shape (e.g. from cache)
+  const ingredients = [], currency_ingredients = [], guild = [...(r.guild_ingredients || [])];
+  for (const ing of r.ingredients) {
+    if (ing.type === "Currency") currency_ingredients.push({ currency_id: ing.id, count: ing.count });
+    else if (ing.type === "GuildUpgrade") guild.push({ upgrade_id: ing.id, count: ing.count });
+    else ingredients.push({ item_id: ing.id, count: ing.count });
+  }
+  return { ...r, ingredients, currency_ingredients, guild_ingredients: guild };
+}
+
 export const chunk = (arr, size) =>
 Array.from({ length: Math.ceil(arr.length / size) }, (_, i) => arr.slice(i * size, i * size + size));
 
@@ -23,6 +67,19 @@ export async function publicFetch(url) {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`API error ${res.status}`);
   return res.json();
+}
+
+// Fetch recipe details by id with the currency-aware schema (see RECIPE_SCHEMA above).
+export async function fetchRecipes(ids) {
+  if (!ids.length) return [];
+  const results = [];
+  for (const ch of chunk([...new Set(ids)], 200)) {
+    try {
+      const data = await publicFetch(`${BASE}/recipes?v=${RECIPE_SCHEMA}&ids=${ch.join(",")}`);
+      if (Array.isArray(data)) results.push(...data.map(normalizeRecipe));
+    } catch {}
+  }
+  return results;
 }
 
 export async function fetchIds(endpoint, ids) {

@@ -29,6 +29,8 @@ import { VENDOR_PRICES } from "./lib/vendorPrices.js";
 // Icy Runestone: account-bound (not on TP), 1g each from Miyani / Mystic Forge vendors.
 export const LEGENDARY_VENDOR_PRICES = {
   19676: 10000, // Icy Runestone
+  79418: 10000, // Mystic Runestone — 1g each (Miyani / Mystic Forge Attendant)
+  95813: 150,   // Hydrocatalytic Reagent — master craftsman vendors (assumed same 1s 50c as Thermocatalytic)
 };
 
 // Items bought with Spirit Shards: { count: items per purchase, shards: cost per purchase }
@@ -36,6 +38,9 @@ export const LEGENDARY_SHARD_COSTS = {
   20796: { count: 10, shards: 1 },   // Philosopher's Stone — 10 for 1 Spirit Shard
   20799: { count: 5,  shards: 3 },   // Mystic Crystal — 5 for 3 Spirit Shards
   20797: { count: 1,  shards: 200 }, // Bloodstone Shard — 200 Spirit Shards (Miyani)
+  46752: { count: 1,  shards: 20 },  // Augur's Stone — 20 Spirit Shards (Miyani)
+  69953: { count: 1,  shards: 10 },  // Anthology of Heroes — 10 Spirit Shards (Miyani)
+  20852: { count: 1,  shards: 50 },  // Eldritch Scroll — 50 Spirit Shards (Miyani)
 };
 
 const NO_GOLD_SOURCES = new Set(["wvw", "exploration", "heroics", "karma"]);
@@ -70,7 +75,22 @@ function strip(node) {
   return rest;
 }
 
+// "Any one of" ingredients (e.g. Mystic Curio takes 35 of ANY T5 material).
+// Pick the option you already own the most of; otherwise the cheapest on the TP.
+function pickAnyOf(node, needed, pool, priceMap) {
+  let best = null;
+  for (const opt of node.anyOf) {
+    const owned = opt.itemId ? (pool.get(opt.itemId) || 0) : 0;
+    const price = tpPrice(priceMap, opt.itemId) || Infinity;
+    const score = [Math.min(owned, needed), -price];
+    if (!best || score[0] > best.score[0] || (score[0] === best.score[0] && score[1] > best.score[1])) best = { opt, score };
+  }
+  const others = node.anyOf.filter(o => o !== best.opt).map(o => o.name).join(", ");
+  return { ...node, itemId: best.opt.itemId, name: best.opt.name, note: `any one of: ${best.opt.name}, ${others}${node.note ? " — " + node.note : ""}` };
+}
+
 function evalNode(node, needed, pool, priceMap, visited) {
+  if (node.anyOf?.length) node = pickAnyOf(node, needed, pool, priceMap);
   const itemId = node.itemId || null;
   const ownedTotal = itemId ? (pool.get(itemId) || 0) : 0;
   const used = Math.min(ownedTotal, needed);
@@ -211,4 +231,28 @@ export function collectAchievementBitCounts(...recipeLists) {
   };
   recipeLists.flat().forEach(walk);
   return out;
+}
+
+/**
+ * Item IDs referenced by legendary data.
+ *  - all: every itemId (used to prefetch names/icons — gifts are account-bound and
+ *    never show up in the normal item fetch).
+ *  - priced: outputs + anything that could be bought on the TP (precursors, tp/vendor/
+ *    currency/craft nodes, tradeable crafted parts like Twilight inside Eternity).
+ *    Merged into the regular TP price refresh so legendary cards get real prices.
+ */
+export function collectLegendaryItemIds(...recipeLists) {
+  const all = new Set(), priced = new Set();
+  const PRICE_SOURCES = new Set(["tp", "vendor", "currency", "craft"]);
+  const walk = (n, isTop) => {
+    if (!n) return;
+    (n.anyOf || []).forEach(o => { if (o.itemId) { all.add(o.itemId); priced.add(o.itemId); } });
+    if (n.itemId) {
+      all.add(n.itemId);
+      if (isTop || n.isPrecursor || PRICE_SOURCES.has(n.source) || !n.accountBound) priced.add(n.itemId);
+    }
+    (n.inputs || []).forEach(c => walk(c, false));
+  };
+  recipeLists.flat().forEach(r => walk(r, true));
+  return { all: [...all], priced: [...priced] };
 }

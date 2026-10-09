@@ -1,206 +1,186 @@
 /**
- * GW2 Gen 2 Legendary Weapon Data
- * Heart of Thorns (HoT) and Path of Fire (PoF) legendaries.
+ * GW2 Gen 2 Legendary Weapon Data — all 16 weapons.
  *
- * Gen 2 structure differs from Gen 1:
- * - Precursor is crafted through a 3-stage COLLECTION (not Mystic Forge random)
- * - Uses Gift of Maguuma Mastery (HoT) or Gift of Desert Mastery (PoF)
- *   instead of Gift of Mastery
- * - Mystic Tribute replaces Gen 1's Gift of Fortune (wiki verified Oct 2026)
- * - Each has a unique weapon-specific Gift
+ * REBUILT Oct 2026 from the GW2 API (/v2/recipes, /v2/items, /v2/achievements) and
+ * the wiki (Mystic Forge recipes, which the API never exposes). Replaces the earlier
+ * placeholder file (5 non-existent weapons, wrong weapon types, made-up gift recipes).
  *
- * Stage costs are approximate — many components are account-bound collections,
- * map currencies, or time-gated crafts. Gold costs show TP-priceable items only.
+ * Every Gen 2 legendary = Precursor + Gift of <Weapon> + Mystic Tribute + Gift of Maguuma Mastery
+ *   (all except the four HoT launch weapons also accept Gift of Desert Mastery).
+ *
+ * Two precursor styles:
+ *  - Heart of Thorns launch weapons (Astralaria, HOPE, Nevermore, Chuka and Champawat):
+ *    3-tier collection chain like Gen 1; collection IV rewards the weapon-specific gift part.
+ *  - Living World weapons (the other 12): one 500-rating craft from 100 Shards + 2 ascended
+ *    weapon parts + Visionary Inscription. Recipe from Grandmaster Craftsman Hobbs
+ *    (Historian of the Armaments mastery). Shards are refined from Tributes bought with map currency.
+ * Gift of <Weapon>:
+ *  - HoT: Gift of the Mists + 100 Icy Runestone + collection-IV gift + Gift of Metal/Wood/Energy
+ *  - Living World: Gift of the Mists + 100 Mystic Runestone + 100 Shards + Gift of Metal/Wood/Energy
  */
+import { MYSTIC_TRIBUTE, GIFT_OF_METAL, GIFT_OF_WOOD, GIFT_OF_ENERGY } from "./legendary-data.js";
 
-import { MYSTIC_TRIBUTE } from "./legendary-data.js";
-
-// ── Shared Gen 2 components ────────────────────────────────────────────────────
-
-// Gift of Maguuma Mastery (HoT legendaries)
-const GIFT_OF_MAGUUMA_MASTERY = {
-  name: 'Gift of Maguuma Mastery',
-  itemId: null, idName: 'Gift of Maguuma Mastery',
-  count: 1, source: 'forge', accountBound: true,
+// Gift of the Mists [wiki verified Oct 2026 — ID 76427]
+export const GIFT_OF_THE_MISTS = {
+  itemId: 76427, name: 'Gift of the Mists', count: 1, source: 'forge', accountBound: true,
+  note: 'Mystic Forge: Gift of Battle + Gift of Glory + Gift of War + Cube of Stabilized Dark Energy',
   inputs: [
-    { name: 'Gift of Maguuma',         itemId: null, idName: 'Gift of Maguuma',   count: 1, source: 'collection', accountBound: true, note: 'Map completion in HoT maps + Mastery points', inputs: [] },
-    { name: 'Gift of Insight',         itemId: null, idName: 'Gift of Insight',   count: 1, source: 'heroics',    accountBound: true, note: 'Hero challenges in HoT', inputs: [] },
-    { name: 'Glob of Ectoplasm',       itemId: 19721, count: 50, source: 'tp',    inputs: [] },
-    { name: 'Obsidian Shard',          itemId: 19925, count: 50, source: 'karma', note: '1,050 Karma each', inputs: [] },
+    { itemId: 19678, name: 'Gift of Battle', count: 1, source: 'wvw', accountBound: true, note: 'WvW Gift of Battle reward track', inputs: [] },
+    { itemId: 70528, name: 'Gift of Glory', count: 1, source: 'currency', accountBound: true, note: 'Bought for 250 Shards of Glory (PvP)',
+      inputs: [{ itemId: 70820, name: 'Shard of Glory', count: 250, source: 'tp', inputs: [] }] },
+    { itemId: 71008, name: 'Gift of War', count: 1, source: 'currency', accountBound: true, note: 'Bought for 250 Memories of Battle (WvW)',
+      inputs: [{ itemId: 71581, name: 'Memory of Battle', count: 250, source: 'tp', inputs: [] }] },
+    { itemId: 73137, name: 'Cube of Stabilized Dark Energy', count: 1, source: 'forge', note: 'Crafted (any discipline 500) [API verified Oct 2026]',
+      inputs: [
+        { itemId: 71994, name: 'Ball of Dark Energy', count: 1, source: 'tp', note: 'Salvage ascended equipment with a Black Lion Salvage Kit, or buy on TP', inputs: [] },
+        { itemId: 73248, name: 'Stabilizing Matrix', count: 75, source: 'tp', inputs: [] },
+      ] },
   ],
 };
 
-// Gift of Desert Mastery (PoF legendaries)
-const GIFT_OF_DESERT_MASTERY = {
-  name: 'Gift of Desert Mastery',
-  itemId: null, idName: 'Gift of Desert Mastery',
-  count: 1, source: 'forge', accountBound: true,
+// Gift of Maguuma Mastery [wiki verified Oct 2026 — ID 73239]
+// Gift of Maguuma + Gift of Insights + Bloodstone Shard + 250 Crystalline Ingot.
+// (The old version here — Gift of Maguuma + Gift of Insight + 50 Ecto + 50 Obsidian — was wrong.)
+export const GIFT_OF_MAGUUMA_MASTERY = {
+  itemId: 73239, name: 'Gift of Maguuma Mastery', count: 1, source: 'forge', accountBound: true,
+  note: 'Mystic Forge: Gift of Maguuma + Gift of Insights + Bloodstone Shard + 250 Crystalline Ingot',
   inputs: [
-    { name: 'Gift of the Desert',      itemId: null, idName: 'Gift of the Desert', count: 1, source: 'collection', accountBound: true, note: 'Map completion in PoF maps + Mastery points', inputs: [] },
-    { name: 'Gift of Desolation',      itemId: null, idName: 'Gift of Desolation', count: 1, source: 'heroics',    accountBound: true, note: 'Hero challenges in PoF', inputs: [] },
-    { name: 'Glob of Ectoplasm',       itemId: 19721, count: 50, source: 'tp',    inputs: [] },
-    { name: 'Obsidian Shard',          itemId: 19925, count: 50, source: 'karma', note: '1,050 Karma each', inputs: [] },
+    { itemId: 74927, name: 'Gift of Maguuma', count: 1, source: 'forge', accountBound: true,
+      note: 'Mystic Forge: the four Heart of Thorns map-completion gifts',
+      inputs: [
+        { itemId: 70797, name: 'Gift of the Fleet', count: 1, source: 'exploration', accountBound: true, note: 'Verdant Brink map completion', inputs: [] },
+        { itemId: 71943, name: 'Gift of Tarir', count: 1, source: 'exploration', accountBound: true, note: 'Auric Basin map completion', inputs: [] },
+        { itemId: null, idName: 'Gift of the Chak', name: 'Gift of the Chak', count: 1, source: 'exploration', accountBound: true, note: 'Tangled Depths map completion', inputs: [] },
+        { itemId: null, idName: 'Gift of the Jungle', name: 'Gift of the Jungle', count: 1, source: 'exploration', accountBound: true, note: "Dragon's Stand map completion", inputs: [] },
+      ] },
+    { itemId: 72964, name: 'Gift of Insights', count: 1, source: 'forge', accountBound: true,
+      note: 'Mystic Forge: Gift of the Itzel + Gift of the Nuhoch + Gift of the Exalted + Gift of Gliding',
+      inputs: [
+        { itemId: 73469, name: 'Gift of the Itzel', count: 1, source: 'currency', accountBound: true, note: 'HoT mastery vendor — Airship Parts + gold (needs Itzel masteries)', inputs: [] },
+        { itemId: null, idName: 'Gift of the Nuhoch', name: 'Gift of the Nuhoch', count: 1, source: 'currency', accountBound: true, note: 'HoT mastery vendor — Ley Line Crystals + gold (needs Nuhoch masteries)', inputs: [] },
+        { itemId: null, idName: 'Gift of the Exalted', name: 'Gift of the Exalted', count: 1, source: 'currency', accountBound: true, note: 'HoT mastery vendor — Lumps of Aurillium + gold (needs Exalted masteries)', inputs: [] },
+        { itemId: null, idName: 'Gift of Gliding', name: 'Gift of Gliding', count: 1, source: 'currency', accountBound: true, note: 'HoT mastery vendor — map currency + gold (needs Gliding masteries)', inputs: [] },
+      ] },
+    { itemId: 20797, name: 'Bloodstone Shard', count: 1, source: 'spirit_shard', accountBound: true, note: '200 Spirit Shards from Miyani', inputs: [] },
+    { itemId: 46683, name: 'Crystalline Ingot', count: 250, source: 'currency', accountBound: true,
+      note: "Dragon's Stand / HoT rewards (also craftable: 1 Crystalline Ore + 1 Fulgurite + 1 Ecto + 1 Amalgamated Gemstone)", inputs: [] },
   ],
 };
-
-// Mystic Tribute — Gen 2 legendaries use this in the slot Gen 1 uses Gift of Fortune.
-// [wiki verified Oct 2026] 2 Gift of Condensed Magic + 2 Gift of Condensed Might
-// + 77 Mystic Clover + 250 Mystic Coin. Shared definition lives in legendary-data.js.
-// (Previously a placeholder "Gift of Fortune" with 77 Mystic Coin + 77 "Crystal".)
-
-// T6 materials shorthand (same IDs as Gen 1 — imported at runtime)
-const T6_IDS = {
-  VICIOUS_CLAW:             24351,
-  VICIOUS_FANG:             24357,
-  ANCIENT_BONE:             24358,
-  ARMORED_SCALE:            24289,
-  PILE_OF_CRYSTALLINE_DUST: 24277,
-  GLOB_OF_ECTOPLASM:        19721,
-  MYSTIC_COIN:              19976,
-};
-
-function t6(name, itemId, idName, count) {
-  return { name, itemId: itemId || null, idName: idName || null, count, source: 'tp', inputs: [] };
-}
-function ls(name, count) {
-  return { name, itemId: null, idName: name, count, source: 'tp', inputs: [] };
-}
-function collectionStage(name, stageNum, note) {
-  return {
-    name: `${name} (Stage ${stageNum})`,
-    itemId: null, idName: `${name} (Stage ${stageNum})`,
-    count: 1, source: 'collection', accountBound: true,
-    note: note || `Collection stage ${stageNum} — account-bound`,
-    inputs: [],
-  };
-}
-
-// Precursor collection chain helper — 3 stages, each account-bound
-// Stage 3 output = the actual precursor fed into the legendary
-function collectionPrecursor(baseName, stage1Note, stage2Note, stage3Note, extraInputs) {
-  return {
-    name: `${baseName} (Precursor)`,
-    // idName intentionally null: baseName is the LEGENDARY's name, so looking it up
-    // would resolve the precursor row to the finished legendary. Precursor item
-    // names are not yet curated for Gen 2.
-    itemId: null, idName: null,
-    count: 1, source: 'collection', accountBound: true,
-    note: 'Gen 2 precursor — crafted via 3-stage collection (account-bound)',
-    inputs: [
-      { name: `${baseName} I`, itemId: null, idName: `${baseName} I`, count: 1, source: 'collection', accountBound: true, note: stage1Note || 'Stage 1 collection', inputs: [] },
-      { name: `${baseName} II`, itemId: null, idName: `${baseName} II`, count: 1, source: 'collection', accountBound: true, note: stage2Note || 'Stage 2 collection', inputs: [] },
-      { name: `${baseName} III`, itemId: null, idName: `${baseName} III`, count: 1, source: 'collection', accountBound: true, note: stage3Note || 'Stage 3 collection — requires map currencies + T6 mats', inputs: [] },
-      ...(extraInputs || []),
-    ],
-  };
-}
 
 export const LEGENDARY_RECIPES_GEN2 = [
 
-  // ── HOPE (Pistol, HoT) ───────────────────────────────────────────────────────
-  {
-    id: 'legendary_hope',
-    name: 'HOPE',
-    itemId: 72713, idName: 'HOPE',
-    rarity: 'Legendary',
-    weaponType: 'Pistol',
-    generation: 2,
-    dataStatus: 'partial', // tribute + mastery verified; weapon gift + precursor stages not yet wiki-verified
-    expansion: 'Heart of Thorns',
-    note: 'Gen 2 — precursor via 3-stage collection (HOPE I/II/III)',
-    inputs: [
-      collectionPrecursor('HOPE',
-        'HOPE I: The Experimental Pistol',
-        'HOPE II: The Prototype',
-        'HOPE III: The Perfected Pistol — HoT currencies'),
-      {
-        name: 'Gift of HOPE',
-        itemId: 77086, idName: 'Gift of HOPE',
-        count: 1, source: 'forge', accountBound: true,
-        inputs: [
-          { name: 'Gift of the Mists', itemId: 76427, idName: 'Gift of the Mists', count: 1, source: 'forge', accountBound: true,
-            inputs: [
-              { name: 'Gift of Battle', itemId: 19678, count: 1, source: 'wvw', accountBound: true, note: 'WvW Skirmish reward track', inputs: [] },
-              { name: 'Gift of Glory', itemId: 70528, count: 1, source: 'currency', note: 'Buy from Miyani for 250 Shard of Glory (PvP)', inputs: [{ name: 'Shard of Glory', itemId: 70820, count: 250, source: 'tp', inputs: [] }] },
-              { name: 'Gift of War', itemId: 71008, count: 1, source: 'currency', note: 'Buy from Miyani for 250 Memory of Battle (WvW) — tradeable, priced from the TP', inputs: [{ name: 'Memory of Battle', itemId: 71581, count: 250, source: 'tp', note: 'WvW reward-track currency — tradeable on the TP', inputs: [] }] },
-              { name: 'Cube of Stabilized Dark Energy', itemId: 73137, count: 1, source: 'craft', inputs: [
-                { name: 'Ball of Dark Energy', itemId: 71994, count: 1, source: 'tp', note: 'Salvage ascended equipment with Black Lion Salvage Kit', inputs: [] },
-                { name: 'Stabilizing Matrix', itemId: 73248, count: 75, source: 'tp', inputs: [] },
-              ]},
-            ],
-          },
-          { name: 'Icy Runestone', itemId: 19676, count: 100, source: 'vendor', note: '1 gold each from vendor', inputs: [] },
-          { name: 'Gift of the Catalyst', itemId: null, idName: 'Gift of the Catalyst', count: 1, source: 'collection', accountBound: true, note: 'Account-bound — obtained via HOPE collection chain', inputs: [] },
-          { name: 'Gift of Wood', itemId: 19622, count: 1, source: 'forge', accountBound: true,
-            inputs: [
-              { name: 'Ancient Wood Plank',  itemId: 19712, count: 250, source: 'tp', inputs: [] },
-              { name: 'Elder Wood Plank',    itemId: 19709, count: 250, source: 'tp', inputs: [] },
-              { name: 'Hard Wood Plank',     itemId: 19711, count: 250, source: 'tp', inputs: [] },
-              { name: 'Seasoned Wood Plank', itemId: 19714, count: 250, source: 'tp', inputs: [] },
-            ],
-          },
-        ],
-      },
-      { ...MYSTIC_TRIBUTE },
-      { ...GIFT_OF_MAGUUMA_MASTERY },
-    ],
-  },
-
-  // ── The Shining Blade (Sword, HoT) ─────────────────────────────────────────
-  {
-    id: 'legendary_shining_blade',
-    name: 'The Shining Blade',
-    itemId: null, idName: 'The Shining Blade',
-    rarity: 'Legendary',
-    weaponType: 'Sword',
-    generation: 2,
-    dataStatus: 'partial', // tribute + mastery verified; weapon gift + precursor stages not yet wiki-verified
-    expansion: 'Heart of Thorns',
-    inputs: [
-      collectionPrecursor('The Shining Blade',
-        'Gather Shining Blade lore items',
-        'Craft intermediate components',
-        'Final stage: T6 mats + Maguuma currencies'),
-      {
-        name: 'Gift of the Shining Blade',
-        itemId: null, idName: 'Gift of the Shining Blade',
-        count: 1, source: 'forge', accountBound: true,
-        inputs: [
-          ls('Charged Lodestone', 100),
-          t6('Pile of Crystalline Dust', 24277, null, 250),
-          t6('Vicious Claw', 24351, null, 250),
-          t6('Armored Scale', 24289, null, 250),
-        ],
-      },
-      { ...MYSTIC_TRIBUTE },
-      { ...GIFT_OF_MAGUUMA_MASTERY },
-    ],
-  },
-
-  // ── Astralaria (Axe, HoT) ───────────────────────────────────────────────────
+  // ── Astralaria (Axe) ──
   {
     id: 'legendary_astralaria',
-    name: 'Astralaria',
-    itemId: null, idName: 'Astralaria',
-    rarity: 'Legendary',
-    weaponType: 'Axe',
-    generation: 2,
-    dataStatus: 'partial', // tribute + mastery verified; weapon gift + precursor stages not yet wiki-verified
-    expansion: 'Heart of Thorns',
+    name: "Astralaria",
+    itemId: 76158,   // [API verified Oct 2026]
+    rarity: 'Legendary', weaponType: 'Axe', generation: 2, expansion: 'Heart of Thorns',
+    note: "Mystic Forge: precursor + Gift of Astralaria + Mystic Tribute + Gift of Maguuma Mastery",
     inputs: [
-      collectionPrecursor('Astralaria',
-        'Astralaria I: The Mechanism',
-        'Astralaria II: The Apparatus',
-        'Astralaria III: The Device — T6 + Maguuma currencies'),
-      {
-        name: 'Gift of the Cosmos',
-        itemId: null, idName: 'Gift of the Cosmos',
-        count: 1, source: 'forge', accountBound: true,
+    { itemId: 71426, name: "The Mechanism", count: 1, source: 'collection', accountBound: true,
+      achievementId: 2433,  // Astralaria III: The Mechanism [API verified Oct 2026]
+      achievementBitCount: 33,
+      achievementName: "Astralaria III: The Mechanism",
+      note: "Gen 2 precursor — crafted once per account via Astralaria III: The Mechanism collection (Weaponsmith 500).",
+      inputs: [
+        { itemId: 74457, name: "Essence of Time and Space", count: 1, source: 'collection', accountBound: true, note: "From Chest of Time and Space — reward for completing Astralaria III: The Mechanism", inputs: [] },
+        { itemId: 74492, name: "Spirit of The Apparatus", count: 1, source: 'collection', accountBound: true,
+          note: "Salvage The Apparatus with any salvage kit",
+          inputs: [
+                { itemId: 75974, name: "The Apparatus", count: 1, source: 'collection', accountBound: true,
+                  achievementId: 2447,  // Astralaria II: The Apparatus [API verified Oct 2026]
+                  achievementBitCount: 14,
+                  achievementName: "Astralaria II: The Apparatus",
+                  note: "Crafted via Astralaria II: The Apparatus collection (Weaponsmith 450).",
+                  inputs: [
+                    { itemId: 72622, name: "Expertise in Advanced Axe Crafting", count: 1, source: 'collection', accountBound: true, note: "From Tricks and Tips for Celestial Axe Crafting — reward for completing Astralaria II: The Apparatus", inputs: [] },
+                    { itemId: 74158, name: "Spirit of The Device", count: 1, source: 'collection', accountBound: true,
+                      note: "Salvage The Device with any salvage kit",
+                      inputs: [
+                        { itemId: 70989, name: "The Device", count: 1, source: 'collection', accountBound: true,
+                          achievementId: 2571,  // Astralaria I: The Device [API verified Oct 2026]
+                          achievementBitCount: 19,
+                          achievementName: "Astralaria I: The Device",
+                          note: "Crafted via Astralaria I: The Device collection (Weaponsmith 450).",
+                          inputs: [
+                            { itemId: 70730, name: "Essence of Ancient Knowledge", count: 1, source: 'collection', accountBound: true, note: "From Chest of Ancient Knowledge — reward for completing Astralaria I: The Device", inputs: [] },
+                            { itemId: 70868, name: "Experimental Axe Blade", count: 1, source: 'forge', accountBound: true,
+                              note: "Crafted (Weaponsmith 450)",
+                              inputs: [
+                                { itemId: 46738, name: "Deldrimor Steel Ingot", count: 15, source: 'tp', inputs: [] },
+                                { itemId: 71581, name: "Memory of Battle", count: 50, source: 'tp', inputs: [] },
+                                { itemId: 70820, name: "Shard of Glory", count: 50, source: 'tp', inputs: [] },
+                              ],
+                            },
+                            { itemId: 70952, name: "Experimental Axe Haft", count: 1, source: 'forge', accountBound: true,
+                              note: "Crafted (Weaponsmith 450)",
+                              inputs: [
+                                { itemId: 46736, name: "Spiritwood Plank", count: 10, source: 'tp', inputs: [] },
+                                { itemId: 71581, name: "Memory of Battle", count: 50, source: 'tp', inputs: [] },
+                                { itemId: 70820, name: "Shard of Glory", count: 50, source: 'tp', inputs: [] },
+                              ],
+                            },
+                            { itemId: 72261, name: "Legendary Inscription", count: 1, source: 'forge', accountBound: true,
+                              note: "Crafted (Artificer, Weaponsmith, Huntsman 450)",
+                              inputs: [
+                                { itemId: 19721, name: "Glob of Ectoplasm", count: 10, source: 'tp', inputs: [] },
+                                { itemId: 24277, name: "Pile of Crystalline Dust", count: 5, source: 'tp', inputs: [] },
+                                { itemId: 12988, name: "Orichalcum Plated Dowel", count: 1, source: 'tp', inputs: [] },
+                                { itemId: 46739, name: "Elonian Leather Square", count: 10, source: 'tp', inputs: [] },
+                              ],
+                            },
+                          ],
+                        },
+                      ],
+                    },
+                    { itemId: 75316, name: "Jar of Luminesce Polish", count: 1, source: 'forge', accountBound: true,
+                      note: "Crafted (Artificer, Weaponsmith, Huntsman 400)",
+                      inputs: [
+                        { itemId: 46731, name: "Pile of Bloodstone Dust", count: 250, source: 'currency', note: "Account-bound — salvaged from ascended gear / fractal rewards", inputs: [] },
+                        { itemId: 68063, name: "Amalgamated Gemstone", count: 1, source: 'tp', inputs: [] },
+                        { itemId: 46747, name: "Thermocatalytic Reagent", count: 10, source: 'tp', inputs: [] },
+                        { itemId: 9461, name: "Master Maintenance Oil", count: 10, source: 'tp', inputs: [] },
+                      ],
+                    },
+                    { itemId: 73517, name: "Prismatic Lodestone", count: 1, source: 'forge', accountBound: true,
+                      note: "Crafted (Artificer, Weaponsmith, Huntsman 400)",
+                      inputs: [
+                        { itemId: 24320, name: "Glacial Lodestone", count: 1, source: 'tp', inputs: [] },
+                        { itemId: 24315, name: "Molten Lodestone", count: 1, source: 'tp', inputs: [] },
+                        { itemId: 24310, name: "Onyx Lodestone", count: 1, source: 'tp', inputs: [] },
+                        { itemId: 24305, name: "Charged Lodestone", count: 1, source: 'tp', inputs: [] },
+                      ],
+                    },
+                  ],
+                },
+          ],
+        },
+        { itemId: 75333, name: "Balanced Counterweight", count: 1, source: 'forge', accountBound: true,
+          note: "Crafted (Weaponsmith 500)",
+          inputs: [
+            { itemId: 46738, name: "Deldrimor Steel Ingot", count: 5, source: 'tp', inputs: [] },
+            { itemId: 19684, name: "Mithril Ingot", count: 150, source: 'tp', inputs: [] },
+            { itemId: 71641, name: "Pile of Coarse Sand", count: 50, source: 'tp', inputs: [] },
+            { itemId: 19683, name: "Iron Ingot", count: 250, source: 'tp', inputs: [] },
+          ],
+        },
+        { itemId: 72724, name: "Engraver's Tools", count: 1, source: 'forge', accountBound: true,
+          note: "Crafted (Weaponsmith 500)",
+          inputs: [
+            { itemId: 19684, name: "Mithril Ingot", count: 100, source: 'tp', inputs: [] },
+            { itemId: 76491, name: "Black Diamond", count: 5, source: 'tp', inputs: [] },
+            { itemId: 71641, name: "Pile of Coarse Sand", count: 10, source: 'tp', inputs: [] },
+            { itemId: 46747, name: "Thermocatalytic Reagent", count: 10, source: 'tp', inputs: [] },
+          ],
+        },
+      ],
+    },
+      { itemId: 71972, name: "Gift of Astralaria", count: 1, source: 'forge', accountBound: true, note: "Mystic Forge [wiki verified Oct 2026]",
         inputs: [
-          ls('Crystal Lodestone', 100),
-          t6('Pile of Crystalline Dust', 24277, null, 250),
-          t6('Armored Scale', 24289, null, 250),
-          t6('Ancient Bone', 24358, null, 250),
+          { ...GIFT_OF_THE_MISTS },
+          { itemId: 19676, name: 'Icy Runestone', count: 100, source: 'vendor', accountBound: true, note: '1 gold each from Miyani (account-bound, not on TP)', inputs: [] },
+          { itemId: 72083, name: "Gift of the Cosmos", count: 1, source: 'collection', accountBound: true, achievementId: 2268, achievementBitCount: 54, achievementName: "Astralaria IV: The Cosmos", note: "Reward for completing Astralaria IV: The Cosmos", inputs: [] },
+          { ...GIFT_OF_METAL },
         ],
       },
       { ...MYSTIC_TRIBUTE },
@@ -208,30 +188,118 @@ export const LEGENDARY_RECIPES_GEN2 = [
     ],
   },
 
-  // ── Chuka and Champawat (Short Bow, HoT) ────────────────────────────────────
+  // ── HOPE (Pistol) ──
   {
-    id: 'legendary_chuka_champawat',
-    name: 'Chuka and Champawat',
-    itemId: null, idName: 'Chuka and Champawat',
-    rarity: 'Legendary',
-    weaponType: 'Short Bow',
-    generation: 2,
-    dataStatus: 'partial', // tribute + mastery verified; weapon gift + precursor stages not yet wiki-verified
-    expansion: 'Heart of Thorns',
+    id: 'legendary_hope',
+    name: "HOPE",
+    itemId: 72713,   // [API verified Oct 2026]
+    rarity: 'Legendary', weaponType: 'Pistol', generation: 2, expansion: 'Heart of Thorns',
+    note: "Mystic Forge: precursor + Gift of HOPE + Mystic Tribute + Gift of Maguuma Mastery",
     inputs: [
-      collectionPrecursor('Chuka and Champawat',
-        'Chuka and Champawat I: Tigris',
-        'Chuka and Champawat II: Dhuum',
-        'Chuka and Champawat III: complete hunt chain'),
-      {
-        name: 'Gift of the Hunt',
-        itemId: null, idName: 'Gift of the Hunt',
-        count: 1, source: 'forge', accountBound: true,
+    { itemId: 76399, name: "Prototype", count: 1, source: 'collection', accountBound: true,
+      achievementId: 2556,  // HOPE III: Prototype [API verified Oct 2026]
+      achievementBitCount: 31,
+      achievementName: "HOPE III: Prototype",
+      note: "Gen 2 precursor — crafted once per account via HOPE III: Prototype collection (Huntsman 500).",
+      inputs: [
+        { itemId: 77082, name: "Essence of Anomaly", count: 1, source: 'collection', accountBound: true, note: "From Chest of Anomaly — reward for completing HOPE III: Prototype", inputs: [] },
+        { itemId: 76083, name: "Spirit of Development", count: 1, source: 'collection', accountBound: true,
+          note: "Salvage Development with any salvage kit",
+          inputs: [
+                { itemId: 70743, name: "Development", count: 1, source: 'collection', accountBound: true,
+                  achievementId: 2354,  // HOPE II: Development [API verified Oct 2026]
+                  achievementBitCount: 14,
+                  achievementName: "HOPE II: Development",
+                  note: "Crafted via HOPE II: Development collection (Huntsman 450).",
+                  inputs: [
+                    { itemId: 75982, name: "Expertise in Advanced Pistol Crafting", count: 1, source: 'collection', accountBound: true, note: "From Tricks and Tips for Mechanical Pistol Crafting — reward for completing HOPE II: Development", inputs: [] },
+                    { itemId: 72458, name: "Spirit of Research", count: 1, source: 'collection', accountBound: true,
+                      note: "Salvage Research with any salvage kit",
+                      inputs: [
+                        { itemId: 70960, name: "Research", count: 1, source: 'collection', accountBound: true,
+                          achievementId: 2450,  // HOPE I: Research [API verified Oct 2026]
+                          achievementBitCount: 20,
+                          achievementName: "HOPE I: Research",
+                          note: "Crafted via HOPE I: Research collection (Huntsman 450).",
+                          inputs: [
+                            { itemId: 76806, name: "Essence of Concoctions", count: 1, source: 'collection', accountBound: true, note: "From Chest of Concoctions — reward for completing HOPE I: Research", inputs: [] },
+                            { itemId: 75330, name: "Experimental Pistol Frame", count: 1, source: 'forge', accountBound: true,
+                              note: "Crafted (Huntsman 450)",
+                              inputs: [
+                                { itemId: 46736, name: "Spiritwood Plank", count: 10, source: 'tp', inputs: [] },
+                                { itemId: 71581, name: "Memory of Battle", count: 50, source: 'tp', inputs: [] },
+                                { itemId: 70820, name: "Shard of Glory", count: 50, source: 'tp', inputs: [] },
+                              ],
+                            },
+                            { itemId: 70874, name: "Experimental Pistol Barrel", count: 1, source: 'forge', accountBound: true,
+                              note: "Crafted (Huntsman 450)",
+                              inputs: [
+                                { itemId: 46738, name: "Deldrimor Steel Ingot", count: 15, source: 'tp', inputs: [] },
+                                { itemId: 71581, name: "Memory of Battle", count: 50, source: 'tp', inputs: [] },
+                                { itemId: 70820, name: "Shard of Glory", count: 50, source: 'tp', inputs: [] },
+                              ],
+                            },
+                            { itemId: 72261, name: "Legendary Inscription", count: 1, source: 'forge', accountBound: true,
+                              note: "Crafted (Artificer, Weaponsmith, Huntsman 450)",
+                              inputs: [
+                                { itemId: 19721, name: "Glob of Ectoplasm", count: 10, source: 'tp', inputs: [] },
+                                { itemId: 24277, name: "Pile of Crystalline Dust", count: 5, source: 'tp', inputs: [] },
+                                { itemId: 12988, name: "Orichalcum Plated Dowel", count: 1, source: 'tp', inputs: [] },
+                                { itemId: 46739, name: "Elonian Leather Square", count: 10, source: 'tp', inputs: [] },
+                              ],
+                            },
+                          ],
+                        },
+                      ],
+                    },
+                    { itemId: 75316, name: "Jar of Luminesce Polish", count: 1, source: 'forge', accountBound: true,
+                      note: "Crafted (Artificer, Weaponsmith, Huntsman 400)",
+                      inputs: [
+                        { itemId: 46731, name: "Pile of Bloodstone Dust", count: 250, source: 'currency', note: "Account-bound — salvaged from ascended gear / fractal rewards", inputs: [] },
+                        { itemId: 68063, name: "Amalgamated Gemstone", count: 1, source: 'tp', inputs: [] },
+                        { itemId: 46747, name: "Thermocatalytic Reagent", count: 10, source: 'tp', inputs: [] },
+                        { itemId: 9461, name: "Master Maintenance Oil", count: 10, source: 'tp', inputs: [] },
+                      ],
+                    },
+                    { itemId: 73517, name: "Prismatic Lodestone", count: 1, source: 'forge', accountBound: true,
+                      note: "Crafted (Artificer, Weaponsmith, Huntsman 400)",
+                      inputs: [
+                        { itemId: 24320, name: "Glacial Lodestone", count: 1, source: 'tp', inputs: [] },
+                        { itemId: 24315, name: "Molten Lodestone", count: 1, source: 'tp', inputs: [] },
+                        { itemId: 24310, name: "Onyx Lodestone", count: 1, source: 'tp', inputs: [] },
+                        { itemId: 24305, name: "Charged Lodestone", count: 1, source: 'tp', inputs: [] },
+                      ],
+                    },
+                  ],
+                },
+          ],
+        },
+        { itemId: 74802, name: "Finely Tuned Firing Pin", count: 1, source: 'forge', accountBound: true,
+          note: "Crafted (Huntsman 500)",
+          inputs: [
+            { itemId: 19684, name: "Mithril Ingot", count: 250, source: 'tp', inputs: [] },
+            { itemId: 19685, name: "Orichalcum Ingot", count: 100, source: 'tp', inputs: [] },
+            { itemId: 46747, name: "Thermocatalytic Reagent", count: 10, source: 'tp', inputs: [] },
+            { itemId: 46738, name: "Deldrimor Steel Ingot", count: 5, source: 'tp', inputs: [] },
+          ],
+        },
+        { itemId: 72535, name: "Advanced Ammunition Cylinder", count: 1, source: 'forge', accountBound: true,
+          note: "Crafted (Huntsman 500)",
+          inputs: [
+            { itemId: 19681, name: "Darksteel Ingot", count: 250, source: 'tp', inputs: [] },
+            { itemId: 19684, name: "Mithril Ingot", count: 250, source: 'tp', inputs: [] },
+            { itemId: 19685, name: "Orichalcum Ingot", count: 50, source: 'tp', inputs: [] },
+            { itemId: 46738, name: "Deldrimor Steel Ingot", count: 5, source: 'tp', inputs: [] },
+          ],
+        },
+      ],
+    },
+      { itemId: 77086, name: "Gift of HOPE", count: 1, source: 'forge', accountBound: true, note: "Mystic Forge [wiki verified Oct 2026]",
         inputs: [
-          ls('Evergreen Lodestone', 100),
-          t6('Vicious Fang', 24357, null, 250),
-          t6('Powerful Venom Sac', null, 'Powerful Venom Sac', 250),
-          t6('Vicious Claw', 24351, null, 250),
+          { ...GIFT_OF_THE_MISTS },
+          { itemId: 19676, name: 'Icy Runestone', count: 100, source: 'vendor', accountBound: true, note: '1 gold each from Miyani (account-bound, not on TP)', inputs: [] },
+          { itemId: 76442, name: "Gift of the Catalyst", count: 1, source: 'collection', accountBound: true, achievementId: 2250, achievementBitCount: 59, achievementName: "HOPE IV: The Catalyst", note: "Reward for completing HOPE IV: The Catalyst", inputs: [] },
+          { ...GIFT_OF_WOOD },
         ],
       },
       { ...MYSTIC_TRIBUTE },
@@ -239,61 +307,118 @@ export const LEGENDARY_RECIPES_GEN2 = [
     ],
   },
 
-  // ── Shooshadoo (Warhorn, HoT) ────────────────────────────────────────────────
-  {
-    id: 'legendary_shooshadoo',
-    name: 'Shooshadoo',
-    itemId: null, idName: 'Shooshadoo',
-    rarity: 'Legendary',
-    weaponType: 'Shield',
-    generation: 2,
-    dataStatus: 'partial', // tribute + mastery verified; weapon gift + precursor stages not yet wiki-verified
-    expansion: 'Heart of Thorns',
-    inputs: [
-      collectionPrecursor('Shooshadoo',
-        'Shooshadoo I: The Experimental Warhorn',
-        'Shooshadoo II: The Prototype',
-        'Shooshadoo III: The Perfected Warhorn'),
-      {
-        name: 'Gift of Shooshadoo',
-        itemId: null, idName: 'Gift of Shooshadoo',
-        count: 1, source: 'forge', accountBound: true,
-        inputs: [
-          ls('Corrupted Lodestone', 100),
-          t6('Powerful Venom Sac', null, 'Powerful Venom Sac', 250),
-          t6('Armored Scale', 24289, null, 250),
-          t6('Elaborate Totem', null, 'Elaborate Totem', 250),
-        ],
-      },
-      { ...MYSTIC_TRIBUTE },
-      { ...GIFT_OF_MAGUUMA_MASTERY },
-    ],
-  },
-
-  // ── Nevermore (Staff, HoT) ───────────────────────────────────────────────────
+  // ── Nevermore (Staff) ──
   {
     id: 'legendary_nevermore',
-    name: 'Nevermore',
-    itemId: null, idName: 'Nevermore',
-    rarity: 'Legendary',
-    weaponType: 'Staff',
-    generation: 2,
-    dataStatus: 'partial', // tribute + mastery verified; weapon gift + precursor stages not yet wiki-verified
-    expansion: 'Heart of Thorns',
+    name: "Nevermore",
+    itemId: 71383,   // [API verified Oct 2026]
+    rarity: 'Legendary', weaponType: 'Staff', generation: 2, expansion: 'Heart of Thorns',
+    note: "Mystic Forge: precursor + Gift of Nevermore + Mystic Tribute + Gift of Maguuma Mastery",
     inputs: [
-      collectionPrecursor('Nevermore',
-        'Nevermore I: The Experimental Staff',
-        'Nevermore II: The Prototype',
-        'Nevermore III: The Perfected Staff'),
-      {
-        name: 'Gift of Nevermore',
-        itemId: null, idName: 'Gift of Nevermore',
-        count: 1, source: 'forge', accountBound: true,
+    { itemId: 74068, name: "The Raven Staff", count: 1, source: 'collection', accountBound: true,
+      achievementId: 2336,  // Nevermore III: The Raven Staff [API verified Oct 2026]
+      achievementBitCount: 34,
+      achievementName: "Nevermore III: The Raven Staff",
+      note: "Gen 2 precursor — crafted once per account via Nevermore III: The Raven Staff collection (Artificer 500).",
+      inputs: [
+        { itemId: 72934, name: "Essence of the Wild Spirit", count: 1, source: 'collection', accountBound: true, note: "From Chest of the Wild Spirit — reward for completing Nevermore III: The Raven Staff", inputs: [] },
+        { itemId: 73266, name: "Spirit of the Ravenswood Staff", count: 1, source: 'collection', accountBound: true,
+          note: "Salvage Ravenswood Staff with any salvage kit",
+          inputs: [
+                { itemId: 76582, name: "Ravenswood Staff", count: 1, source: 'collection', accountBound: true,
+                  achievementId: 2288,  // Nevermore II: Ravenswood Staff [API verified Oct 2026]
+                  achievementBitCount: 14,
+                  achievementName: "Nevermore II: Ravenswood Staff",
+                  note: "Crafted via Nevermore II: Ravenswood Staff collection (Artificer 450).",
+                  inputs: [
+                    { itemId: 73955, name: "Expertise in Runed Staff Crafting", count: 1, source: 'collection', accountBound: true, note: "From Tricks and Tips for Runed Staff Crafting — reward for completing Nevermore II: Ravenswood Staff", inputs: [] },
+                    { itemId: 76116, name: "Spirit of the Ravenswood Branch", count: 1, source: 'collection', accountBound: true,
+                      note: "Salvage Ravenswood Branch with any salvage kit",
+                      inputs: [
+                        { itemId: 75467, name: "Ravenswood Branch", count: 1, source: 'collection', accountBound: true,
+                          achievementId: 2528,  // Nevermore I: Ravenswood Branch [API verified Oct 2026]
+                          achievementBitCount: 14,
+                          achievementName: "Nevermore I: Ravenswood Branch",
+                          note: "Crafted via Nevermore I: Ravenswood Branch collection (Artificer 450).",
+                          inputs: [
+                            { itemId: 70658, name: "Essence of Natural Protection", count: 1, source: 'collection', accountBound: true, note: "From Chest of Natural Protection — reward for completing Nevermore I: Ravenswood Branch", inputs: [] },
+                            { itemId: 71932, name: "Experimental Staff Head", count: 1, source: 'forge', accountBound: true,
+                              note: "Crafted (Artificer 450)",
+                              inputs: [
+                                { itemId: 46736, name: "Spiritwood Plank", count: 10, source: 'tp', inputs: [] },
+                                { itemId: 71581, name: "Memory of Battle", count: 100, source: 'tp', inputs: [] },
+                                { itemId: 70820, name: "Shard of Glory", count: 100, source: 'tp', inputs: [] },
+                              ],
+                            },
+                            { itemId: 73748, name: "Experimental Staff Shaft", count: 1, source: 'forge', accountBound: true,
+                              note: "Crafted (Artificer 450)",
+                              inputs: [
+                                { itemId: 46736, name: "Spiritwood Plank", count: 25, source: 'tp', inputs: [] },
+                                { itemId: 71581, name: "Memory of Battle", count: 100, source: 'tp', inputs: [] },
+                                { itemId: 70820, name: "Shard of Glory", count: 100, source: 'tp', inputs: [] },
+                              ],
+                            },
+                            { itemId: 72261, name: "Legendary Inscription", count: 1, source: 'forge', accountBound: true,
+                              note: "Crafted (Artificer, Weaponsmith, Huntsman 450)",
+                              inputs: [
+                                { itemId: 19721, name: "Glob of Ectoplasm", count: 10, source: 'tp', inputs: [] },
+                                { itemId: 24277, name: "Pile of Crystalline Dust", count: 5, source: 'tp', inputs: [] },
+                                { itemId: 12988, name: "Orichalcum Plated Dowel", count: 1, source: 'tp', inputs: [] },
+                                { itemId: 46739, name: "Elonian Leather Square", count: 10, source: 'tp', inputs: [] },
+                              ],
+                            },
+                          ],
+                        },
+                      ],
+                    },
+                    { itemId: 75316, name: "Jar of Luminesce Polish", count: 1, source: 'forge', accountBound: true,
+                      note: "Crafted (Artificer, Weaponsmith, Huntsman 400)",
+                      inputs: [
+                        { itemId: 46731, name: "Pile of Bloodstone Dust", count: 250, source: 'currency', note: "Account-bound — salvaged from ascended gear / fractal rewards", inputs: [] },
+                        { itemId: 68063, name: "Amalgamated Gemstone", count: 1, source: 'tp', inputs: [] },
+                        { itemId: 46747, name: "Thermocatalytic Reagent", count: 10, source: 'tp', inputs: [] },
+                        { itemId: 9461, name: "Master Maintenance Oil", count: 10, source: 'tp', inputs: [] },
+                      ],
+                    },
+                    { itemId: 73517, name: "Prismatic Lodestone", count: 1, source: 'forge', accountBound: true,
+                      note: "Crafted (Artificer, Weaponsmith, Huntsman 400)",
+                      inputs: [
+                        { itemId: 24320, name: "Glacial Lodestone", count: 1, source: 'tp', inputs: [] },
+                        { itemId: 24315, name: "Molten Lodestone", count: 1, source: 'tp', inputs: [] },
+                        { itemId: 24310, name: "Onyx Lodestone", count: 1, source: 'tp', inputs: [] },
+                        { itemId: 24305, name: "Charged Lodestone", count: 1, source: 'tp', inputs: [] },
+                      ],
+                    },
+                  ],
+                },
+          ],
+        },
+        { itemId: 74118, name: "Raven Statue", count: 1, source: 'forge', accountBound: true,
+          note: "Crafted (Artificer 500)",
+          inputs: [
+            { itemId: 46736, name: "Spiritwood Plank", count: 5, source: 'tp', inputs: [] },
+            { itemId: 19709, name: "Elder Wood Plank", count: 50, source: 'tp', inputs: [] },
+            { itemId: 19712, name: "Ancient Wood Plank", count: 50, source: 'tp', inputs: [] },
+            { itemId: 19721, name: "Glob of Ectoplasm", count: 5, source: 'tp', inputs: [] },
+          ],
+        },
+        { itemId: 76587, name: "Rune Carving Tools", count: 1, source: 'forge', accountBound: true,
+          note: "Crafted (Artificer 500)",
+          inputs: [
+            { itemId: 46736, name: "Spiritwood Plank", count: 5, source: 'tp', inputs: [] },
+            { itemId: 46738, name: "Deldrimor Steel Ingot", count: 3, source: 'tp', inputs: [] },
+            { itemId: 19709, name: "Elder Wood Plank", count: 50, source: 'tp', inputs: [] },
+            { itemId: 19684, name: "Mithril Ingot", count: 50, source: 'tp', inputs: [] },
+          ],
+        },
+      ],
+    },
+      { itemId: 74300, name: "Gift of Nevermore", count: 1, source: 'forge', accountBound: true, note: "Mystic Forge [wiki verified Oct 2026]",
         inputs: [
-          ls('Corrupted Lodestone', 100),
-          t6('Ancient Bone', 24358, null, 250),
-          t6('Vicious Fang', 24357, null, 250),
-          t6('Vicious Claw', 24351, null, 250),
+          { ...GIFT_OF_THE_MISTS },
+          { itemId: 19676, name: 'Icy Runestone', count: 100, source: 'vendor', accountBound: true, note: '1 gold each from Miyani (account-bound, not on TP)', inputs: [] },
+          { itemId: 71173, name: "Gift of the Raven Spirit", count: 1, source: 'collection', accountBound: true, achievementId: 2550, achievementBitCount: 63, achievementName: "Nevermore IV: The Raven Spirit", note: "Reward for completing Nevermore IV: The Raven Spirit", inputs: [] },
+          { ...GIFT_OF_ENERGY },
         ],
       },
       { ...MYSTIC_TRIBUTE },
@@ -301,30 +426,237 @@ export const LEGENDARY_RECIPES_GEN2 = [
     ],
   },
 
-  // ── Eureka (Scepter, HoT) ────────────────────────────────────────────────────
+  // ── Chuka and Champawat (Short Bow) ──
+  {
+    id: 'legendary_chuka_champawat',
+    name: "Chuka and Champawat",
+    itemId: 78556,   // [API verified Oct 2026]
+    rarity: 'Legendary', weaponType: 'Short Bow', generation: 2, expansion: 'Heart of Thorns',
+    note: "Mystic Forge: precursor + Gift of Chuka and Champawat + Mystic Tribute + Gift of Maguuma Mastery",
+    inputs: [
+    { itemId: 78425, name: "Tigris", count: 1, source: 'collection', accountBound: true,
+      achievementId: 2951,  // Chuka and Champawat III: Tigris [API verified Oct 2026]
+      achievementBitCount: 20,
+      achievementName: "Chuka and Champawat III: Tigris",
+      note: "Gen 2 precursor — crafted once per account via Chuka and Champawat III: Tigris collection (Huntsman 500).",
+      inputs: [
+        { itemId: 78119, name: "Spirit of the Tiger", count: 1, source: 'collection', accountBound: true, note: "From Chest of the Tiger — reward for completing Chuka and Champawat III: Tigris", inputs: [] },
+        { itemId: 78342, name: "Spirit of the Ambush", count: 1, source: 'collection', accountBound: true,
+          note: "Salvage The Ambush with any salvage kit",
+          inputs: [
+                { itemId: 78524, name: "The Ambush", count: 1, source: 'collection', accountBound: true,
+                  achievementId: 2921,  // Chuka and Champawat II: Ambush [API verified Oct 2026]
+                  achievementBitCount: 16,
+                  achievementName: "Chuka and Champawat II: Ambush",
+                  note: "Crafted via Chuka and Champawat II: Ambush collection (Huntsman 450).",
+                  inputs: [
+                    { itemId: 78544, name: "Expertise in Advanced Short Bow Crafting", count: 1, source: 'collection', accountBound: true, note: "From Tricks and Tips for Short Bow Crafting — reward for completing Chuka and Champawat II: Ambush", inputs: [] },
+                    { itemId: 78548, name: "Spirit of the Hunt", count: 1, source: 'collection', accountBound: true,
+                      note: "Salvage The Hunt with any salvage kit",
+                      inputs: [
+                        { itemId: 78330, name: "The Hunt", count: 1, source: 'collection', accountBound: true,
+                          achievementId: 2990,  // Chuka and Champawat I: The Hunt [API verified Oct 2026]
+                          achievementBitCount: 7,
+                          achievementName: "Chuka and Champawat I: The Hunt",
+                          note: "Crafted via Chuka and Champawat I: The Hunt collection (Huntsman 450).",
+                          inputs: [
+                            { itemId: 78685, name: "Essence of the Hunt", count: 1, source: 'collection', accountBound: true, note: "From Chest of the Hunt — reward for completing Chuka and Champawat I: The Hunt", inputs: [] },
+                            { itemId: 78717, name: "Hunter's Short-Bow Stave", count: 1, source: 'forge', accountBound: true,
+                              note: "Crafted (Huntsman 450)",
+                              inputs: [
+                                { itemId: 46736, name: "Spiritwood Plank", count: 4, source: 'tp', inputs: [] },
+                                { itemId: 71581, name: "Memory of Battle", count: 100, source: 'tp', inputs: [] },
+                                { itemId: 70820, name: "Shard of Glory", count: 100, source: 'tp', inputs: [] },
+                              ],
+                            },
+                            { itemId: 78370, name: "Hunter's Short-Bow String", count: 1, source: 'forge', accountBound: true,
+                              note: "Crafted (Huntsman 450)",
+                              inputs: [
+                                { itemId: 46739, name: "Elonian Leather Square", count: 3, source: 'tp', inputs: [] },
+                                { itemId: 71581, name: "Memory of Battle", count: 100, source: 'tp', inputs: [] },
+                                { itemId: 70820, name: "Shard of Glory", count: 100, source: 'tp', inputs: [] },
+                              ],
+                            },
+                            { itemId: 72261, name: "Legendary Inscription", count: 1, source: 'forge', accountBound: true,
+                              note: "Crafted (Artificer, Weaponsmith, Huntsman 450)",
+                              inputs: [
+                                { itemId: 19721, name: "Glob of Ectoplasm", count: 10, source: 'tp', inputs: [] },
+                                { itemId: 24277, name: "Pile of Crystalline Dust", count: 5, source: 'tp', inputs: [] },
+                                { itemId: 12988, name: "Orichalcum Plated Dowel", count: 1, source: 'tp', inputs: [] },
+                                { itemId: 46739, name: "Elonian Leather Square", count: 10, source: 'tp', inputs: [] },
+                              ],
+                            },
+                          ],
+                        },
+                      ],
+                    },
+                    { itemId: 75316, name: "Jar of Luminesce Polish", count: 1, source: 'forge', accountBound: true,
+                      note: "Crafted (Artificer, Weaponsmith, Huntsman 400)",
+                      inputs: [
+                        { itemId: 46731, name: "Pile of Bloodstone Dust", count: 250, source: 'currency', note: "Account-bound — salvaged from ascended gear / fractal rewards", inputs: [] },
+                        { itemId: 68063, name: "Amalgamated Gemstone", count: 1, source: 'tp', inputs: [] },
+                        { itemId: 46747, name: "Thermocatalytic Reagent", count: 10, source: 'tp', inputs: [] },
+                        { itemId: 9461, name: "Master Maintenance Oil", count: 10, source: 'tp', inputs: [] },
+                      ],
+                    },
+                    { itemId: 73517, name: "Prismatic Lodestone", count: 1, source: 'forge', accountBound: true,
+                      note: "Crafted (Artificer, Weaponsmith, Huntsman 400)",
+                      inputs: [
+                        { itemId: 24320, name: "Glacial Lodestone", count: 1, source: 'tp', inputs: [] },
+                        { itemId: 24315, name: "Molten Lodestone", count: 1, source: 'tp', inputs: [] },
+                        { itemId: 24310, name: "Onyx Lodestone", count: 1, source: 'tp', inputs: [] },
+                        { itemId: 24305, name: "Charged Lodestone", count: 1, source: 'tp', inputs: [] },
+                      ],
+                    },
+                  ],
+                },
+          ],
+        },
+        { itemId: 78475, name: "Visage of Chuka", count: 1, source: 'forge', accountBound: true,
+          note: "Crafted (Huntsman 500)",
+          inputs: [
+            { itemId: 46694, name: "Soros' Assassin Inscription", count: 1, source: 'tp', inputs: [] },
+            { itemId: 49523, name: "Lesser Vision Crystal", count: 1, source: 'forge', accountBound: true,
+              note: "Crafted (Leatherworker, Armorsmith, Tailor 500)",
+              inputs: [
+                { itemId: 46732, name: "Dragonite Ingot", count: 2, source: 'currency', note: "Account-bound — refined from Dragonite Ore", inputs: [] },
+                { itemId: 46734, name: "Empyreal Star", count: 2, source: 'currency', note: "Account-bound — refined from Empyreal Fragments", inputs: [] },
+                { itemId: 46752, name: "Augur's Stone", count: 1, source: 'spirit_shard', note: "Augur's Stone — 20 Spirit Shards from Miyani", inputs: [] },
+                { itemId: 46730, name: "Bloodstone Brick", count: 2, source: 'forge', accountBound: true,
+                  note: "Crafted (Artificer, Weaponsmith, Huntsman 450)",
+                  inputs: [
+                    { itemId: 46731, name: "Pile of Bloodstone Dust", count: 100, source: 'currency', note: "Account-bound — salvaged from ascended gear / fractal rewards", inputs: [] },
+                    { itemId: 19925, name: "Obsidian Shard", count: 2, source: 'karma', note: "1,050 Karma each (or 100 Volatile/Unbound Magic + 96c)", inputs: [] },
+                    { itemId: 46747, name: "Thermocatalytic Reagent", count: 10, source: 'tp', inputs: [] },
+                  ],
+                },
+              ],
+            },
+            { itemId: 46739, name: "Elonian Leather Square", count: 5, source: 'tp', inputs: [] },
+            { itemId: 46738, name: "Deldrimor Steel Ingot", count: 2, source: 'tp', inputs: [] },
+          ],
+        },
+        { itemId: 78642, name: "Visage of Champawat", count: 1, source: 'forge', accountBound: true,
+          note: "Crafted (Huntsman 500)",
+          inputs: [
+            { itemId: 46696, name: "Stonecleaver's Valkyrie Inscription", count: 1, source: 'tp', inputs: [] },
+            { itemId: 49523, name: "Lesser Vision Crystal", count: 1, source: 'forge', accountBound: true,
+              note: "Crafted (Leatherworker, Armorsmith, Tailor 500)",
+              inputs: [
+                { itemId: 46732, name: "Dragonite Ingot", count: 2, source: 'currency', note: "Account-bound — refined from Dragonite Ore", inputs: [] },
+                { itemId: 46734, name: "Empyreal Star", count: 2, source: 'currency', note: "Account-bound — refined from Empyreal Fragments", inputs: [] },
+                { itemId: 46752, name: "Augur's Stone", count: 1, source: 'spirit_shard', note: "Augur's Stone — 20 Spirit Shards from Miyani", inputs: [] },
+                { itemId: 46730, name: "Bloodstone Brick", count: 2, source: 'forge', accountBound: true,
+                  note: "Crafted (Artificer, Weaponsmith, Huntsman 450)",
+                  inputs: [
+                    { itemId: 46731, name: "Pile of Bloodstone Dust", count: 100, source: 'currency', note: "Account-bound — salvaged from ascended gear / fractal rewards", inputs: [] },
+                    { itemId: 19925, name: "Obsidian Shard", count: 2, source: 'karma', note: "1,050 Karma each (or 100 Volatile/Unbound Magic + 96c)", inputs: [] },
+                    { itemId: 46747, name: "Thermocatalytic Reagent", count: 10, source: 'tp', inputs: [] },
+                  ],
+                },
+              ],
+            },
+            { itemId: 46736, name: "Spiritwood Plank", count: 5, source: 'tp', inputs: [] },
+            { itemId: 46738, name: "Deldrimor Steel Ingot", count: 2, source: 'tp', inputs: [] },
+          ],
+        },
+      ],
+    },
+      { itemId: 78627, name: "Gift of Chuka and Champawat", count: 1, source: 'forge', accountBound: true, note: "Mystic Forge [wiki verified Oct 2026] — recipe pattern assumed (wiki page did not load)",
+        inputs: [
+          { ...GIFT_OF_THE_MISTS },
+          { itemId: 19676, name: 'Icy Runestone', count: 100, source: 'vendor', accountBound: true, note: '1 gold each from Miyani (account-bound, not on TP)', inputs: [] },
+          { itemId: 78344, name: "Gift of Family", count: 1, source: 'collection', accountBound: true, achievementId: 2974, achievementBitCount: 9, achievementName: "Chuka and Champawat IV: A Nontraditional Family", note: "Reward for completing Chuka and Champawat IV: A Nontraditional Family", inputs: [] },
+          { ...GIFT_OF_WOOD },
+        ],
+      },
+      { ...MYSTIC_TRIBUTE },
+      { ...GIFT_OF_MAGUUMA_MASTERY },
+    ],
+  },
+
+  // ── Eureka (Mace) ──
   {
     id: 'legendary_eureka',
-    name: 'Eureka',
-    itemId: null, idName: 'Eureka',
-    rarity: 'Legendary',
-    weaponType: 'Mace',
-    generation: 2,
-    dataStatus: 'partial', // tribute + mastery verified; weapon gift + precursor stages not yet wiki-verified
-    expansion: 'Heart of Thorns',
+    name: "Eureka",
+    itemId: 79562,   // [API verified Oct 2026]
+    rarity: 'Legendary', weaponType: 'Mace', generation: 2, expansion: 'Living World',
+    note: "Mystic Forge: precursor + Gift of Eureka + Mystic Tribute + Gift of Maguuma Mastery (or Gift of Desert Mastery)",
     inputs: [
-      collectionPrecursor('Eureka',
-        'Eureka I: The Experimental Scepter',
-        'Eureka II: The Prototype',
-        'Eureka III: The Perfected Scepter'),
-      {
-        name: 'Gift of Eureka',
-        itemId: null, idName: 'Gift of Eureka',
-        count: 1, source: 'forge', accountBound: true,
+    { itemId: 79570, name: "Endeavor", count: 1, source: 'forge', accountBound: true,
+      note: "Crafted (Weaponsmith 500) — recipe from Grandmaster Craftsman Hobbs (Lion's Arch), requires the Historian of the Armaments mastery",
+      inputs: [
+        { itemId: 79445, name: "Shard of Endeavor", count: 100, source: 'forge', accountBound: true,
+          note: "Crafted (Weaponsmith 450)",
+          inputs: [
+            { itemId: 79453, name: "Tribute to Endeavor", count: 1, source: 'currency', note: "Bought from Living World / PoF map vendors (Itzel Mastery Vendor, Natto, Alaleh…) for map currency (e.g. Volatile Magic, Unbound Magic, Trade Contracts). Requires the matching precursor recipe.", inputs: [] },
+            { itemId: 79410, name: "Mystic Curio", count: 1, source: 'tp', note: "Mystic Curio", inputs: [] },
+            { itemId: 19684, name: "Mithril Ingot", count: 30, source: 'tp', inputs: [] },
+            { itemId: 19709, name: "Elder Wood Plank", count: 20, source: 'tp', inputs: [] },
+          ],
+        },
+        { itemId: 45850, name: "Small Spiritwood Haft", count: 1, source: 'forge', accountBound: true,
+          note: "Crafted (Weaponsmith 500)",
+          inputs: [
+            { itemId: 46736, name: "Spiritwood Plank", count: 2, source: 'tp', inputs: [] },
+            { itemId: 24277, name: "Pile of Crystalline Dust", count: 5, source: 'tp', inputs: [] },
+            { itemId: 46747, name: "Thermocatalytic Reagent", count: 50, source: 'tp', inputs: [] },
+          ],
+        },
+        { itemId: 45852, name: "Deldrimor Steel Mace Head", count: 1, source: 'forge', accountBound: true,
+          note: "Crafted (Weaponsmith 500)",
+          inputs: [
+            { itemId: 46738, name: "Deldrimor Steel Ingot", count: 3, source: 'tp', inputs: [] },
+            { itemId: 24277, name: "Pile of Crystalline Dust", count: 5, source: 'tp', inputs: [] },
+            { itemId: 46747, name: "Thermocatalytic Reagent", count: 50, source: 'tp', inputs: [] },
+          ],
+        },
+        { itemId: 80503, name: "Visionary Inscription", count: 1, source: 'forge', accountBound: true,
+          note: "Crafted (Artificer, Weaponsmith, Huntsman 500)",
+          inputs: [
+            { itemId: 72261, name: "Legendary Inscription", count: 1, source: 'forge', accountBound: true,
+              note: "Crafted (Artificer, Weaponsmith, Huntsman 450)",
+              inputs: [
+                { itemId: 19721, name: "Glob of Ectoplasm", count: 10, source: 'tp', inputs: [] },
+                { itemId: 24277, name: "Pile of Crystalline Dust", count: 5, source: 'tp', inputs: [] },
+                { itemId: 12988, name: "Orichalcum Plated Dowel", count: 1, source: 'tp', inputs: [] },
+                { itemId: 46739, name: "Elonian Leather Square", count: 10, source: 'tp', inputs: [] },
+              ],
+            },
+            { itemId: 46746, name: "Vision Crystal", count: 1, source: 'forge', accountBound: true,
+              note: "Crafted (Artificer, Weaponsmith, Huntsman 500)",
+              inputs: [
+                { itemId: 46732, name: "Dragonite Ingot", count: 5, source: 'currency', note: "Account-bound — refined from Dragonite Ore", inputs: [] },
+                { itemId: 46734, name: "Empyreal Star", count: 5, source: 'currency', note: "Account-bound — refined from Empyreal Fragments", inputs: [] },
+                { itemId: 46752, name: "Augur's Stone", count: 1, source: 'spirit_shard', note: "Augur's Stone — 20 Spirit Shards from Miyani", inputs: [] },
+                { itemId: 46730, name: "Bloodstone Brick", count: 5, source: 'forge', accountBound: true,
+                  note: "Crafted (Artificer, Weaponsmith, Huntsman 450)",
+                  inputs: [
+                    { itemId: 46731, name: "Pile of Bloodstone Dust", count: 100, source: 'currency', note: "Account-bound — salvaged from ascended gear / fractal rewards", inputs: [] },
+                    { itemId: 19925, name: "Obsidian Shard", count: 2, source: 'karma', note: "1,050 Karma each (or 100 Volatile/Unbound Magic + 96c)", inputs: [] },
+                    { itemId: 46747, name: "Thermocatalytic Reagent", count: 10, source: 'tp', inputs: [] },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+      { itemId: 79419, name: "Gift of Eureka", count: 1, source: 'forge', accountBound: true, note: "Mystic Forge [wiki verified Oct 2026]",
         inputs: [
-          ls('Charged Lodestone', 100),
-          t6('Elaborate Totem', null, 'Elaborate Totem', 250),
-          t6('Powerful Venom Sac', null, 'Powerful Venom Sac', 250),
-          t6('Pile of Crystalline Dust', 24277, null, 250),
+          { ...GIFT_OF_THE_MISTS },
+          { itemId: 79418, name: 'Mystic Runestone', count: 100, source: 'vendor', accountBound: true, note: '1 gold each (Miyani / Mystic Forge Attendant, needs Scholar of Secrets mastery)', inputs: [] },
+          { itemId: 79445, name: "Shard of Endeavor", count: 100, source: 'forge', accountBound: true,
+            note: "Crafted (Weaponsmith 450)",
+            inputs: [
+              { itemId: 79453, name: "Tribute to Endeavor", count: 1, source: 'currency', note: "Bought from Living World / PoF map vendors (Itzel Mastery Vendor, Natto, Alaleh…) for map currency (e.g. Volatile Magic, Unbound Magic, Trade Contracts). Requires the matching precursor recipe.", inputs: [] },
+              { itemId: 79410, name: "Mystic Curio", count: 1, source: 'tp', note: "Mystic Curio", inputs: [] },
+              { itemId: 19684, name: "Mithril Ingot", count: 30, source: 'tp', inputs: [] },
+              { itemId: 19709, name: "Elder Wood Plank", count: 20, source: 'tp', inputs: [] },
+            ],
+          },
+          { ...GIFT_OF_METAL },
         ],
       },
       { ...MYSTIC_TRIBUTE },
@@ -332,30 +664,88 @@ export const LEGENDARY_RECIPES_GEN2 = [
     ],
   },
 
-  // ── HMS Divinity (Shield, HoT) ───────────────────────────────────────────────
+  // ── The Shining Blade (Sword) ──
   {
-    id: 'legendary_hms_divinity',
-    name: 'The HMS Divinity',
-    itemId: null, idName: 'The HMS Divinity',
-    rarity: 'Legendary',
-    weaponType: 'Rifle',
-    generation: 2,
-    dataStatus: 'partial', // tribute + mastery verified; weapon gift + precursor stages not yet wiki-verified
-    expansion: 'Heart of Thorns',
+    id: 'legendary_shining_blade',
+    name: "The Shining Blade",
+    itemId: 81957,   // [API verified Oct 2026]
+    rarity: 'Legendary', weaponType: 'Sword', generation: 2, expansion: 'Living World',
+    note: "Mystic Forge: precursor + Gift of the Blade + Mystic Tribute + Gift of Maguuma Mastery (or Gift of Desert Mastery)",
     inputs: [
-      collectionPrecursor('HMS Divinity',
-        'HMS Divinity I: The Experimental Shield',
-        'HMS Divinity II: The Prototype',
-        'HMS Divinity III: The Perfected Shield'),
-      {
-        name: 'Gift of the Fleet',
-        itemId: null, idName: 'Gift of the Fleet',
-        count: 1, source: 'forge', accountBound: true,
+    { itemId: 81812, name: "Save the Queen", count: 1, source: 'forge', accountBound: true,
+      note: "Crafted (Weaponsmith 500) — recipe from Grandmaster Craftsman Hobbs (Lion's Arch), requires the Historian of the Armaments mastery",
+      inputs: [
+        { itemId: 81961, name: "Shard of the Crown", count: 100, source: 'forge', accountBound: true,
+          note: "Crafted (Weaponsmith 450)",
+          inputs: [
+            { itemId: 81974, name: "Tribute to the Queen", count: 1, source: 'currency', note: "Bought from Living World / PoF map vendors (Itzel Mastery Vendor, Natto, Alaleh…) for map currency (e.g. Volatile Magic, Unbound Magic, Trade Contracts). Requires the matching precursor recipe.", inputs: [] },
+            { itemId: 79410, name: "Mystic Curio", count: 1, source: 'tp', note: "Mystic Curio", inputs: [] },
+            { itemId: 19684, name: "Mithril Ingot", count: 30, source: 'tp', inputs: [] },
+            { itemId: 19709, name: "Elder Wood Plank", count: 20, source: 'tp', inputs: [] },
+          ],
+        },
+        { itemId: 45856, name: "Deldrimor Steel Sword Hilt", count: 1, source: 'forge', accountBound: true,
+          note: "Crafted (Weaponsmith 500)",
+          inputs: [
+            { itemId: 46738, name: "Deldrimor Steel Ingot", count: 3, source: 'tp', inputs: [] },
+            { itemId: 24277, name: "Pile of Crystalline Dust", count: 5, source: 'tp', inputs: [] },
+            { itemId: 46747, name: "Thermocatalytic Reagent", count: 50, source: 'tp', inputs: [] },
+          ],
+        },
+        { itemId: 45848, name: "Deldrimor Steel Sword Blade", count: 1, source: 'forge', accountBound: true,
+          note: "Crafted (Weaponsmith 500)",
+          inputs: [
+            { itemId: 46738, name: "Deldrimor Steel Ingot", count: 3, source: 'tp', inputs: [] },
+            { itemId: 24277, name: "Pile of Crystalline Dust", count: 5, source: 'tp', inputs: [] },
+            { itemId: 46747, name: "Thermocatalytic Reagent", count: 50, source: 'tp', inputs: [] },
+          ],
+        },
+        { itemId: 80503, name: "Visionary Inscription", count: 1, source: 'forge', accountBound: true,
+          note: "Crafted (Artificer, Weaponsmith, Huntsman 500)",
+          inputs: [
+            { itemId: 72261, name: "Legendary Inscription", count: 1, source: 'forge', accountBound: true,
+              note: "Crafted (Artificer, Weaponsmith, Huntsman 450)",
+              inputs: [
+                { itemId: 19721, name: "Glob of Ectoplasm", count: 10, source: 'tp', inputs: [] },
+                { itemId: 24277, name: "Pile of Crystalline Dust", count: 5, source: 'tp', inputs: [] },
+                { itemId: 12988, name: "Orichalcum Plated Dowel", count: 1, source: 'tp', inputs: [] },
+                { itemId: 46739, name: "Elonian Leather Square", count: 10, source: 'tp', inputs: [] },
+              ],
+            },
+            { itemId: 46746, name: "Vision Crystal", count: 1, source: 'forge', accountBound: true,
+              note: "Crafted (Artificer, Weaponsmith, Huntsman 500)",
+              inputs: [
+                { itemId: 46732, name: "Dragonite Ingot", count: 5, source: 'currency', note: "Account-bound — refined from Dragonite Ore", inputs: [] },
+                { itemId: 46734, name: "Empyreal Star", count: 5, source: 'currency', note: "Account-bound — refined from Empyreal Fragments", inputs: [] },
+                { itemId: 46752, name: "Augur's Stone", count: 1, source: 'spirit_shard', note: "Augur's Stone — 20 Spirit Shards from Miyani", inputs: [] },
+                { itemId: 46730, name: "Bloodstone Brick", count: 5, source: 'forge', accountBound: true,
+                  note: "Crafted (Artificer, Weaponsmith, Huntsman 450)",
+                  inputs: [
+                    { itemId: 46731, name: "Pile of Bloodstone Dust", count: 100, source: 'currency', note: "Account-bound — salvaged from ascended gear / fractal rewards", inputs: [] },
+                    { itemId: 19925, name: "Obsidian Shard", count: 2, source: 'karma', note: "1,050 Karma each (or 100 Volatile/Unbound Magic + 96c)", inputs: [] },
+                    { itemId: 46747, name: "Thermocatalytic Reagent", count: 10, source: 'tp', inputs: [] },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+      { itemId: 82003, name: "Gift of the Blade", count: 1, source: 'forge', accountBound: true, note: "Mystic Forge [wiki verified Oct 2026]",
         inputs: [
-          ls('Evergreen Lodestone', 100),
-          t6('Armored Scale', 24289, null, 250),
-          t6('Ancient Bone', 24358, null, 250),
-          t6('Vial of Powerful Blood', null, 'Vial of Powerful Blood', 250),
+          { ...GIFT_OF_THE_MISTS },
+          { itemId: 79418, name: 'Mystic Runestone', count: 100, source: 'vendor', accountBound: true, note: '1 gold each (Miyani / Mystic Forge Attendant, needs Scholar of Secrets mastery)', inputs: [] },
+          { itemId: 81961, name: "Shard of the Crown", count: 100, source: 'forge', accountBound: true,
+            note: "Crafted (Weaponsmith 450)",
+            inputs: [
+              { itemId: 81974, name: "Tribute to the Queen", count: 1, source: 'currency', note: "Bought from Living World / PoF map vendors (Itzel Mastery Vendor, Natto, Alaleh…) for map currency (e.g. Volatile Magic, Unbound Magic, Trade Contracts). Requires the matching precursor recipe.", inputs: [] },
+              { itemId: 79410, name: "Mystic Curio", count: 1, source: 'tp', note: "Mystic Curio", inputs: [] },
+              { itemId: 19684, name: "Mithril Ingot", count: 30, source: 'tp', inputs: [] },
+              { itemId: 19709, name: "Elder Wood Plank", count: 20, source: 'tp', inputs: [] },
+            ],
+          },
+          { ...GIFT_OF_METAL },
         ],
       },
       { ...MYSTIC_TRIBUTE },
@@ -363,30 +753,88 @@ export const LEGENDARY_RECIPES_GEN2 = [
     ],
   },
 
-  // ── The Binding of Ipos (Dagger, HoT) ────────────────────────────────────────
+  // ── The Binding of Ipos (Focus) ──
   {
     id: 'legendary_binding_of_ipos',
-    name: 'The Binding of Ipos',
-    itemId: null, idName: 'The Binding of Ipos',
-    rarity: 'Legendary',
-    weaponType: 'Focus',
-    generation: 2,
-    dataStatus: 'partial', // tribute + mastery verified; weapon gift + precursor stages not yet wiki-verified
-    expansion: 'Heart of Thorns',
+    name: "The Binding of Ipos",
+    itemId: 86098,   // [API verified Oct 2026]
+    rarity: 'Legendary', weaponType: 'Focus', generation: 2, expansion: 'Living World',
+    note: "Mystic Forge: precursor + Gift of Ipos + Mystic Tribute + Gift of Maguuma Mastery (or Gift of Desert Mastery)",
     inputs: [
-      collectionPrecursor('The Binding of Ipos',
-        'The Binding of Ipos I',
-        'The Binding of Ipos II',
-        'The Binding of Ipos III — T6 mats + Maguuma currencies'),
-      {
-        name: 'Gift of Ipos',
-        itemId: null, idName: 'Gift of Ipos',
-        count: 1, source: 'forge', accountBound: true,
+    { itemId: 86097, name: "Ars Goetia", count: 1, source: 'forge', accountBound: true,
+      note: "Crafted (Artificer 500) — recipe from Grandmaster Craftsman Hobbs (Lion's Arch), requires the Historian of the Armaments mastery",
+      inputs: [
+        { itemId: 80503, name: "Visionary Inscription", count: 1, source: 'forge', accountBound: true,
+          note: "Crafted (Artificer, Weaponsmith, Huntsman 500)",
+          inputs: [
+            { itemId: 72261, name: "Legendary Inscription", count: 1, source: 'forge', accountBound: true,
+              note: "Crafted (Artificer, Weaponsmith, Huntsman 450)",
+              inputs: [
+                { itemId: 19721, name: "Glob of Ectoplasm", count: 10, source: 'tp', inputs: [] },
+                { itemId: 24277, name: "Pile of Crystalline Dust", count: 5, source: 'tp', inputs: [] },
+                { itemId: 12988, name: "Orichalcum Plated Dowel", count: 1, source: 'tp', inputs: [] },
+                { itemId: 46739, name: "Elonian Leather Square", count: 10, source: 'tp', inputs: [] },
+              ],
+            },
+            { itemId: 46746, name: "Vision Crystal", count: 1, source: 'forge', accountBound: true,
+              note: "Crafted (Artificer, Weaponsmith, Huntsman 500)",
+              inputs: [
+                { itemId: 46732, name: "Dragonite Ingot", count: 5, source: 'currency', note: "Account-bound — refined from Dragonite Ore", inputs: [] },
+                { itemId: 46734, name: "Empyreal Star", count: 5, source: 'currency', note: "Account-bound — refined from Empyreal Fragments", inputs: [] },
+                { itemId: 46752, name: "Augur's Stone", count: 1, source: 'spirit_shard', note: "Augur's Stone — 20 Spirit Shards from Miyani", inputs: [] },
+                { itemId: 46730, name: "Bloodstone Brick", count: 5, source: 'forge', accountBound: true,
+                  note: "Crafted (Artificer, Weaponsmith, Huntsman 450)",
+                  inputs: [
+                    { itemId: 46731, name: "Pile of Bloodstone Dust", count: 100, source: 'currency', note: "Account-bound — salvaged from ascended gear / fractal rewards", inputs: [] },
+                    { itemId: 19925, name: "Obsidian Shard", count: 2, source: 'karma', note: "1,050 Karma each (or 100 Volatile/Unbound Magic + 96c)", inputs: [] },
+                    { itemId: 46747, name: "Thermocatalytic Reagent", count: 10, source: 'tp', inputs: [] },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+        { itemId: 86120, name: "Shard of the Dark Arts", count: 100, source: 'forge', accountBound: true,
+          note: "Crafted (Artificer 450)",
+          inputs: [
+            { itemId: 86266, name: "Tribute to the Dark Arts", count: 1, source: 'currency', note: "Bought from Living World / PoF map vendors (Itzel Mastery Vendor, Natto, Alaleh…) for map currency (e.g. Volatile Magic, Unbound Magic, Trade Contracts). Requires the matching precursor recipe.", inputs: [] },
+            { itemId: 79410, name: "Mystic Curio", count: 1, source: 'tp', note: "Mystic Curio", inputs: [] },
+            { itemId: 19684, name: "Mithril Ingot", count: 20, source: 'tp', inputs: [] },
+            { itemId: 19709, name: "Elder Wood Plank", count: 10, source: 'tp', inputs: [] },
+          ],
+        },
+        { itemId: 45883, name: "Spiritwood Focus Casing", count: 1, source: 'forge', accountBound: true,
+          note: "Crafted (Artificer 500)",
+          inputs: [
+            { itemId: 46736, name: "Spiritwood Plank", count: 3, source: 'tp', inputs: [] },
+            { itemId: 24277, name: "Pile of Crystalline Dust", count: 5, source: 'tp', inputs: [] },
+            { itemId: 46747, name: "Thermocatalytic Reagent", count: 50, source: 'tp', inputs: [] },
+          ],
+        },
+        { itemId: 45884, name: "Spiritwood Focus Core", count: 1, source: 'forge', accountBound: true,
+          note: "Crafted (Artificer 500)",
+          inputs: [
+            { itemId: 46736, name: "Spiritwood Plank", count: 2, source: 'tp', inputs: [] },
+            { itemId: 24277, name: "Pile of Crystalline Dust", count: 5, source: 'tp', inputs: [] },
+            { itemId: 46747, name: "Thermocatalytic Reagent", count: 50, source: 'tp', inputs: [] },
+          ],
+        },
+      ],
+    },
+      { itemId: 85744, name: "Gift of Ipos", count: 1, source: 'forge', accountBound: true, note: "Mystic Forge [wiki verified Oct 2026]",
         inputs: [
-          ls('Destroyer Lodestone', 100),
-          t6('Vicious Fang', 24357, null, 250),
-          t6('Vicious Claw', 24351, null, 250),
-          t6('Powerful Venom Sac', null, 'Powerful Venom Sac', 250),
+          { ...GIFT_OF_THE_MISTS },
+          { itemId: 79418, name: 'Mystic Runestone', count: 100, source: 'vendor', accountBound: true, note: '1 gold each (Miyani / Mystic Forge Attendant, needs Scholar of Secrets mastery)', inputs: [] },
+          { itemId: 86120, name: "Shard of the Dark Arts", count: 100, source: 'forge', accountBound: true,
+            note: "Crafted (Artificer 450)",
+            inputs: [
+              { itemId: 86266, name: "Tribute to the Dark Arts", count: 1, source: 'currency', note: "Bought from Living World / PoF map vendors (Itzel Mastery Vendor, Natto, Alaleh…) for map currency (e.g. Volatile Magic, Unbound Magic, Trade Contracts). Requires the matching precursor recipe.", inputs: [] },
+              { itemId: 79410, name: "Mystic Curio", count: 1, source: 'tp', note: "Mystic Curio", inputs: [] },
+              { itemId: 19684, name: "Mithril Ingot", count: 20, source: 'tp', inputs: [] },
+              { itemId: 19709, name: "Elder Wood Plank", count: 10, source: 'tp', inputs: [] },
+            ],
+          },
+          { ...GIFT_OF_ENERGY },
         ],
       },
       { ...MYSTIC_TRIBUTE },
@@ -394,30 +842,177 @@ export const LEGENDARY_RECIPES_GEN2 = [
     ],
   },
 
-  // ── Claw of the Khan-Ur (Dagger, HoT) ────────────────────────────────────────
+  // ── Shooshadoo (Shield) ──
+  {
+    id: 'legendary_shooshadoo',
+    name: "Shooshadoo",
+    itemId: 79802,   // [API verified Oct 2026]
+    rarity: 'Legendary', weaponType: 'Shield', generation: 2, expansion: 'Living World',
+    note: "Mystic Forge: precursor + Gift of Shooshadoo + Mystic Tribute + Gift of Maguuma Mastery (or Gift of Desert Mastery)",
+    inputs: [
+    { itemId: 79836, name: "Friendship", count: 1, source: 'forge', accountBound: true,
+      note: "Crafted (Weaponsmith 500) — recipe from Grandmaster Craftsman Hobbs (Lion's Arch), requires the Historian of the Armaments mastery",
+      inputs: [
+        { itemId: 80503, name: "Visionary Inscription", count: 1, source: 'forge', accountBound: true,
+          note: "Crafted (Artificer, Weaponsmith, Huntsman 500)",
+          inputs: [
+            { itemId: 72261, name: "Legendary Inscription", count: 1, source: 'forge', accountBound: true,
+              note: "Crafted (Artificer, Weaponsmith, Huntsman 450)",
+              inputs: [
+                { itemId: 19721, name: "Glob of Ectoplasm", count: 10, source: 'tp', inputs: [] },
+                { itemId: 24277, name: "Pile of Crystalline Dust", count: 5, source: 'tp', inputs: [] },
+                { itemId: 12988, name: "Orichalcum Plated Dowel", count: 1, source: 'tp', inputs: [] },
+                { itemId: 46739, name: "Elonian Leather Square", count: 10, source: 'tp', inputs: [] },
+              ],
+            },
+            { itemId: 46746, name: "Vision Crystal", count: 1, source: 'forge', accountBound: true,
+              note: "Crafted (Artificer, Weaponsmith, Huntsman 500)",
+              inputs: [
+                { itemId: 46732, name: "Dragonite Ingot", count: 5, source: 'currency', note: "Account-bound — refined from Dragonite Ore", inputs: [] },
+                { itemId: 46734, name: "Empyreal Star", count: 5, source: 'currency', note: "Account-bound — refined from Empyreal Fragments", inputs: [] },
+                { itemId: 46752, name: "Augur's Stone", count: 1, source: 'spirit_shard', note: "Augur's Stone — 20 Spirit Shards from Miyani", inputs: [] },
+                { itemId: 46730, name: "Bloodstone Brick", count: 5, source: 'forge', accountBound: true,
+                  note: "Crafted (Artificer, Weaponsmith, Huntsman 450)",
+                  inputs: [
+                    { itemId: 46731, name: "Pile of Bloodstone Dust", count: 100, source: 'currency', note: "Account-bound — salvaged from ascended gear / fractal rewards", inputs: [] },
+                    { itemId: 19925, name: "Obsidian Shard", count: 2, source: 'karma', note: "1,050 Karma each (or 100 Volatile/Unbound Magic + 96c)", inputs: [] },
+                    { itemId: 46747, name: "Thermocatalytic Reagent", count: 10, source: 'tp', inputs: [] },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+        { itemId: 79784, name: "Shard of Friendship", count: 100, source: 'forge', accountBound: true,
+          note: "Crafted (Weaponsmith 450)",
+          inputs: [
+            { itemId: 79845, name: "Tribute to Friendship", count: 1, source: 'currency', note: "Bought from Living World / PoF map vendors (Itzel Mastery Vendor, Natto, Alaleh…) for map currency (e.g. Volatile Magic, Unbound Magic, Trade Contracts). Requires the matching precursor recipe.", inputs: [] },
+            { itemId: 79410, name: "Mystic Curio", count: 1, source: 'tp', note: "Mystic Curio", inputs: [] },
+            { itemId: 19684, name: "Mithril Ingot", count: 20, source: 'tp', inputs: [] },
+            { itemId: 19709, name: "Elder Wood Plank", count: 10, source: 'tp', inputs: [] },
+          ],
+        },
+        { itemId: 45857, name: "Deldrimor Steel Shield Backing", count: 1, source: 'forge', accountBound: true,
+          note: "Crafted (Weaponsmith 500)",
+          inputs: [
+            { itemId: 46738, name: "Deldrimor Steel Ingot", count: 2, source: 'tp', inputs: [] },
+            { itemId: 24277, name: "Pile of Crystalline Dust", count: 5, source: 'tp', inputs: [] },
+            { itemId: 46747, name: "Thermocatalytic Reagent", count: 50, source: 'tp', inputs: [] },
+          ],
+        },
+        { itemId: 45858, name: "Deldrimor Steel Shield Boss", count: 1, source: 'forge', accountBound: true,
+          note: "Crafted (Weaponsmith 500)",
+          inputs: [
+            { itemId: 46738, name: "Deldrimor Steel Ingot", count: 2, source: 'tp', inputs: [] },
+            { itemId: 24277, name: "Pile of Crystalline Dust", count: 5, source: 'tp', inputs: [] },
+            { itemId: 46747, name: "Thermocatalytic Reagent", count: 50, source: 'tp', inputs: [] },
+          ],
+        },
+      ],
+    },
+      { itemId: 79839, name: "Gift of Shooshadoo", count: 1, source: 'forge', accountBound: true, note: "Mystic Forge [wiki verified Oct 2026]",
+        inputs: [
+          { ...GIFT_OF_THE_MISTS },
+          { itemId: 79418, name: 'Mystic Runestone', count: 100, source: 'vendor', accountBound: true, note: '1 gold each (Miyani / Mystic Forge Attendant, needs Scholar of Secrets mastery)', inputs: [] },
+          { itemId: 79784, name: "Shard of Friendship", count: 100, source: 'forge', accountBound: true,
+            note: "Crafted (Weaponsmith 450)",
+            inputs: [
+              { itemId: 79845, name: "Tribute to Friendship", count: 1, source: 'currency', note: "Bought from Living World / PoF map vendors (Itzel Mastery Vendor, Natto, Alaleh…) for map currency (e.g. Volatile Magic, Unbound Magic, Trade Contracts). Requires the matching precursor recipe.", inputs: [] },
+              { itemId: 79410, name: "Mystic Curio", count: 1, source: 'tp', note: "Mystic Curio", inputs: [] },
+              { itemId: 19684, name: "Mithril Ingot", count: 20, source: 'tp', inputs: [] },
+              { itemId: 19709, name: "Elder Wood Plank", count: 10, source: 'tp', inputs: [] },
+            ],
+          },
+          { ...GIFT_OF_METAL },
+        ],
+      },
+      { ...MYSTIC_TRIBUTE },
+      { ...GIFT_OF_MAGUUMA_MASTERY },
+    ],
+  },
+
+  // ── Claw of the Khan-Ur (Dagger) ──
   {
     id: 'legendary_claw_khan_ur',
-    name: 'Claw of the Khan-Ur',
-    itemId: null, idName: 'Claw of the Khan-Ur',
-    rarity: 'Legendary',
-    weaponType: 'Dagger',
-    generation: 2,
-    dataStatus: 'partial', // tribute + mastery verified; weapon gift + precursor stages not yet wiki-verified
-    expansion: 'Heart of Thorns',
+    name: "Claw of the Khan-Ur",
+    itemId: 87109,   // [API verified Oct 2026]
+    rarity: 'Legendary', weaponType: 'Dagger', generation: 2, expansion: 'Living World',
+    note: "Mystic Forge: precursor + Gift of the Four Legions + Mystic Tribute + Gift of Maguuma Mastery (or Gift of Desert Mastery)",
     inputs: [
-      collectionPrecursor('Claw of the Khan-Ur',
-        'Claw of the Khan-Ur I',
-        'Claw of the Khan-Ur II',
-        'Claw of the Khan-Ur III'),
-      {
-        name: 'Gift of the Khan-Ur',
-        itemId: null, idName: 'Gift of the Khan-Ur',
-        count: 1, source: 'forge', accountBound: true,
+    { itemId: 87037, name: "Claw of Resolution", count: 1, source: 'forge', accountBound: true,
+      note: "Crafted (Weaponsmith 500) — recipe from Grandmaster Craftsman Hobbs (Lion's Arch), requires the Historian of the Armaments mastery",
+      inputs: [
+        { itemId: 87031, name: "Shard of Resolution", count: 100, source: 'forge', accountBound: true,
+          note: "Crafted (Weaponsmith 450)",
+          inputs: [
+            { itemId: 87165, name: "Tribute to Resolution", count: 1, source: 'currency', note: "Bought from Living World / PoF map vendors (Itzel Mastery Vendor, Natto, Alaleh…) for map currency (e.g. Volatile Magic, Unbound Magic, Trade Contracts). Requires the matching precursor recipe.", inputs: [] },
+            { itemId: 79410, name: "Mystic Curio", count: 1, source: 'tp', note: "Mystic Curio", inputs: [] },
+            { itemId: 19684, name: "Mithril Ingot", count: 30, source: 'tp', inputs: [] },
+            { itemId: 19709, name: "Elder Wood Plank", count: 20, source: 'tp', inputs: [] },
+          ],
+        },
+        { itemId: 80503, name: "Visionary Inscription", count: 1, source: 'forge', accountBound: true,
+          note: "Crafted (Artificer, Weaponsmith, Huntsman 500)",
+          inputs: [
+            { itemId: 72261, name: "Legendary Inscription", count: 1, source: 'forge', accountBound: true,
+              note: "Crafted (Artificer, Weaponsmith, Huntsman 450)",
+              inputs: [
+                { itemId: 19721, name: "Glob of Ectoplasm", count: 10, source: 'tp', inputs: [] },
+                { itemId: 24277, name: "Pile of Crystalline Dust", count: 5, source: 'tp', inputs: [] },
+                { itemId: 12988, name: "Orichalcum Plated Dowel", count: 1, source: 'tp', inputs: [] },
+                { itemId: 46739, name: "Elonian Leather Square", count: 10, source: 'tp', inputs: [] },
+              ],
+            },
+            { itemId: 46746, name: "Vision Crystal", count: 1, source: 'forge', accountBound: true,
+              note: "Crafted (Artificer, Weaponsmith, Huntsman 500)",
+              inputs: [
+                { itemId: 46732, name: "Dragonite Ingot", count: 5, source: 'currency', note: "Account-bound — refined from Dragonite Ore", inputs: [] },
+                { itemId: 46734, name: "Empyreal Star", count: 5, source: 'currency', note: "Account-bound — refined from Empyreal Fragments", inputs: [] },
+                { itemId: 46752, name: "Augur's Stone", count: 1, source: 'spirit_shard', note: "Augur's Stone — 20 Spirit Shards from Miyani", inputs: [] },
+                { itemId: 46730, name: "Bloodstone Brick", count: 5, source: 'forge', accountBound: true,
+                  note: "Crafted (Artificer, Weaponsmith, Huntsman 450)",
+                  inputs: [
+                    { itemId: 46731, name: "Pile of Bloodstone Dust", count: 100, source: 'currency', note: "Account-bound — salvaged from ascended gear / fractal rewards", inputs: [] },
+                    { itemId: 19925, name: "Obsidian Shard", count: 2, source: 'karma', note: "1,050 Karma each (or 100 Volatile/Unbound Magic + 96c)", inputs: [] },
+                    { itemId: 46747, name: "Thermocatalytic Reagent", count: 10, source: 'tp', inputs: [] },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+        { itemId: 45854, name: "Deldrimor Steel Dagger Hilt", count: 1, source: 'forge', accountBound: true,
+          note: "Crafted (Weaponsmith 500)",
+          inputs: [
+            { itemId: 46738, name: "Deldrimor Steel Ingot", count: 2, source: 'tp', inputs: [] },
+            { itemId: 24277, name: "Pile of Crystalline Dust", count: 5, source: 'tp', inputs: [] },
+            { itemId: 46747, name: "Thermocatalytic Reagent", count: 50, source: 'tp', inputs: [] },
+          ],
+        },
+        { itemId: 45846, name: "Deldrimor Steel Dagger Blade", count: 1, source: 'forge', accountBound: true,
+          note: "Crafted (Weaponsmith 500)",
+          inputs: [
+            { itemId: 46738, name: "Deldrimor Steel Ingot", count: 3, source: 'tp', inputs: [] },
+            { itemId: 24277, name: "Pile of Crystalline Dust", count: 5, source: 'tp', inputs: [] },
+            { itemId: 46747, name: "Thermocatalytic Reagent", count: 50, source: 'tp', inputs: [] },
+          ],
+        },
+      ],
+    },
+      { itemId: 87115, name: "Gift of the Four Legions", count: 1, source: 'forge', accountBound: true, note: "Mystic Forge [wiki verified Oct 2026]",
         inputs: [
-          ls('Onyx Lodestone', 100),
-          t6('Vicious Claw', 24351, null, 250),
-          t6('Vicious Fang', 24357, null, 250),
-          t6('Ancient Bone', 24358, null, 250),
+          { ...GIFT_OF_THE_MISTS },
+          { itemId: 79418, name: 'Mystic Runestone', count: 100, source: 'vendor', accountBound: true, note: '1 gold each (Miyani / Mystic Forge Attendant, needs Scholar of Secrets mastery)', inputs: [] },
+          { itemId: 87031, name: "Shard of Resolution", count: 100, source: 'forge', accountBound: true,
+            note: "Crafted (Weaponsmith 450)",
+            inputs: [
+              { itemId: 87165, name: "Tribute to Resolution", count: 1, source: 'currency', note: "Bought from Living World / PoF map vendors (Itzel Mastery Vendor, Natto, Alaleh…) for map currency (e.g. Volatile Magic, Unbound Magic, Trade Contracts). Requires the matching precursor recipe.", inputs: [] },
+              { itemId: 79410, name: "Mystic Curio", count: 1, source: 'tp', note: "Mystic Curio", inputs: [] },
+              { itemId: 19684, name: "Mithril Ingot", count: 30, source: 'tp', inputs: [] },
+              { itemId: 19709, name: "Elder Wood Plank", count: 20, source: 'tp', inputs: [] },
+            ],
+          },
+          { ...GIFT_OF_METAL },
         ],
       },
       { ...MYSTIC_TRIBUTE },
@@ -425,68 +1020,630 @@ export const LEGENDARY_RECIPES_GEN2 = [
     ],
   },
 
-  // ── Exordium (Greatsword, PoF) ───────────────────────────────────────────────
+  // ── Exordium (Greatsword) ──
   {
     id: 'legendary_exordium',
-    name: 'Exordium',
-    itemId: null, idName: 'Exordium',
-    rarity: 'Legendary',
-    weaponType: 'Greatsword',
-    generation: 2,
-    dataStatus: 'partial', // tribute + mastery verified; weapon gift + precursor stages not yet wiki-verified
-    expansion: 'Path of Fire',
+    name: "Exordium",
+    itemId: 90551,   // [API verified Oct 2026]
+    rarity: 'Legendary', weaponType: 'Greatsword', generation: 2, expansion: 'Living World',
+    note: "Mystic Forge: precursor + Gift of Exordium + Mystic Tribute + Gift of Maguuma Mastery (or Gift of Desert Mastery)",
     inputs: [
-      collectionPrecursor('Exordium',
-        'Exordium I: The Experimental Greatsword',
-        'Exordium II: The Prototype',
-        'Exordium III: The Perfected Greatsword'),
-      {
-        name: 'Gift of Exordium',
-        itemId: null, idName: 'Gift of Exordium',
-        count: 1, source: 'forge', accountBound: true,
+    { itemId: 90883, name: "Exitare", count: 1, source: 'forge', accountBound: true,
+      note: "Crafted (Weaponsmith 500) — recipe from Grandmaster Craftsman Hobbs (Lion's Arch), requires the Historian of the Armaments mastery",
+      inputs: [
+        { itemId: 90390, name: "Shard of Exitare", count: 100, source: 'forge', accountBound: true,
+          note: "Crafted (Weaponsmith 450)",
+          inputs: [
+            { itemId: 90776, name: "Tribute to the Exitare", count: 1, source: 'currency', note: "Bought from Living World / PoF map vendors (Itzel Mastery Vendor, Natto, Alaleh…) for map currency (e.g. Volatile Magic, Unbound Magic, Trade Contracts). Requires the matching precursor recipe.", inputs: [] },
+            { itemId: 79410, name: "Mystic Curio", count: 1, source: 'tp', note: "Mystic Curio", inputs: [] },
+            { itemId: 19684, name: "Mithril Ingot", count: 40, source: 'tp', inputs: [] },
+            { itemId: 19709, name: "Elder Wood Plank", count: 30, source: 'tp', inputs: [] },
+          ],
+        },
+        { itemId: 80503, name: "Visionary Inscription", count: 1, source: 'forge', accountBound: true,
+          note: "Crafted (Artificer, Weaponsmith, Huntsman 500)",
+          inputs: [
+            { itemId: 72261, name: "Legendary Inscription", count: 1, source: 'forge', accountBound: true,
+              note: "Crafted (Artificer, Weaponsmith, Huntsman 450)",
+              inputs: [
+                { itemId: 19721, name: "Glob of Ectoplasm", count: 10, source: 'tp', inputs: [] },
+                { itemId: 24277, name: "Pile of Crystalline Dust", count: 5, source: 'tp', inputs: [] },
+                { itemId: 12988, name: "Orichalcum Plated Dowel", count: 1, source: 'tp', inputs: [] },
+                { itemId: 46739, name: "Elonian Leather Square", count: 10, source: 'tp', inputs: [] },
+              ],
+            },
+            { itemId: 46746, name: "Vision Crystal", count: 1, source: 'forge', accountBound: true,
+              note: "Crafted (Artificer, Weaponsmith, Huntsman 500)",
+              inputs: [
+                { itemId: 46732, name: "Dragonite Ingot", count: 5, source: 'currency', note: "Account-bound — refined from Dragonite Ore", inputs: [] },
+                { itemId: 46734, name: "Empyreal Star", count: 5, source: 'currency', note: "Account-bound — refined from Empyreal Fragments", inputs: [] },
+                { itemId: 46752, name: "Augur's Stone", count: 1, source: 'spirit_shard', note: "Augur's Stone — 20 Spirit Shards from Miyani", inputs: [] },
+                { itemId: 46730, name: "Bloodstone Brick", count: 5, source: 'forge', accountBound: true,
+                  note: "Crafted (Artificer, Weaponsmith, Huntsman 450)",
+                  inputs: [
+                    { itemId: 46731, name: "Pile of Bloodstone Dust", count: 100, source: 'currency', note: "Account-bound — salvaged from ascended gear / fractal rewards", inputs: [] },
+                    { itemId: 19925, name: "Obsidian Shard", count: 2, source: 'karma', note: "1,050 Karma each (or 100 Volatile/Unbound Magic + 96c)", inputs: [] },
+                    { itemId: 46747, name: "Thermocatalytic Reagent", count: 10, source: 'tp', inputs: [] },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+        { itemId: 45855, name: "Deldrimor Steel Greatsword Hilt", count: 1, source: 'forge', accountBound: true,
+          note: "Crafted (Weaponsmith 500)",
+          inputs: [
+            { itemId: 46738, name: "Deldrimor Steel Ingot", count: 3, source: 'tp', inputs: [] },
+            { itemId: 24277, name: "Pile of Crystalline Dust", count: 5, source: 'tp', inputs: [] },
+            { itemId: 46747, name: "Thermocatalytic Reagent", count: 50, source: 'tp', inputs: [] },
+          ],
+        },
+        { itemId: 45847, name: "Deldrimor Steel Greatsword Blade", count: 1, source: 'forge', accountBound: true,
+          note: "Crafted (Weaponsmith 500)",
+          inputs: [
+            { itemId: 46738, name: "Deldrimor Steel Ingot", count: 3, source: 'tp', inputs: [] },
+            { itemId: 24277, name: "Pile of Crystalline Dust", count: 5, source: 'tp', inputs: [] },
+            { itemId: 46747, name: "Thermocatalytic Reagent", count: 50, source: 'tp', inputs: [] },
+          ],
+        },
+      ],
+    },
+      { itemId: 90893, name: "Gift of Exordium", count: 1, source: 'forge', accountBound: true, note: "Mystic Forge [wiki verified Oct 2026]",
         inputs: [
-          ls('Onyx Lodestone', 100),
-          t6('Vicious Claw', 24351, null, 250),
-          t6('Ancient Bone', 24358, null, 250),
-          t6('Vial of Powerful Blood', null, 'Vial of Powerful Blood', 250),
+          { ...GIFT_OF_THE_MISTS },
+          { itemId: 79418, name: 'Mystic Runestone', count: 100, source: 'vendor', accountBound: true, note: '1 gold each (Miyani / Mystic Forge Attendant, needs Scholar of Secrets mastery)', inputs: [] },
+          { itemId: 90390, name: "Shard of Exitare", count: 100, source: 'forge', accountBound: true,
+            note: "Crafted (Weaponsmith 450)",
+            inputs: [
+              { itemId: 90776, name: "Tribute to the Exitare", count: 1, source: 'currency', note: "Bought from Living World / PoF map vendors (Itzel Mastery Vendor, Natto, Alaleh…) for map currency (e.g. Volatile Magic, Unbound Magic, Trade Contracts). Requires the matching precursor recipe.", inputs: [] },
+              { itemId: 79410, name: "Mystic Curio", count: 1, source: 'tp', note: "Mystic Curio", inputs: [] },
+              { itemId: 19684, name: "Mithril Ingot", count: 40, source: 'tp', inputs: [] },
+              { itemId: 19709, name: "Elder Wood Plank", count: 30, source: 'tp', inputs: [] },
+            ],
+          },
+          { ...GIFT_OF_METAL },
         ],
       },
       { ...MYSTIC_TRIBUTE },
-      { ...GIFT_OF_DESERT_MASTERY },
+      { ...GIFT_OF_MAGUUMA_MASTERY },
     ],
   },
 
-  // ── Pharus (Long Bow, PoF) ───────────────────────────────────────────────────
+  // ── Pharus (Long Bow) ──
   {
     id: 'legendary_pharus',
-    name: 'Pharus',
-    itemId: null, idName: 'Pharus',
-    rarity: 'Legendary',
-    weaponType: 'Long Bow',
-    generation: 2,
-    dataStatus: 'partial', // tribute + mastery verified; weapon gift + precursor stages not yet wiki-verified
-    expansion: 'Path of Fire',
+    name: "Pharus",
+    itemId: 89854,   // [API verified Oct 2026]
+    rarity: 'Legendary', weaponType: 'Long Bow', generation: 2, expansion: 'Living World',
+    note: "Mystic Forge: precursor + Gift of Pharus + Mystic Tribute + Gift of Maguuma Mastery (or Gift of Desert Mastery)",
     inputs: [
-      collectionPrecursor('Pharus',
-        'Pharus I: The Experimental Longbow',
-        'Pharus II: The Prototype',
-        'Pharus III: The Perfected Longbow'),
-      {
-        name: 'Gift of Pharus',
-        itemId: null, idName: 'Gift of Pharus',
-        count: 1, source: 'forge', accountBound: true,
+    { itemId: 89886, name: "Spero", count: 1, source: 'forge', accountBound: true,
+      note: "Crafted (Huntsman 500) — recipe from Grandmaster Craftsman Hobbs (Lion's Arch), requires the Historian of the Armaments mastery",
+      inputs: [
+        { itemId: 89947, name: "Shard of Spero", count: 100, source: 'forge', accountBound: true,
+          note: "Crafted (Huntsman 450)",
+          inputs: [
+            { itemId: 89478, name: "Tribute to Spero", count: 1, source: 'currency', note: "Bought from Living World / PoF map vendors (Itzel Mastery Vendor, Natto, Alaleh…) for map currency (e.g. Volatile Magic, Unbound Magic, Trade Contracts). Requires the matching precursor recipe.", inputs: [] },
+            { itemId: 79410, name: "Mystic Curio", count: 1, source: 'tp', note: "Mystic Curio", inputs: [] },
+            { itemId: 19684, name: "Mithril Ingot", count: 40, source: 'tp', inputs: [] },
+            { itemId: 19709, name: "Elder Wood Plank", count: 30, source: 'tp', inputs: [] },
+          ],
+        },
+        { itemId: 80503, name: "Visionary Inscription", count: 1, source: 'forge', accountBound: true,
+          note: "Crafted (Artificer, Weaponsmith, Huntsman 500)",
+          inputs: [
+            { itemId: 72261, name: "Legendary Inscription", count: 1, source: 'forge', accountBound: true,
+              note: "Crafted (Artificer, Weaponsmith, Huntsman 450)",
+              inputs: [
+                { itemId: 19721, name: "Glob of Ectoplasm", count: 10, source: 'tp', inputs: [] },
+                { itemId: 24277, name: "Pile of Crystalline Dust", count: 5, source: 'tp', inputs: [] },
+                { itemId: 12988, name: "Orichalcum Plated Dowel", count: 1, source: 'tp', inputs: [] },
+                { itemId: 46739, name: "Elonian Leather Square", count: 10, source: 'tp', inputs: [] },
+              ],
+            },
+            { itemId: 46746, name: "Vision Crystal", count: 1, source: 'forge', accountBound: true,
+              note: "Crafted (Artificer, Weaponsmith, Huntsman 500)",
+              inputs: [
+                { itemId: 46732, name: "Dragonite Ingot", count: 5, source: 'currency', note: "Account-bound — refined from Dragonite Ore", inputs: [] },
+                { itemId: 46734, name: "Empyreal Star", count: 5, source: 'currency', note: "Account-bound — refined from Empyreal Fragments", inputs: [] },
+                { itemId: 46752, name: "Augur's Stone", count: 1, source: 'spirit_shard', note: "Augur's Stone — 20 Spirit Shards from Miyani", inputs: [] },
+                { itemId: 46730, name: "Bloodstone Brick", count: 5, source: 'forge', accountBound: true,
+                  note: "Crafted (Artificer, Weaponsmith, Huntsman 450)",
+                  inputs: [
+                    { itemId: 46731, name: "Pile of Bloodstone Dust", count: 100, source: 'currency', note: "Account-bound — salvaged from ascended gear / fractal rewards", inputs: [] },
+                    { itemId: 19925, name: "Obsidian Shard", count: 2, source: 'karma', note: "1,050 Karma each (or 100 Volatile/Unbound Magic + 96c)", inputs: [] },
+                    { itemId: 46747, name: "Thermocatalytic Reagent", count: 10, source: 'tp', inputs: [] },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+        { itemId: 45841, name: "Spiritwood Longbow Stave", count: 1, source: 'forge', accountBound: true,
+          note: "Crafted (Huntsman 500)",
+          inputs: [
+            { itemId: 46736, name: "Spiritwood Plank", count: 4, source: 'tp', inputs: [] },
+            { itemId: 24277, name: "Pile of Crystalline Dust", count: 5, source: 'tp', inputs: [] },
+            { itemId: 46747, name: "Thermocatalytic Reagent", count: 50, source: 'tp', inputs: [] },
+          ],
+        },
+        { itemId: 45844, name: "Elonian String", count: 1, source: 'forge', accountBound: true,
+          note: "Crafted (Huntsman 500)",
+          inputs: [
+            { itemId: 46739, name: "Elonian Leather Square", count: 3, source: 'tp', inputs: [] },
+            { itemId: 24277, name: "Pile of Crystalline Dust", count: 5, source: 'tp', inputs: [] },
+            { itemId: 46747, name: "Thermocatalytic Reagent", count: 50, source: 'tp', inputs: [] },
+          ],
+        },
+      ],
+    },
+      { itemId: 89445, name: "Gift of Pharus", count: 1, source: 'forge', accountBound: true, note: "Mystic Forge [wiki verified Oct 2026]",
         inputs: [
-          ls('Charged Lodestone', 100),
-          t6('Armored Scale', 24289, null, 250),
-          t6('Elaborate Totem', null, 'Elaborate Totem', 250),
-          t6('Pile of Crystalline Dust', 24277, null, 250),
+          { ...GIFT_OF_THE_MISTS },
+          { itemId: 79418, name: 'Mystic Runestone', count: 100, source: 'vendor', accountBound: true, note: '1 gold each (Miyani / Mystic Forge Attendant, needs Scholar of Secrets mastery)', inputs: [] },
+          { itemId: 89947, name: "Shard of Spero", count: 100, source: 'forge', accountBound: true,
+            note: "Crafted (Huntsman 450)",
+            inputs: [
+              { itemId: 89478, name: "Tribute to Spero", count: 1, source: 'currency', note: "Bought from Living World / PoF map vendors (Itzel Mastery Vendor, Natto, Alaleh…) for map currency (e.g. Volatile Magic, Unbound Magic, Trade Contracts). Requires the matching precursor recipe.", inputs: [] },
+              { itemId: 79410, name: "Mystic Curio", count: 1, source: 'tp', note: "Mystic Curio", inputs: [] },
+              { itemId: 19684, name: "Mithril Ingot", count: 40, source: 'tp', inputs: [] },
+              { itemId: 19709, name: "Elder Wood Plank", count: 30, source: 'tp', inputs: [] },
+            ],
+          },
+          { ...GIFT_OF_WOOD },
         ],
       },
       { ...MYSTIC_TRIBUTE },
-      { ...GIFT_OF_DESERT_MASTERY },
+      { ...GIFT_OF_MAGUUMA_MASTERY },
+    ],
+  },
+
+  // ── The HMS Divinity (Rifle) ──
+  {
+    id: 'legendary_hms_divinity',
+    name: "The HMS Divinity",
+    itemId: 80488,   // [API verified Oct 2026]
+    rarity: 'Legendary', weaponType: 'Rifle', generation: 2, expansion: 'Living World',
+    note: "Mystic Forge: precursor + Gift of Divinity + Mystic Tribute + Gift of Maguuma Mastery (or Gift of Desert Mastery)",
+    inputs: [
+    { itemId: 80135, name: "Man o' War", count: 1, source: 'forge', accountBound: true,
+      note: "Crafted (Huntsman 500) — recipe from Grandmaster Craftsman Hobbs (Lion's Arch), requires the Historian of the Armaments mastery",
+      inputs: [
+        { itemId: 80503, name: "Visionary Inscription", count: 1, source: 'forge', accountBound: true,
+          note: "Crafted (Artificer, Weaponsmith, Huntsman 500)",
+          inputs: [
+            { itemId: 72261, name: "Legendary Inscription", count: 1, source: 'forge', accountBound: true,
+              note: "Crafted (Artificer, Weaponsmith, Huntsman 450)",
+              inputs: [
+                { itemId: 19721, name: "Glob of Ectoplasm", count: 10, source: 'tp', inputs: [] },
+                { itemId: 24277, name: "Pile of Crystalline Dust", count: 5, source: 'tp', inputs: [] },
+                { itemId: 12988, name: "Orichalcum Plated Dowel", count: 1, source: 'tp', inputs: [] },
+                { itemId: 46739, name: "Elonian Leather Square", count: 10, source: 'tp', inputs: [] },
+              ],
+            },
+            { itemId: 46746, name: "Vision Crystal", count: 1, source: 'forge', accountBound: true,
+              note: "Crafted (Artificer, Weaponsmith, Huntsman 500)",
+              inputs: [
+                { itemId: 46732, name: "Dragonite Ingot", count: 5, source: 'currency', note: "Account-bound — refined from Dragonite Ore", inputs: [] },
+                { itemId: 46734, name: "Empyreal Star", count: 5, source: 'currency', note: "Account-bound — refined from Empyreal Fragments", inputs: [] },
+                { itemId: 46752, name: "Augur's Stone", count: 1, source: 'spirit_shard', note: "Augur's Stone — 20 Spirit Shards from Miyani", inputs: [] },
+                { itemId: 46730, name: "Bloodstone Brick", count: 5, source: 'forge', accountBound: true,
+                  note: "Crafted (Artificer, Weaponsmith, Huntsman 450)",
+                  inputs: [
+                    { itemId: 46731, name: "Pile of Bloodstone Dust", count: 100, source: 'currency', note: "Account-bound — salvaged from ascended gear / fractal rewards", inputs: [] },
+                    { itemId: 19925, name: "Obsidian Shard", count: 2, source: 'karma', note: "1,050 Karma each (or 100 Volatile/Unbound Magic + 96c)", inputs: [] },
+                    { itemId: 46747, name: "Thermocatalytic Reagent", count: 10, source: 'tp', inputs: [] },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+        { itemId: 80380, name: "Shard o' War", count: 100, source: 'forge', accountBound: true,
+          note: "Crafted (Huntsman 450)",
+          inputs: [
+            { itemId: 80201, name: "Tribute to the Man o' War", count: 1, source: 'currency', note: "Bought from Living World / PoF map vendors (Itzel Mastery Vendor, Natto, Alaleh…) for map currency (e.g. Volatile Magic, Unbound Magic, Trade Contracts). Requires the matching precursor recipe.", inputs: [] },
+            { itemId: 79410, name: "Mystic Curio", count: 1, source: 'tp', note: "Mystic Curio", inputs: [] },
+            { itemId: 19684, name: "Mithril Ingot", count: 40, source: 'tp', inputs: [] },
+            { itemId: 19709, name: "Elder Wood Plank", count: 30, source: 'tp', inputs: [] },
+          ],
+        },
+        { itemId: 45834, name: "Deldrimor Steel Rifle Barrel", count: 1, source: 'forge', accountBound: true,
+          note: "Crafted (Huntsman 500)",
+          inputs: [
+            { itemId: 46738, name: "Deldrimor Steel Ingot", count: 3, source: 'tp', inputs: [] },
+            { itemId: 24277, name: "Pile of Crystalline Dust", count: 5, source: 'tp', inputs: [] },
+            { itemId: 46747, name: "Thermocatalytic Reagent", count: 50, source: 'tp', inputs: [] },
+          ],
+        },
+        { itemId: 45843, name: "Spiritwood Rifle Stock", count: 1, source: 'forge', accountBound: true,
+          note: "Crafted (Huntsman 500)",
+          inputs: [
+            { itemId: 46736, name: "Spiritwood Plank", count: 3, source: 'tp', inputs: [] },
+            { itemId: 24277, name: "Pile of Crystalline Dust", count: 5, source: 'tp', inputs: [] },
+            { itemId: 46747, name: "Thermocatalytic Reagent", count: 50, source: 'tp', inputs: [] },
+          ],
+        },
+      ],
+    },
+      { itemId: 80650, name: "Gift of Divinity", count: 1, source: 'forge', accountBound: true, note: "Mystic Forge [wiki verified Oct 2026]",
+        inputs: [
+          { ...GIFT_OF_THE_MISTS },
+          { itemId: 79418, name: 'Mystic Runestone', count: 100, source: 'vendor', accountBound: true, note: '1 gold each (Miyani / Mystic Forge Attendant, needs Scholar of Secrets mastery)', inputs: [] },
+          { itemId: 80380, name: "Shard o' War", count: 100, source: 'forge', accountBound: true,
+            note: "Crafted (Huntsman 450)",
+            inputs: [
+              { itemId: 80201, name: "Tribute to the Man o' War", count: 1, source: 'currency', note: "Bought from Living World / PoF map vendors (Itzel Mastery Vendor, Natto, Alaleh…) for map currency (e.g. Volatile Magic, Unbound Magic, Trade Contracts). Requires the matching precursor recipe.", inputs: [] },
+              { itemId: 79410, name: "Mystic Curio", count: 1, source: 'tp', note: "Mystic Curio", inputs: [] },
+              { itemId: 19684, name: "Mithril Ingot", count: 40, source: 'tp', inputs: [] },
+              { itemId: 19709, name: "Elder Wood Plank", count: 30, source: 'tp', inputs: [] },
+            ],
+          },
+          { ...GIFT_OF_WOOD },
+        ],
+      },
+      { ...MYSTIC_TRIBUTE },
+      { ...GIFT_OF_MAGUUMA_MASTERY },
+    ],
+  },
+
+  // ── Xiuquatl (Scepter) ──
+  {
+    id: 'legendary_xiuquatl',
+    name: "Xiuquatl",
+    itemId: 88576,   // [API verified Oct 2026]
+    rarity: 'Legendary', weaponType: 'Scepter', generation: 2, expansion: 'Living World',
+    note: "Mystic Forge: precursor + Gift of Xiuquatl + Mystic Tribute + Gift of Maguuma Mastery (or Gift of Desert Mastery)",
+    inputs: [
+    { itemId: 88851, name: "Tlehco", count: 1, source: 'forge', accountBound: true,
+      note: "Crafted (Artificer 500) — recipe from Grandmaster Craftsman Hobbs (Lion's Arch), requires the Historian of the Armaments mastery",
+      inputs: [
+        { itemId: 88738, name: "Shard of Tlehco", count: 100, source: 'forge', accountBound: true,
+          note: "Crafted (Artificer 450)",
+          inputs: [
+            { itemId: 88756, name: "Tribute to Tlehco", count: 1, source: 'currency', note: "Bought from Living World / PoF map vendors (Itzel Mastery Vendor, Natto, Alaleh…) for map currency (e.g. Volatile Magic, Unbound Magic, Trade Contracts). Requires the matching precursor recipe.", inputs: [] },
+            { itemId: 79410, name: "Mystic Curio", count: 1, source: 'tp', note: "Mystic Curio", inputs: [] },
+            { itemId: 19684, name: "Mithril Ingot", count: 30, source: 'tp', inputs: [] },
+            { itemId: 19709, name: "Elder Wood Plank", count: 20, source: 'tp', inputs: [] },
+          ],
+        },
+        { itemId: 80503, name: "Visionary Inscription", count: 1, source: 'forge', accountBound: true,
+          note: "Crafted (Artificer, Weaponsmith, Huntsman 500)",
+          inputs: [
+            { itemId: 72261, name: "Legendary Inscription", count: 1, source: 'forge', accountBound: true,
+              note: "Crafted (Artificer, Weaponsmith, Huntsman 450)",
+              inputs: [
+                { itemId: 19721, name: "Glob of Ectoplasm", count: 10, source: 'tp', inputs: [] },
+                { itemId: 24277, name: "Pile of Crystalline Dust", count: 5, source: 'tp', inputs: [] },
+                { itemId: 12988, name: "Orichalcum Plated Dowel", count: 1, source: 'tp', inputs: [] },
+                { itemId: 46739, name: "Elonian Leather Square", count: 10, source: 'tp', inputs: [] },
+              ],
+            },
+            { itemId: 46746, name: "Vision Crystal", count: 1, source: 'forge', accountBound: true,
+              note: "Crafted (Artificer, Weaponsmith, Huntsman 500)",
+              inputs: [
+                { itemId: 46732, name: "Dragonite Ingot", count: 5, source: 'currency', note: "Account-bound — refined from Dragonite Ore", inputs: [] },
+                { itemId: 46734, name: "Empyreal Star", count: 5, source: 'currency', note: "Account-bound — refined from Empyreal Fragments", inputs: [] },
+                { itemId: 46752, name: "Augur's Stone", count: 1, source: 'spirit_shard', note: "Augur's Stone — 20 Spirit Shards from Miyani", inputs: [] },
+                { itemId: 46730, name: "Bloodstone Brick", count: 5, source: 'forge', accountBound: true,
+                  note: "Crafted (Artificer, Weaponsmith, Huntsman 450)",
+                  inputs: [
+                    { itemId: 46731, name: "Pile of Bloodstone Dust", count: 100, source: 'currency', note: "Account-bound — salvaged from ascended gear / fractal rewards", inputs: [] },
+                    { itemId: 19925, name: "Obsidian Shard", count: 2, source: 'karma', note: "1,050 Karma each (or 100 Volatile/Unbound Magic + 96c)", inputs: [] },
+                    { itemId: 46747, name: "Thermocatalytic Reagent", count: 10, source: 'tp', inputs: [] },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+        { itemId: 45886, name: "Spiritwood Scepter Rod", count: 1, source: 'forge', accountBound: true,
+          note: "Crafted (Artificer 500)",
+          inputs: [
+            { itemId: 46736, name: "Spiritwood Plank", count: 3, source: 'tp', inputs: [] },
+            { itemId: 24277, name: "Pile of Crystalline Dust", count: 5, source: 'tp', inputs: [] },
+            { itemId: 46747, name: "Thermocatalytic Reagent", count: 50, source: 'tp', inputs: [] },
+          ],
+        },
+        { itemId: 45885, name: "Spiritwood Scepter Core", count: 1, source: 'forge', accountBound: true,
+          note: "Crafted (Artificer 500)",
+          inputs: [
+            { itemId: 46736, name: "Spiritwood Plank", count: 2, source: 'tp', inputs: [] },
+            { itemId: 24277, name: "Pile of Crystalline Dust", count: 5, source: 'tp', inputs: [] },
+            { itemId: 46747, name: "Thermocatalytic Reagent", count: 50, source: 'tp', inputs: [] },
+          ],
+        },
+      ],
+    },
+      { itemId: 88500, name: "Gift of Xiuquatl", count: 1, source: 'forge', accountBound: true, note: "Mystic Forge [wiki verified Oct 2026]",
+        inputs: [
+          { ...GIFT_OF_THE_MISTS },
+          { itemId: 79418, name: 'Mystic Runestone', count: 100, source: 'vendor', accountBound: true, note: '1 gold each (Miyani / Mystic Forge Attendant, needs Scholar of Secrets mastery)', inputs: [] },
+          { itemId: 88738, name: "Shard of Tlehco", count: 100, source: 'forge', accountBound: true,
+            note: "Crafted (Artificer 450)",
+            inputs: [
+              { itemId: 88756, name: "Tribute to Tlehco", count: 1, source: 'currency', note: "Bought from Living World / PoF map vendors (Itzel Mastery Vendor, Natto, Alaleh…) for map currency (e.g. Volatile Magic, Unbound Magic, Trade Contracts). Requires the matching precursor recipe.", inputs: [] },
+              { itemId: 79410, name: "Mystic Curio", count: 1, source: 'tp', note: "Mystic Curio", inputs: [] },
+              { itemId: 19684, name: "Mithril Ingot", count: 30, source: 'tp', inputs: [] },
+              { itemId: 19709, name: "Elder Wood Plank", count: 20, source: 'tp', inputs: [] },
+            ],
+          },
+          { ...GIFT_OF_ENERGY },
+        ],
+      },
+      { ...MYSTIC_TRIBUTE },
+      { ...GIFT_OF_MAGUUMA_MASTERY },
+    ],
+  },
+
+  // ── Flames of War (Torch) ──
+  {
+    id: 'legendary_flames_of_war',
+    name: "Flames of War",
+    itemId: 81206,   // [API verified Oct 2026]
+    rarity: 'Legendary', weaponType: 'Torch', generation: 2, expansion: 'Living World',
+    note: "Mystic Forge: precursor + Gift of Balthazar + Mystic Tribute + Gift of Maguuma Mastery (or Gift of Desert Mastery)",
+    inputs: [
+    { itemId: 81022, name: "Liturgy", count: 1, source: 'forge', accountBound: true,
+      note: "Crafted (Huntsman 500) — recipe from Grandmaster Craftsman Hobbs (Lion's Arch), requires the Historian of the Armaments mastery",
+      inputs: [
+        { itemId: 80503, name: "Visionary Inscription", count: 1, source: 'forge', accountBound: true,
+          note: "Crafted (Artificer, Weaponsmith, Huntsman 500)",
+          inputs: [
+            { itemId: 72261, name: "Legendary Inscription", count: 1, source: 'forge', accountBound: true,
+              note: "Crafted (Artificer, Weaponsmith, Huntsman 450)",
+              inputs: [
+                { itemId: 19721, name: "Glob of Ectoplasm", count: 10, source: 'tp', inputs: [] },
+                { itemId: 24277, name: "Pile of Crystalline Dust", count: 5, source: 'tp', inputs: [] },
+                { itemId: 12988, name: "Orichalcum Plated Dowel", count: 1, source: 'tp', inputs: [] },
+                { itemId: 46739, name: "Elonian Leather Square", count: 10, source: 'tp', inputs: [] },
+              ],
+            },
+            { itemId: 46746, name: "Vision Crystal", count: 1, source: 'forge', accountBound: true,
+              note: "Crafted (Artificer, Weaponsmith, Huntsman 500)",
+              inputs: [
+                { itemId: 46732, name: "Dragonite Ingot", count: 5, source: 'currency', note: "Account-bound — refined from Dragonite Ore", inputs: [] },
+                { itemId: 46734, name: "Empyreal Star", count: 5, source: 'currency', note: "Account-bound — refined from Empyreal Fragments", inputs: [] },
+                { itemId: 46752, name: "Augur's Stone", count: 1, source: 'spirit_shard', note: "Augur's Stone — 20 Spirit Shards from Miyani", inputs: [] },
+                { itemId: 46730, name: "Bloodstone Brick", count: 5, source: 'forge', accountBound: true,
+                  note: "Crafted (Artificer, Weaponsmith, Huntsman 450)",
+                  inputs: [
+                    { itemId: 46731, name: "Pile of Bloodstone Dust", count: 100, source: 'currency', note: "Account-bound — salvaged from ascended gear / fractal rewards", inputs: [] },
+                    { itemId: 19925, name: "Obsidian Shard", count: 2, source: 'karma', note: "1,050 Karma each (or 100 Volatile/Unbound Magic + 96c)", inputs: [] },
+                    { itemId: 46747, name: "Thermocatalytic Reagent", count: 10, source: 'tp', inputs: [] },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+        { itemId: 81051, name: "Shard of Liturgy", count: 100, source: 'forge', accountBound: true,
+          note: "Crafted (Huntsman 450)",
+          inputs: [
+            { itemId: 81163, name: "Tribute to Liturgy", count: 1, source: 'currency', note: "Bought from Living World / PoF map vendors (Itzel Mastery Vendor, Natto, Alaleh…) for map currency (e.g. Volatile Magic, Unbound Magic, Trade Contracts). Requires the matching precursor recipe.", inputs: [] },
+            { itemId: 79410, name: "Mystic Curio", count: 1, source: 'tp', note: "Mystic Curio", inputs: [] },
+            { itemId: 19684, name: "Mithril Ingot", count: 20, source: 'tp', inputs: [] },
+            { itemId: 19709, name: "Elder Wood Plank", count: 10, source: 'tp', inputs: [] },
+          ],
+        },
+        { itemId: 45838, name: "Deldrimor Steel Torch Head", count: 1, source: 'forge', accountBound: true,
+          note: "Crafted (Huntsman 500)",
+          inputs: [
+            { itemId: 46738, name: "Deldrimor Steel Ingot", count: 2, source: 'tp', inputs: [] },
+            { itemId: 24277, name: "Pile of Crystalline Dust", count: 5, source: 'tp', inputs: [] },
+            { itemId: 46747, name: "Thermocatalytic Reagent", count: 50, source: 'tp', inputs: [] },
+          ],
+        },
+        { itemId: 45836, name: "Spiritwood Torch Handle", count: 1, source: 'forge', accountBound: true,
+          note: "Crafted (Huntsman 500)",
+          inputs: [
+            { itemId: 46736, name: "Spiritwood Plank", count: 2, source: 'tp', inputs: [] },
+            { itemId: 24277, name: "Pile of Crystalline Dust", count: 5, source: 'tp', inputs: [] },
+            { itemId: 46747, name: "Thermocatalytic Reagent", count: 50, source: 'tp', inputs: [] },
+          ],
+        },
+      ],
+    },
+      { itemId: 81144, name: "Gift of Balthazar", count: 1, source: 'forge', accountBound: true, note: "Mystic Forge [wiki verified Oct 2026]",
+        inputs: [
+          { ...GIFT_OF_THE_MISTS },
+          { itemId: 79418, name: 'Mystic Runestone', count: 100, source: 'vendor', accountBound: true, note: '1 gold each (Miyani / Mystic Forge Attendant, needs Scholar of Secrets mastery)', inputs: [] },
+          { itemId: 81051, name: "Shard of Liturgy", count: 100, source: 'forge', accountBound: true,
+            note: "Crafted (Huntsman 450)",
+            inputs: [
+              { itemId: 81163, name: "Tribute to Liturgy", count: 1, source: 'currency', note: "Bought from Living World / PoF map vendors (Itzel Mastery Vendor, Natto, Alaleh…) for map currency (e.g. Volatile Magic, Unbound Magic, Trade Contracts). Requires the matching precursor recipe.", inputs: [] },
+              { itemId: 79410, name: "Mystic Curio", count: 1, source: 'tp', note: "Mystic Curio", inputs: [] },
+              { itemId: 19684, name: "Mithril Ingot", count: 20, source: 'tp', inputs: [] },
+              { itemId: 19709, name: "Elder Wood Plank", count: 10, source: 'tp', inputs: [] },
+            ],
+          },
+          { ...GIFT_OF_WOOD },
+        ],
+      },
+      { ...MYSTIC_TRIBUTE },
+      { ...GIFT_OF_MAGUUMA_MASTERY },
+    ],
+  },
+
+  // ── Verdarach (Warhorn) ──
+  {
+    id: 'legendary_verdarach',
+    name: "Verdarach",
+    itemId: 87687,   // [API verified Oct 2026]
+    rarity: 'Legendary', weaponType: 'Warhorn', generation: 2, expansion: 'Living World',
+    note: "Mystic Forge: precursor + Gift of Verdarach + Mystic Tribute + Gift of Maguuma Mastery (or Gift of Desert Mastery)",
+    inputs: [
+    { itemId: 87764, name: "Call of the Void", count: 1, source: 'forge', accountBound: true,
+      note: "Crafted (Huntsman 500) — recipe from Grandmaster Craftsman Hobbs (Lion's Arch), requires the Historian of the Armaments mastery",
+      inputs: [
+        { itemId: 87711, name: "Shard of Call of the Void", count: 100, source: 'forge', accountBound: true,
+          note: "Crafted (Huntsman 450)",
+          inputs: [
+            { itemId: 87627, name: "Tribute to the Call of the Void", count: 1, source: 'currency', note: "Bought from Living World / PoF map vendors (Itzel Mastery Vendor, Natto, Alaleh…) for map currency (e.g. Volatile Magic, Unbound Magic, Trade Contracts). Requires the matching precursor recipe.", inputs: [] },
+            { itemId: 79410, name: "Mystic Curio", count: 1, source: 'tp', note: "Mystic Curio", inputs: [] },
+            { itemId: 19684, name: "Mithril Ingot", count: 20, source: 'tp', inputs: [] },
+            { itemId: 19709, name: "Elder Wood Plank", count: 10, source: 'tp', inputs: [] },
+          ],
+        },
+        { itemId: 80503, name: "Visionary Inscription", count: 1, source: 'forge', accountBound: true,
+          note: "Crafted (Artificer, Weaponsmith, Huntsman 500)",
+          inputs: [
+            { itemId: 72261, name: "Legendary Inscription", count: 1, source: 'forge', accountBound: true,
+              note: "Crafted (Artificer, Weaponsmith, Huntsman 450)",
+              inputs: [
+                { itemId: 19721, name: "Glob of Ectoplasm", count: 10, source: 'tp', inputs: [] },
+                { itemId: 24277, name: "Pile of Crystalline Dust", count: 5, source: 'tp', inputs: [] },
+                { itemId: 12988, name: "Orichalcum Plated Dowel", count: 1, source: 'tp', inputs: [] },
+                { itemId: 46739, name: "Elonian Leather Square", count: 10, source: 'tp', inputs: [] },
+              ],
+            },
+            { itemId: 46746, name: "Vision Crystal", count: 1, source: 'forge', accountBound: true,
+              note: "Crafted (Artificer, Weaponsmith, Huntsman 500)",
+              inputs: [
+                { itemId: 46732, name: "Dragonite Ingot", count: 5, source: 'currency', note: "Account-bound — refined from Dragonite Ore", inputs: [] },
+                { itemId: 46734, name: "Empyreal Star", count: 5, source: 'currency', note: "Account-bound — refined from Empyreal Fragments", inputs: [] },
+                { itemId: 46752, name: "Augur's Stone", count: 1, source: 'spirit_shard', note: "Augur's Stone — 20 Spirit Shards from Miyani", inputs: [] },
+                { itemId: 46730, name: "Bloodstone Brick", count: 5, source: 'forge', accountBound: true,
+                  note: "Crafted (Artificer, Weaponsmith, Huntsman 450)",
+                  inputs: [
+                    { itemId: 46731, name: "Pile of Bloodstone Dust", count: 100, source: 'currency', note: "Account-bound — salvaged from ascended gear / fractal rewards", inputs: [] },
+                    { itemId: 19925, name: "Obsidian Shard", count: 2, source: 'karma', note: "1,050 Karma each (or 100 Volatile/Unbound Magic + 96c)", inputs: [] },
+                    { itemId: 46747, name: "Thermocatalytic Reagent", count: 10, source: 'tp', inputs: [] },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+        { itemId: 45839, name: "Deldrimor Steel Horn", count: 1, source: 'forge', accountBound: true,
+          note: "Crafted (Huntsman 500)",
+          inputs: [
+            { itemId: 46736, name: "Spiritwood Plank", count: 2, source: 'tp', inputs: [] },
+            { itemId: 46738, name: "Deldrimor Steel Ingot", count: 1, source: 'tp', inputs: [] },
+            { itemId: 24277, name: "Pile of Crystalline Dust", count: 5, source: 'tp', inputs: [] },
+            { itemId: 46747, name: "Thermocatalytic Reagent", count: 50, source: 'tp', inputs: [] },
+          ],
+        },
+        { itemId: 45840, name: "Deldrimor Steel Warhorn Mouthpiece", count: 1, source: 'forge', accountBound: true,
+          note: "Crafted (Huntsman 500)",
+          inputs: [
+            { itemId: 46738, name: "Deldrimor Steel Ingot", count: 1, source: 'tp', inputs: [] },
+            { itemId: 24277, name: "Pile of Crystalline Dust", count: 5, source: 'tp', inputs: [] },
+            { itemId: 46747, name: "Thermocatalytic Reagent", count: 50, source: 'tp', inputs: [] },
+          ],
+        },
+      ],
+    },
+      { itemId: 88060, name: "Gift of Verdarach", count: 1, source: 'forge', accountBound: true, note: "Mystic Forge [wiki verified Oct 2026]",
+        inputs: [
+          { ...GIFT_OF_THE_MISTS },
+          { itemId: 79418, name: 'Mystic Runestone', count: 100, source: 'vendor', accountBound: true, note: '1 gold each (Miyani / Mystic Forge Attendant, needs Scholar of Secrets mastery)', inputs: [] },
+          { itemId: 87711, name: "Shard of Call of the Void", count: 100, source: 'forge', accountBound: true,
+            note: "Crafted (Huntsman 450)",
+            inputs: [
+              { itemId: 87627, name: "Tribute to the Call of the Void", count: 1, source: 'currency', note: "Bought from Living World / PoF map vendors (Itzel Mastery Vendor, Natto, Alaleh…) for map currency (e.g. Volatile Magic, Unbound Magic, Trade Contracts). Requires the matching precursor recipe.", inputs: [] },
+              { itemId: 79410, name: "Mystic Curio", count: 1, source: 'tp', note: "Mystic Curio", inputs: [] },
+              { itemId: 19684, name: "Mithril Ingot", count: 20, source: 'tp', inputs: [] },
+              { itemId: 19709, name: "Elder Wood Plank", count: 10, source: 'tp', inputs: [] },
+            ],
+          },
+          { ...GIFT_OF_WOOD },
+        ],
+      },
+      { ...MYSTIC_TRIBUTE },
+      { ...GIFT_OF_MAGUUMA_MASTERY },
+    ],
+  },
+
+  // ── Sharur (Hammer) ──
+  {
+    id: 'legendary_sharur',
+    name: "Sharur",
+    itemId: 81839,   // [API verified Oct 2026]
+    rarity: 'Legendary', weaponType: 'Hammer', generation: 2, expansion: 'Living World',
+    note: "Mystic Forge: precursor + Gift of Arah + Mystic Tribute + Gift of Maguuma Mastery (or Gift of Desert Mastery)",
+    inputs: [
+    { itemId: 81634, name: "Might of Arah", count: 1, source: 'forge', accountBound: true,
+      note: "Crafted (Weaponsmith 500) — recipe from Grandmaster Craftsman Hobbs (Lion's Arch), requires the Historian of the Armaments mastery",
+      inputs: [
+        { itemId: 80503, name: "Visionary Inscription", count: 1, source: 'forge', accountBound: true,
+          note: "Crafted (Artificer, Weaponsmith, Huntsman 500)",
+          inputs: [
+            { itemId: 72261, name: "Legendary Inscription", count: 1, source: 'forge', accountBound: true,
+              note: "Crafted (Artificer, Weaponsmith, Huntsman 450)",
+              inputs: [
+                { itemId: 19721, name: "Glob of Ectoplasm", count: 10, source: 'tp', inputs: [] },
+                { itemId: 24277, name: "Pile of Crystalline Dust", count: 5, source: 'tp', inputs: [] },
+                { itemId: 12988, name: "Orichalcum Plated Dowel", count: 1, source: 'tp', inputs: [] },
+                { itemId: 46739, name: "Elonian Leather Square", count: 10, source: 'tp', inputs: [] },
+              ],
+            },
+            { itemId: 46746, name: "Vision Crystal", count: 1, source: 'forge', accountBound: true,
+              note: "Crafted (Artificer, Weaponsmith, Huntsman 500)",
+              inputs: [
+                { itemId: 46732, name: "Dragonite Ingot", count: 5, source: 'currency', note: "Account-bound — refined from Dragonite Ore", inputs: [] },
+                { itemId: 46734, name: "Empyreal Star", count: 5, source: 'currency', note: "Account-bound — refined from Empyreal Fragments", inputs: [] },
+                { itemId: 46752, name: "Augur's Stone", count: 1, source: 'spirit_shard', note: "Augur's Stone — 20 Spirit Shards from Miyani", inputs: [] },
+                { itemId: 46730, name: "Bloodstone Brick", count: 5, source: 'forge', accountBound: true,
+                  note: "Crafted (Artificer, Weaponsmith, Huntsman 450)",
+                  inputs: [
+                    { itemId: 46731, name: "Pile of Bloodstone Dust", count: 100, source: 'currency', note: "Account-bound — salvaged from ascended gear / fractal rewards", inputs: [] },
+                    { itemId: 19925, name: "Obsidian Shard", count: 2, source: 'karma', note: "1,050 Karma each (or 100 Volatile/Unbound Magic + 96c)", inputs: [] },
+                    { itemId: 46747, name: "Thermocatalytic Reagent", count: 10, source: 'tp', inputs: [] },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+        { itemId: 82069, name: "Shard of Arah", count: 100, source: 'forge', accountBound: true,
+          note: "Crafted (Weaponsmith 450)",
+          inputs: [
+            { itemId: 81871, name: "Tribute to Arah", count: 1, source: 'currency', note: "Bought from Living World / PoF map vendors (Itzel Mastery Vendor, Natto, Alaleh…) for map currency (e.g. Volatile Magic, Unbound Magic, Trade Contracts). Requires the matching precursor recipe.", inputs: [] },
+            { itemId: 79410, name: "Mystic Curio", count: 1, source: 'tp', note: "Mystic Curio", inputs: [] },
+            { itemId: 19684, name: "Mithril Ingot", count: 40, source: 'tp', inputs: [] },
+            { itemId: 19709, name: "Elder Wood Plank", count: 30, source: 'tp', inputs: [] },
+          ],
+        },
+        { itemId: 45851, name: "Deldrimor Steel Hammer Head", count: 1, source: 'forge', accountBound: true,
+          note: "Crafted (Weaponsmith 500)",
+          inputs: [
+            { itemId: 46738, name: "Deldrimor Steel Ingot", count: 3, source: 'tp', inputs: [] },
+            { itemId: 24277, name: "Pile of Crystalline Dust", count: 5, source: 'tp', inputs: [] },
+            { itemId: 46747, name: "Thermocatalytic Reagent", count: 50, source: 'tp', inputs: [] },
+          ],
+        },
+        { itemId: 45849, name: "Large Spiritwood Haft", count: 1, source: 'forge', accountBound: true,
+          note: "Crafted (Weaponsmith 500)",
+          inputs: [
+            { itemId: 46736, name: "Spiritwood Plank", count: 2, source: 'tp', inputs: [] },
+            { itemId: 24277, name: "Pile of Crystalline Dust", count: 5, source: 'tp', inputs: [] },
+            { itemId: 46747, name: "Thermocatalytic Reagent", count: 50, source: 'tp', inputs: [] },
+          ],
+        },
+      ],
+    },
+      { itemId: 81684, name: "Gift of Arah", count: 1, source: 'forge', accountBound: true, note: "Mystic Forge [wiki verified Oct 2026]",
+        inputs: [
+          { ...GIFT_OF_THE_MISTS },
+          { itemId: 79418, name: 'Mystic Runestone', count: 100, source: 'vendor', accountBound: true, note: '1 gold each (Miyani / Mystic Forge Attendant, needs Scholar of Secrets mastery)', inputs: [] },
+          { itemId: 82069, name: "Shard of Arah", count: 100, source: 'forge', accountBound: true,
+            note: "Crafted (Weaponsmith 450)",
+            inputs: [
+              { itemId: 81871, name: "Tribute to Arah", count: 1, source: 'currency', note: "Bought from Living World / PoF map vendors (Itzel Mastery Vendor, Natto, Alaleh…) for map currency (e.g. Volatile Magic, Unbound Magic, Trade Contracts). Requires the matching precursor recipe.", inputs: [] },
+              { itemId: 79410, name: "Mystic Curio", count: 1, source: 'tp', note: "Mystic Curio", inputs: [] },
+              { itemId: 19684, name: "Mithril Ingot", count: 40, source: 'tp', inputs: [] },
+              { itemId: 19709, name: "Elder Wood Plank", count: 30, source: 'tp', inputs: [] },
+            ],
+          },
+          { ...GIFT_OF_METAL },
+        ],
+      },
+      { ...MYSTIC_TRIBUTE },
+      { ...GIFT_OF_MAGUUMA_MASTERY },
     ],
   },
 
 ];
 
-export const LEGENDARY_GEN2_EXPANSIONS = ['All', 'Heart of Thorns', 'Path of Fire'];
+export const LEGENDARY_GEN2_EXPANSIONS = ['All', 'Heart of Thorns', 'Living World'];

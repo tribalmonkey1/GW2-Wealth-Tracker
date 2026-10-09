@@ -24,6 +24,8 @@
  * gold costs come from TP-purchasable sub-ingredients only.
  */
 
+import { BACK_ITEMS_V2, TRINKETS_V2, RELICS_V2, RUNES_V2, SIGILS_V2 } from "./legendary-data-other-v2.js";
+
 // ── Shared helpers ─────────────────────────────────────────────────────────────
 function tp(name, itemId, idName, count) {
   return { name, itemId: itemId || null, idName: idName || null, count, source: 'tp', inputs: [] };
@@ -485,12 +487,15 @@ const LEGENDARY_SIGILS = [
   legendarySigil('Legendary Sigil of Energy',        'Legendary Sigil of Energy'),
 ];
 
+// Oct 2026: back items, trinkets (except Aurora), relic, rune and sigil now come from the
+// rebuilt legendary-data-other-v2.js (real item IDs from /v2/legendaryarmory). Aurora keeps
+// its hand-built tree from this file. The older definitions above are no longer exported.
 export const LEGENDARY_OTHER_RECIPES = {
-  backItems: [AD_INFINITUM, WARBRINGER],
-  trinkets: [AURORA, VISION, COALESCENCE, PRISMATIC_REGALIA],
-  relics: [RELIC_OF_NAYOS],
-  runes: LEGENDARY_RUNES,
-  sigils: LEGENDARY_SIGILS,
+  backItems: BACK_ITEMS_V2,
+  trinkets: [AURORA, ...TRINKETS_V2],
+  relics: RELICS_V2,
+  runes: RUNES_V2,
+  sigils: SIGILS_V2,
 };
 
 export const LEGENDARY_OTHER_CATEGORIES = ['Back Items', 'Trinkets', 'Relics', 'Runes', 'Sigils'];

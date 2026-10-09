@@ -30,6 +30,7 @@ import {
   LEGENDARY_RECIPES_GEN3,
   LEGENDARY_GEN3_EXPANSIONS,
 } from "./legendary-data-gen3.js";
+import { LEGENDARY_RECIPES_NEWER } from "./legendary-data-newer.js";
 import {
   LEGENDARY_ARMOR_RECIPES,
   ARMOR_WEIGHT_CLASSES,
@@ -573,13 +574,13 @@ function LegendaryRecipeCard({ recipe, itemMap, priceMap, ownedMap, legendaryAch
           {recipe.note && <span style={{ fontSize: 10, color: 'var(--gold)', marginLeft: 10, fontStyle: 'italic' }}>{recipe.note}</span>}
         </div>
         {status && (
-          <span title={status.title} style={{ fontSize: 10, fontFamily: 'Cinzel,serif', letterSpacing: 1, padding: '2px 8px', borderRadius: 3, border: `1px solid ${status.color}`, color: status.color, flexShrink: 0 }}>
+          <span title={recipe.statusNote || status.title} style={{ fontSize: 10, fontFamily: 'Cinzel,serif', letterSpacing: 1, padding: '2px 8px', borderRadius: 3, border: `1px solid ${status.color}`, color: status.color, flexShrink: 0 }}>
             ⚠ {status.label}
           </span>
         )}
         {recipe.generation && (
           <span style={{ fontSize: 10, fontFamily: 'Cinzel,serif', letterSpacing: 1, padding: '2px 8px', borderRadius: 3, background: 'rgba(159,77,255,.15)', border: '1px solid rgba(159,77,255,.4)', color: '#9f4dff', flexShrink: 0 }}>
-            Gen {recipe.generation}
+            {recipe.badge || `Gen ${recipe.generation}`}
           </span>
         )}
         {recipe.expansion && (
@@ -673,7 +674,7 @@ export default function MysticForgeTab({ data, priceMap, ownedMap, velocitySumma
     if (!itemMap || Object.keys(itemMap).length === 0) return [];
     // Deduplicate by id to prevent duplicates when same weapon appears in multiple gen files
     const seen = new Set();
-    const allRecipes = [...LEGENDARY_RECIPES, ...LEGENDARY_RECIPES_GEN2, ...LEGENDARY_RECIPES_GEN3]
+    const allRecipes = [...LEGENDARY_RECIPES, ...LEGENDARY_RECIPES_GEN2, ...LEGENDARY_RECIPES_GEN3, ...LEGENDARY_RECIPES_NEWER]
       .filter(r => { if (seen.has(r.id)) return false; seen.add(r.id); return true; });
     return resolveLegendaryIds(allRecipes, itemMap);
   }, [itemMap]);
@@ -1185,7 +1186,7 @@ export default function MysticForgeTab({ data, priceMap, ownedMap, velocitySumma
 
           {/* Controls */}
           <div style={{ display: "flex", gap: 12, alignItems: "flex-start", marginBottom: 16, flexWrap: "wrap" }}>
-            <input className="si" placeholder="Search legendaries..." value={searchLegendary}
+            <input className="si" placeholder="Search by name or weapon type (e.g. hammer)..." value={searchLegendary}
               onChange={e => setSearchLegendary(e.target.value)} />
           </div>
 
@@ -1238,7 +1239,12 @@ export default function MysticForgeTab({ data, priceMap, ownedMap, velocitySumma
             .filter(r => legendaryGen === "All" || String(r.generation) === legendaryGen)
             .filter(r => legendaryExpansion === "All" || r.expansion === legendaryExpansion)
             .filter(r => legendaryWeaponType === "All" || r.weaponType === legendaryWeaponType)
-            .filter(r => !searchLegendary || r.name.toLowerCase().includes(searchLegendary.toLowerCase()))
+            .filter(r => {
+              // Search matches the legendary's name OR its weapon type ("hammer", "short bow"…)
+              if (!searchLegendary) return true;
+              const q = searchLegendary.toLowerCase();
+              return r.name.toLowerCase().includes(q) || (r.weaponType || '').toLowerCase().includes(q);
+            })
             .map(recipe => (
               <LegendaryRecipeCard
                 key={recipe.id}

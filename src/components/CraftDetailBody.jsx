@@ -12,6 +12,7 @@
 import React from "react";
 import { Gold } from "./Gold.jsx";
 import { VENDOR_PRICES } from "../lib/vendorPrices.js";
+import { CURRENCY_INGREDIENT_NAMES } from "../lib/gw2Api.js";
 import { getRecipeDisciplines, checkFulfillment } from "../lib/craftingCalc.js";
 
 export const forgeableOutputIds = new Set([
@@ -185,6 +186,15 @@ export function CraftDetailBody({ ci, itemMap, priceMap, ownedMap, resolvedRecip
           <span style={{ width: 60 }} /><span style={{ width: 110 }} /><span style={{ width: 130 }} />
           <span style={{ width: 130, textAlign: "right", color: "var(--red)" }}><Gold v={ci.totalMustBuyCostSell} /></span>
         </div>
+        {ci.currencyCosts?.length > 0 && ci.currencyCosts.map(c => (
+          <div key={c.currencyId} className="r-row" title="Wallet currency — no gold value, not included in the totals above">
+            <span style={{ flex: 1, fontFamily: "Cinzel,serif", fontSize: 11, letterSpacing: 1, color: "var(--text3)" }}>ALSO COSTS (WALLET CURRENCY)</span>
+            <span style={{ width: 60 }} /><span style={{ width: 110 }} /><span style={{ width: 130 }} />
+            <span style={{ width: 130, textAlign: "right", color: "var(--blue2)" }}>
+              {c.count.toLocaleString()} {CURRENCY_INGREDIENT_NAMES[c.currencyId] || `currency #${c.currencyId}`}{c.count !== 1 ? "s" : ""}
+            </span>
+          </div>
+        ))}
       </div>
 
       {/* Buy order suggestions: ingredients where placing a buy order saves gold ──

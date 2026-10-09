@@ -8,6 +8,7 @@
  * original.)
  */
 import React, { useMemo } from "react";
+import { CURRENCY_INGREDIENT_NAMES } from "../lib/gw2Api.js";
 import { Gold } from "../components/Gold.jsx";
 import { ReceiptStat } from "../components/ReceiptStat.jsx";
 import { PriceChart } from "../components/PriceChart.jsx";
@@ -355,6 +356,15 @@ export function CraftingTab({
                 <span className="ci-stat-lbl">SELL PRICE</span>
                 <span style={{ fontSize: 15 }}><Gold v={sellPrice} size={15} /></span>
                 </div>
+                {ci.currencyCosts?.length > 0 && (
+                  <div className="ci-stat" style={{ borderLeft: "1px solid var(--border)", paddingLeft: 16 }}
+                  title="Wallet currency this recipe also uses. It has no gold value, so it is not included in Net Profit.">
+                  <span className="ci-stat-lbl">ALSO COSTS</span>
+                  <span style={{ fontSize: 13, color: "var(--blue2)" }}>
+                  {ci.currencyCosts.map(c => `${c.count.toLocaleString()} ${CURRENCY_INGREDIENT_NAMES[c.currencyId] || `currency #${c.currencyId}`}${c.count !== 1 ? "s" : ""}`).join(", ")}
+                  </span>
+                  </div>
+                )}
                 <div style={{ borderLeft: "1px solid var(--border)", paddingLeft: 16 }}>
                 <ReceiptStat
                 label="NET PROFIT"
