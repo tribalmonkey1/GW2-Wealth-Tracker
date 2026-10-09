@@ -6,12 +6,14 @@
  * - Precursor is crafted through a 3-stage COLLECTION (not Mystic Forge random)
  * - Uses Gift of Maguuma Mastery (HoT) or Gift of Desert Mastery (PoF)
  *   instead of Gift of Mastery
- * - Gift of Fortune is the same as Gen 1
+ * - Mystic Tribute replaces Gen 1's Gift of Fortune (wiki verified Oct 2026)
  * - Each has a unique weapon-specific Gift
  *
  * Stage costs are approximate — many components are account-bound collections,
  * map currencies, or time-gated crafts. Gold costs show TP-priceable items only.
  */
+
+import { MYSTIC_TRIBUTE } from "./legendary-data.js";
 
 // ── Shared Gen 2 components ────────────────────────────────────────────────────
 
@@ -41,18 +43,10 @@ const GIFT_OF_DESERT_MASTERY = {
   ],
 };
 
-// Gen 2 Gift of Fortune (same as Gen 1)
-const GIFT_OF_FORTUNE_GEN2 = {
-  name: 'Gift of Fortune',
-  itemId: null, idName: 'Gift of Fortune',
-  count: 1, source: 'forge', accountBound: true,
-  inputs: [
-    { name: 'Mystic Clover',        itemId: 19675, count: 77,  source: 'tp',    inputs: [] },
-    { name: 'Glob of Ectoplasm',    itemId: 19721, count: 250, source: 'tp',    inputs: [] },
-    { name: 'Mystic Coin',          itemId: 19976, count: 77,  source: 'tp',    inputs: [] },
-    { name: 'Crystal',              itemId: null, idName: 'Crystal', count: 77, source: 'tp', inputs: [] },
-  ],
-};
+// Mystic Tribute — Gen 2 legendaries use this in the slot Gen 1 uses Gift of Fortune.
+// [wiki verified Oct 2026] 2 Gift of Condensed Magic + 2 Gift of Condensed Might
+// + 77 Mystic Clover + 250 Mystic Coin. Shared definition lives in legendary-data.js.
+// (Previously a placeholder "Gift of Fortune" with 77 Mystic Coin + 77 "Crystal".)
 
 // T6 materials shorthand (same IDs as Gen 1 — imported at runtime)
 const T6_IDS = {
@@ -86,7 +80,10 @@ function collectionStage(name, stageNum, note) {
 function collectionPrecursor(baseName, stage1Note, stage2Note, stage3Note, extraInputs) {
   return {
     name: `${baseName} (Precursor)`,
-    itemId: null, idName: baseName,
+    // idName intentionally null: baseName is the LEGENDARY's name, so looking it up
+    // would resolve the precursor row to the finished legendary. Precursor item
+    // names are not yet curated for Gen 2.
+    itemId: null, idName: null,
     count: 1, source: 'collection', accountBound: true,
     note: 'Gen 2 precursor — crafted via 3-stage collection (account-bound)',
     inputs: [
@@ -108,6 +105,7 @@ export const LEGENDARY_RECIPES_GEN2 = [
     rarity: 'Legendary',
     weaponType: 'Pistol',
     generation: 2,
+    dataStatus: 'partial', // tribute + mastery verified; weapon gift + precursor stages not yet wiki-verified
     expansion: 'Heart of Thorns',
     note: 'Gen 2 — precursor via 3-stage collection (HOPE I/II/III)',
     inputs: [
@@ -143,7 +141,7 @@ export const LEGENDARY_RECIPES_GEN2 = [
           },
         ],
       },
-      { ...GIFT_OF_FORTUNE_GEN2 },
+      { ...MYSTIC_TRIBUTE },
       { ...GIFT_OF_MAGUUMA_MASTERY },
     ],
   },
@@ -156,6 +154,7 @@ export const LEGENDARY_RECIPES_GEN2 = [
     rarity: 'Legendary',
     weaponType: 'Sword',
     generation: 2,
+    dataStatus: 'partial', // tribute + mastery verified; weapon gift + precursor stages not yet wiki-verified
     expansion: 'Heart of Thorns',
     inputs: [
       collectionPrecursor('The Shining Blade',
@@ -173,7 +172,7 @@ export const LEGENDARY_RECIPES_GEN2 = [
           t6('Armored Scale', 24289, null, 250),
         ],
       },
-      { ...GIFT_OF_FORTUNE_GEN2 },
+      { ...MYSTIC_TRIBUTE },
       { ...GIFT_OF_MAGUUMA_MASTERY },
     ],
   },
@@ -186,6 +185,7 @@ export const LEGENDARY_RECIPES_GEN2 = [
     rarity: 'Legendary',
     weaponType: 'Axe',
     generation: 2,
+    dataStatus: 'partial', // tribute + mastery verified; weapon gift + precursor stages not yet wiki-verified
     expansion: 'Heart of Thorns',
     inputs: [
       collectionPrecursor('Astralaria',
@@ -203,7 +203,7 @@ export const LEGENDARY_RECIPES_GEN2 = [
           t6('Ancient Bone', 24358, null, 250),
         ],
       },
-      { ...GIFT_OF_FORTUNE_GEN2 },
+      { ...MYSTIC_TRIBUTE },
       { ...GIFT_OF_MAGUUMA_MASTERY },
     ],
   },
@@ -216,6 +216,7 @@ export const LEGENDARY_RECIPES_GEN2 = [
     rarity: 'Legendary',
     weaponType: 'Short Bow',
     generation: 2,
+    dataStatus: 'partial', // tribute + mastery verified; weapon gift + precursor stages not yet wiki-verified
     expansion: 'Heart of Thorns',
     inputs: [
       collectionPrecursor('Chuka and Champawat',
@@ -233,37 +234,7 @@ export const LEGENDARY_RECIPES_GEN2 = [
           t6('Vicious Claw', 24351, null, 250),
         ],
       },
-      { ...GIFT_OF_FORTUNE_GEN2 },
-      { ...GIFT_OF_MAGUUMA_MASTERY },
-    ],
-  },
-
-  // ── Naegling (Mace, HoT) ─────────────────────────────────────────────────────
-  {
-    id: 'legendary_naegling',
-    name: 'Naegling',
-    itemId: null, idName: 'Naegling',
-    rarity: 'Legendary',
-    weaponType: 'Mace',
-    generation: 2,
-    expansion: 'Heart of Thorns',
-    inputs: [
-      collectionPrecursor('Naegling',
-        'Naegling I: The Experimental Mace',
-        'Naegling II: The Prototype',
-        'Naegling III: The Perfected Mace'),
-      {
-        name: 'Gift of Naegling',
-        itemId: null, idName: 'Gift of Naegling',
-        count: 1, source: 'forge', accountBound: true,
-        inputs: [
-          ls('Onyx Lodestone', 100),
-          t6('Ancient Bone', 24358, null, 250),
-          t6('Vicious Claw', 24351, null, 250),
-          t6('Vial of Powerful Blood', null, 'Vial of Powerful Blood', 250),
-        ],
-      },
-      { ...GIFT_OF_FORTUNE_GEN2 },
+      { ...MYSTIC_TRIBUTE },
       { ...GIFT_OF_MAGUUMA_MASTERY },
     ],
   },
@@ -274,8 +245,9 @@ export const LEGENDARY_RECIPES_GEN2 = [
     name: 'Shooshadoo',
     itemId: null, idName: 'Shooshadoo',
     rarity: 'Legendary',
-    weaponType: 'Warhorn',
+    weaponType: 'Shield',
     generation: 2,
+    dataStatus: 'partial', // tribute + mastery verified; weapon gift + precursor stages not yet wiki-verified
     expansion: 'Heart of Thorns',
     inputs: [
       collectionPrecursor('Shooshadoo',
@@ -293,7 +265,7 @@ export const LEGENDARY_RECIPES_GEN2 = [
           t6('Elaborate Totem', null, 'Elaborate Totem', 250),
         ],
       },
-      { ...GIFT_OF_FORTUNE_GEN2 },
+      { ...MYSTIC_TRIBUTE },
       { ...GIFT_OF_MAGUUMA_MASTERY },
     ],
   },
@@ -306,6 +278,7 @@ export const LEGENDARY_RECIPES_GEN2 = [
     rarity: 'Legendary',
     weaponType: 'Staff',
     generation: 2,
+    dataStatus: 'partial', // tribute + mastery verified; weapon gift + precursor stages not yet wiki-verified
     expansion: 'Heart of Thorns',
     inputs: [
       collectionPrecursor('Nevermore',
@@ -323,7 +296,7 @@ export const LEGENDARY_RECIPES_GEN2 = [
           t6('Vicious Claw', 24351, null, 250),
         ],
       },
-      { ...GIFT_OF_FORTUNE_GEN2 },
+      { ...MYSTIC_TRIBUTE },
       { ...GIFT_OF_MAGUUMA_MASTERY },
     ],
   },
@@ -334,8 +307,9 @@ export const LEGENDARY_RECIPES_GEN2 = [
     name: 'Eureka',
     itemId: null, idName: 'Eureka',
     rarity: 'Legendary',
-    weaponType: 'Scepter',
+    weaponType: 'Mace',
     generation: 2,
+    dataStatus: 'partial', // tribute + mastery verified; weapon gift + precursor stages not yet wiki-verified
     expansion: 'Heart of Thorns',
     inputs: [
       collectionPrecursor('Eureka',
@@ -353,7 +327,7 @@ export const LEGENDARY_RECIPES_GEN2 = [
           t6('Pile of Crystalline Dust', 24277, null, 250),
         ],
       },
-      { ...GIFT_OF_FORTUNE_GEN2 },
+      { ...MYSTIC_TRIBUTE },
       { ...GIFT_OF_MAGUUMA_MASTERY },
     ],
   },
@@ -361,11 +335,12 @@ export const LEGENDARY_RECIPES_GEN2 = [
   // ── HMS Divinity (Shield, HoT) ───────────────────────────────────────────────
   {
     id: 'legendary_hms_divinity',
-    name: 'HMS Divinity',
-    itemId: null, idName: 'HMS Divinity',
+    name: 'The HMS Divinity',
+    itemId: null, idName: 'The HMS Divinity',
     rarity: 'Legendary',
-    weaponType: 'Shield',
+    weaponType: 'Rifle',
     generation: 2,
+    dataStatus: 'partial', // tribute + mastery verified; weapon gift + precursor stages not yet wiki-verified
     expansion: 'Heart of Thorns',
     inputs: [
       collectionPrecursor('HMS Divinity',
@@ -383,7 +358,7 @@ export const LEGENDARY_RECIPES_GEN2 = [
           t6('Vial of Powerful Blood', null, 'Vial of Powerful Blood', 250),
         ],
       },
-      { ...GIFT_OF_FORTUNE_GEN2 },
+      { ...MYSTIC_TRIBUTE },
       { ...GIFT_OF_MAGUUMA_MASTERY },
     ],
   },
@@ -394,8 +369,9 @@ export const LEGENDARY_RECIPES_GEN2 = [
     name: 'The Binding of Ipos',
     itemId: null, idName: 'The Binding of Ipos',
     rarity: 'Legendary',
-    weaponType: 'Dagger',
+    weaponType: 'Focus',
     generation: 2,
+    dataStatus: 'partial', // tribute + mastery verified; weapon gift + precursor stages not yet wiki-verified
     expansion: 'Heart of Thorns',
     inputs: [
       collectionPrecursor('The Binding of Ipos',
@@ -413,7 +389,7 @@ export const LEGENDARY_RECIPES_GEN2 = [
           t6('Powerful Venom Sac', null, 'Powerful Venom Sac', 250),
         ],
       },
-      { ...GIFT_OF_FORTUNE_GEN2 },
+      { ...MYSTIC_TRIBUTE },
       { ...GIFT_OF_MAGUUMA_MASTERY },
     ],
   },
@@ -426,6 +402,7 @@ export const LEGENDARY_RECIPES_GEN2 = [
     rarity: 'Legendary',
     weaponType: 'Dagger',
     generation: 2,
+    dataStatus: 'partial', // tribute + mastery verified; weapon gift + precursor stages not yet wiki-verified
     expansion: 'Heart of Thorns',
     inputs: [
       collectionPrecursor('Claw of the Khan-Ur',
@@ -443,38 +420,8 @@ export const LEGENDARY_RECIPES_GEN2 = [
           t6('Ancient Bone', 24358, null, 250),
         ],
       },
-      { ...GIFT_OF_FORTUNE_GEN2 },
+      { ...MYSTIC_TRIBUTE },
       { ...GIFT_OF_MAGUUMA_MASTERY },
-    ],
-  },
-
-  // ── Elegy (Pistol, PoF) ──────────────────────────────────────────────────────
-  {
-    id: 'legendary_elegy',
-    name: 'Elegy',
-    itemId: null, idName: 'Elegy',
-    rarity: 'Legendary',
-    weaponType: 'Pistol',
-    generation: 2,
-    expansion: 'Path of Fire',
-    inputs: [
-      collectionPrecursor('Elegy',
-        'Elegy I: The Experimental Pistol',
-        'Elegy II: The Prototype',
-        'Elegy III: The Perfected Pistol — PoF currencies'),
-      {
-        name: 'Gift of Elegy',
-        itemId: null, idName: 'Gift of Elegy',
-        count: 1, source: 'forge', accountBound: true,
-        inputs: [
-          ls('Glacial Lodestone', 100),
-          t6('Powerful Venom Sac', null, 'Powerful Venom Sac', 250),
-          t6('Armored Scale', 24289, null, 250),
-          t6('Pile of Crystalline Dust', 24277, null, 250),
-        ],
-      },
-      { ...GIFT_OF_FORTUNE_GEN2 },
-      { ...GIFT_OF_DESERT_MASTERY },
     ],
   },
 
@@ -486,6 +433,7 @@ export const LEGENDARY_RECIPES_GEN2 = [
     rarity: 'Legendary',
     weaponType: 'Greatsword',
     generation: 2,
+    dataStatus: 'partial', // tribute + mastery verified; weapon gift + precursor stages not yet wiki-verified
     expansion: 'Path of Fire',
     inputs: [
       collectionPrecursor('Exordium',
@@ -503,7 +451,7 @@ export const LEGENDARY_RECIPES_GEN2 = [
           t6('Vial of Powerful Blood', null, 'Vial of Powerful Blood', 250),
         ],
       },
-      { ...GIFT_OF_FORTUNE_GEN2 },
+      { ...MYSTIC_TRIBUTE },
       { ...GIFT_OF_DESERT_MASTERY },
     ],
   },
@@ -516,6 +464,7 @@ export const LEGENDARY_RECIPES_GEN2 = [
     rarity: 'Legendary',
     weaponType: 'Long Bow',
     generation: 2,
+    dataStatus: 'partial', // tribute + mastery verified; weapon gift + precursor stages not yet wiki-verified
     expansion: 'Path of Fire',
     inputs: [
       collectionPrecursor('Pharus',
@@ -533,97 +482,7 @@ export const LEGENDARY_RECIPES_GEN2 = [
           t6('Pile of Crystalline Dust', 24277, null, 250),
         ],
       },
-      { ...GIFT_OF_FORTUNE_GEN2 },
-      { ...GIFT_OF_DESERT_MASTERY },
-    ],
-  },
-
-  // ── Tigris (Pistol, PoF) ─────────────────────────────────────────────────────
-  {
-    id: 'legendary_tigris',
-    name: 'Tigris',
-    itemId: null, idName: 'Tigris',
-    rarity: 'Legendary',
-    weaponType: 'Rifle',
-    generation: 2,
-    expansion: 'Path of Fire',
-    inputs: [
-      collectionPrecursor('Tigris',
-        'Tigris I: The Experimental Rifle',
-        'Tigris II: The Prototype',
-        'Tigris III: The Perfected Rifle'),
-      {
-        name: 'Gift of Tigris',
-        itemId: null, idName: 'Gift of Tigris',
-        count: 1, source: 'forge', accountBound: true,
-        inputs: [
-          ls('Destroyer Lodestone', 100),
-          t6('Vicious Fang', 24357, null, 250),
-          t6('Vicious Claw', 24351, null, 250),
-          t6('Ancient Bone', 24358, null, 250),
-        ],
-      },
-      { ...GIFT_OF_FORTUNE_GEN2 },
-      { ...GIFT_OF_DESERT_MASTERY },
-    ],
-  },
-
-  // ── Ruka (Hammer, PoF) ──────────────────────────────────────────────────────
-  {
-    id: 'legendary_ruka',
-    name: 'Ruka',
-    itemId: null, idName: 'Ruka',
-    rarity: 'Legendary',
-    weaponType: 'Hammer',
-    generation: 2,
-    expansion: 'Path of Fire',
-    inputs: [
-      collectionPrecursor('Ruka',
-        'Ruka I: The Experimental Hammer',
-        'Ruka II: The Prototype',
-        'Ruka III: The Perfected Hammer'),
-      {
-        name: 'Gift of Ruka',
-        itemId: null, idName: 'Gift of Ruka',
-        count: 1, source: 'forge', accountBound: true,
-        inputs: [
-          ls('Destroyer Lodestone', 100),
-          t6('Ancient Bone', 24358, null, 250),
-          t6('Vial of Powerful Blood', null, 'Vial of Powerful Blood', 250),
-          t6('Armored Scale', 24289, null, 250),
-        ],
-      },
-      { ...GIFT_OF_FORTUNE_GEN2 },
-      { ...GIFT_OF_DESERT_MASTERY },
-    ],
-  },
-
-  // ── Phoenix (Short Bow, PoF) ─────────────────────────────────────────────────
-  {
-    id: 'legendary_phoenix',
-    name: 'Phoenix',
-    itemId: null, idName: 'Phoenix',
-    rarity: 'Legendary',
-    weaponType: 'Short Bow',
-    generation: 2,
-    expansion: 'Path of Fire',
-    inputs: [
-      collectionPrecursor('Phoenix',
-        'Phoenix I: The Experimental Short Bow',
-        'Phoenix II: The Prototype',
-        'Phoenix III: The Perfected Short Bow'),
-      {
-        name: 'Gift of Phoenix',
-        itemId: null, idName: 'Gift of Phoenix',
-        count: 1, source: 'forge', accountBound: true,
-        inputs: [
-          ls('Molten Lodestone', 100),
-          t6('Elaborate Totem', null, 'Elaborate Totem', 250),
-          t6('Powerful Venom Sac', null, 'Powerful Venom Sac', 250),
-          t6('Vicious Fang', 24357, null, 250),
-        ],
-      },
-      { ...GIFT_OF_FORTUNE_GEN2 },
+      { ...MYSTIC_TRIBUTE },
       { ...GIFT_OF_DESERT_MASTERY },
     ],
   },

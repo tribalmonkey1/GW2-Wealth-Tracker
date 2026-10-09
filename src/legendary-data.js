@@ -16,6 +16,8 @@
  *  but have no TP price lookup.
  */
 
+import { evaluateLegendaryTree } from "./legendary-cost.js";
+
 // ── Verified Item IDs ─────────────────────────────────────────────────────────
 const ID = {
   // Shared gift outputs
@@ -124,8 +126,8 @@ const ID = {
   MYSTIC_TRIBUTE:           71820,
 
   // Gen 1 legendary weapons
-  ETERNITY:                 88933,
-  THE_BIFROST:              88567,
+  ETERNITY:                 30689,   // [API verified Oct 2026] — 88933 was an NPC/axe-type copy, not the craftable weapon
+  THE_BIFROST:              30698,   // [API verified Oct 2026] — 88567 was an NPC/axe-type copy, not the craftable weapon
 
   // Previously-null IDs — resolved June 2026
   SPIRITWOOD_PLANK:         46736,   // Ascended, account-bound, TP tradeable
@@ -508,6 +510,10 @@ function tp(itemId, name, count) {
 function forge(itemId, name, count, inputs) {
   return { itemId, name, count, source: 'forge', accountBound: true, inputs };
 }
+// Account-bound vendor purchase for gold (e.g. Icy Runestone, 1g each from Miyani)
+function vendor(itemId, name, count, note) {
+  return { itemId, name, count, source: 'vendor', accountBound: true, note: note || '1 gold each from Miyani (account-bound, not on TP)', inputs: [] };
+}
 function wvw(itemId, name, count, note) {
   return { itemId, name, count, source: 'wvw', accountBound: true, note, inputs: [] };
 }
@@ -560,7 +566,8 @@ const GIFT_OF_FORTUNE = forge(ID.GIFT_OF_FORTUNE, 'Gift of Fortune', 1, [
 
 // Gift of Mastery [wiki verified]
 const GIFT_OF_MASTERY = forge(ID.GIFT_OF_MASTERY, 'Gift of Mastery', 1, [
-  collection(null, 'Bloodstone Shard', 1, 'Account-bound — from Arah story path or HoT mastery vendor'),
+  { itemId: 20797, name: 'Bloodstone Shard', count: 1, source: 'spirit_shard', accountBound: true,
+    note: '200 Spirit Shards from Miyani [API + wiki verified Oct 2026]', inputs: [] },
   karma(ID.OBSIDIAN_SHARD, 'Obsidian Shard', 250, '1,050 Karma each (or Volatile/Unbound Magic + 96c)'),
   exploration(ID.GIFT_OF_EXPLORATION, 'Gift of Exploration', 1, '100% World Completion (all hearts, WPs, PoIs, Vistas)'),
   wvw(ID.GIFT_OF_BATTLE, 'Gift of Battle', 1, 'WvW Skirmish reward track'),
@@ -700,7 +707,7 @@ const LEGENDARY_INSCRIPTION_COMPONENT = {
 const GIFT_OF_TWILIGHT = forge(ID.GIFT_OF_TWILIGHT, 'Gift of Twilight', 1, [
   { ...GIFT_OF_METAL },
   { ...GIFT_OF_DARKNESS },
-  tp(ID.ICY_RUNESTONE,    'Icy Runestone',           100),
+  vendor(ID.ICY_RUNESTONE,    'Icy Runestone',           100),
   tp(ID.SIGIL_OF_BLOOD,   'Superior Sigil of Blood',  1),
 ]);
 
@@ -708,7 +715,7 @@ const GIFT_OF_TWILIGHT = forge(ID.GIFT_OF_TWILIGHT, 'Gift of Twilight', 1, [
 const GIFT_OF_SUNRISE = forge(ID.GIFT_OF_SUNRISE, 'Gift of Sunrise', 1, [
   { ...GIFT_OF_METAL },
   { ...GIFT_OF_LIGHT },
-  tp(ID.ICY_RUNESTONE,      'Icy Runestone',              100),
+  vendor(ID.ICY_RUNESTONE,      'Icy Runestone',              100),
   tp(ID.SIGIL_OF_STRENGTH,  'Superior Sigil of Strength',   1),
 ]);
 
@@ -716,7 +723,7 @@ const GIFT_OF_SUNRISE = forge(ID.GIFT_OF_SUNRISE, 'Gift of Sunrise', 1, [
 const GIFT_OF_BOLT = forge(ID.GIFT_OF_BOLT, 'Gift of Bolt', 1, [
   { ...GIFT_OF_METAL },
   { ...GIFT_OF_LIGHTNING },
-  tp(ID.ICY_RUNESTONE,   'Icy Runestone',          100),
+  vendor(ID.ICY_RUNESTONE,   'Icy Runestone',          100),
   tp(ID.SIGIL_OF_AIR,    'Superior Sigil of Air',   1),
 ]);
 
@@ -724,7 +731,7 @@ const GIFT_OF_BOLT = forge(ID.GIFT_OF_BOLT, 'Gift of Bolt', 1, [
 const GIFT_OF_FROSTFANG = forge(ID.GIFT_OF_FROSTFANG, 'Gift of Frostfang', 1, [
   { ...GIFT_OF_METAL },
   { ...GIFT_OF_ICE },
-  tp(ID.ICY_RUNESTONE,   'Icy Runestone',          100),
+  vendor(ID.ICY_RUNESTONE,   'Icy Runestone',          100),
   tp(ID.SIGIL_OF_ICE,    'Superior Sigil of Ice',   1),
 ]);
 
@@ -732,7 +739,7 @@ const GIFT_OF_FROSTFANG = forge(ID.GIFT_OF_FROSTFANG, 'Gift of Frostfang', 1, [
 const GIFT_OF_INCINERATOR = forge(ID.GIFT_OF_INCINERATOR, 'Gift of Incinerator', 1, [
   { ...GIFT_OF_METAL },
   { ...VIAL_OF_LIQUID_FLAME },
-  tp(ID.ICY_RUNESTONE,   'Icy Runestone',          100),
+  vendor(ID.ICY_RUNESTONE,   'Icy Runestone',          100),
   tp(ID.SIGIL_OF_FIRE,   'Superior Sigil of Fire',  1),
 ]);
 
@@ -753,7 +760,7 @@ const GIFT_OF_THE_MOOT = forge(ID.GIFT_OF_THE_MOOT, 'Gift of The Moot', 1, [
         note: 'Gem Store consumable (80 gems each) — also TP tradeable', inputs: [] },
     ],
   },
-  tp(ID.ICY_RUNESTONE,    'Icy Runestone',            100),
+  vendor(ID.ICY_RUNESTONE,    'Icy Runestone',            100),
   tp(ID.SIGIL_OF_ENERGY,  'Superior Sigil of Energy',  1),
 ]);
 
@@ -773,7 +780,7 @@ const GIFT_OF_QUIP = forge(ID.GIFT_OF_QUIP, 'Gift of Quip', 1, [
         note: 'Gem Store consumable (80 gems each) — also TP tradeable', inputs: [] },
     ],
   },
-  tp(ID.ICY_RUNESTONE,    'Icy Runestone',              100),
+  vendor(ID.ICY_RUNESTONE,    'Icy Runestone',              100),
   tp(ID.SIGIL_OF_STAMINA, 'Superior Sigil of Stamina',   1),
 ]);
 
@@ -792,7 +799,7 @@ const GIFT_OF_METEORLOGICUS = forge(ID.GIFT_OF_METEORLOGICUS, 'Gift of Meteorlog
       tp(ID.CHARGED_LODESTONE, 'Charged Lodestone', 100),
     ],
   },
-  tp(ID.ICY_RUNESTONE,   'Icy Runestone',          100),
+  vendor(ID.ICY_RUNESTONE,   'Icy Runestone',          100),
   tp(ID.SIGIL_OF_AIR,    'Superior Sigil of Air',   1),
 ]);
 
@@ -800,7 +807,7 @@ const GIFT_OF_METEORLOGICUS = forge(ID.GIFT_OF_METEORLOGICUS, 'Gift of Meteorlog
 const GIFT_OF_THE_MINSTREL = forge(ID.GIFT_OF_THE_MINSTREL, 'Gift of The Minstrel', 1, [
   { ...GIFT_OF_ENERGY },
   { ...GIFT_OF_MUSIC },
-  tp(ID.ICY_RUNESTONE,    'Icy Runestone',            100),
+  vendor(ID.ICY_RUNESTONE,    'Icy Runestone',            100),
   tp(ID.SIGIL_OF_ENERGY,  'Superior Sigil of Energy',  1),
 ]);
 
@@ -810,7 +817,7 @@ const GIFT_OF_THE_FLAMESEEKER = forge(ID.GIFT_OF_THE_FLAMESEEKER, 'Gift of The F
   { itemId: ID.GIFT_OF_HISTORY, name: 'Gift of History', count: 1,
     source: 'collection', accountBound: true,
     note: 'Account-bound crafted item — obtained via The Flameseeker Prophecies collection chain', inputs: [] },
-  tp(ID.ICY_RUNESTONE,    'Icy Runestone',             100),
+  vendor(ID.ICY_RUNESTONE,    'Icy Runestone',             100),
   tp(ID.SIGIL_OF_BATTLE,  'Superior Sigil of Battle',   1),
 ]);
 
@@ -818,7 +825,7 @@ const GIFT_OF_THE_FLAMESEEKER = forge(ID.GIFT_OF_THE_FLAMESEEKER, 'Gift of The F
 const GIFT_OF_RODGORT = forge(ID.GIFT_OF_RODGORT, 'Gift of Rodgort', 1, [
   { ...GIFT_OF_WOOD },
   { ...VIAL_OF_LIQUID_FLAME },
-  tp(ID.ICY_RUNESTONE,   'Icy Runestone',          100),
+  vendor(ID.ICY_RUNESTONE,   'Icy Runestone',          100),
   tp(ID.SIGIL_OF_FIRE,   'Superior Sigil of Fire',  1),
 ]);
 
@@ -828,7 +835,7 @@ const GIFT_OF_HOWLER = forge(ID.GIFT_OF_HOWLER, 'Gift of Howler', 1, [
   { itemId: ID.WOLF_STATUE, name: 'Wolf Statue', count: 1,
     source: 'collection', accountBound: true,
     note: 'Account-bound crafted item — obtained via Howler collection chain', inputs: [] },
-  tp(ID.ICY_RUNESTONE,     'Icy Runestone',              100),
+  vendor(ID.ICY_RUNESTONE,     'Icy Runestone',              100),
   tp(ID.SIGIL_OF_ACCURACY, 'Superior Sigil of Accuracy',  1),
 ]);
 
@@ -851,7 +858,7 @@ const VIAL_OF_QUICKSILVER = {
 const GIFT_OF_THE_JUGGERNAUT = forge(ID.GIFT_OF_THE_JUGGERNAUT, 'Gift of The Juggernaut', 1, [
   { ...GIFT_OF_METAL },
   { ...VIAL_OF_QUICKSILVER },
-  tp(ID.ICY_RUNESTONE,       'Icy Runestone',                100),
+  vendor(ID.ICY_RUNESTONE,       'Icy Runestone',                100),
   tp(ID.SIGIL_OF_BENEVOLENCE,'Superior Sigil of Benevolence', 1),
 ]);
 
@@ -859,7 +866,7 @@ const GIFT_OF_THE_JUGGERNAUT = forge(ID.GIFT_OF_THE_JUGGERNAUT, 'Gift of The Jug
 const GIFT_OF_KUDZU = forge(ID.GIFT_OF_KUDZU, 'Gift of Kudzu', 1, [
   { ...GIFT_OF_WOOD },
   { ...GIFT_OF_NATURE },
-  tp(ID.ICY_RUNESTONE,     'Icy Runestone',             100),
+  vendor(ID.ICY_RUNESTONE,     'Icy Runestone',             100),
   tp(ID.SIGIL_OF_CELERITY, 'Superior Sigil of Celerity', 1),
 ]);
 
@@ -869,7 +876,7 @@ const GIFT_OF_THE_PREDATOR = forge(ID.GIFT_OF_THE_PREDATOR, 'Gift of The Predato
   { itemId: ID.GIFT_OF_STEALTH, name: 'Gift of Stealth', count: 1,
     source: 'collection', accountBound: true,
     note: 'Account-bound crafted item — obtained via The Predator collection chain', inputs: [] },
-  tp(ID.ICY_RUNESTONE,    'Icy Runestone',           100),
+  vendor(ID.ICY_RUNESTONE,    'Icy Runestone',           100),
   tp(ID.SIGIL_OF_FORCE,   'Superior Sigil of Force',  1),
 ]);
 
@@ -879,7 +886,7 @@ const GIFT_OF_THE_DREAMER = forge(ID.GIFT_OF_THE_DREAMER, 'Gift of The Dreamer',
   { itemId: ID.UNICORN_STATUE, name: 'Unicorn Statue', count: 1,
     source: 'collection', accountBound: true,
     note: 'Account-bound crafted item — obtained via The Dreamer collection chain', inputs: [] },
-  tp(ID.ICY_RUNESTONE,    'Icy Runestone',           100),
+  vendor(ID.ICY_RUNESTONE,    'Icy Runestone',           100),
   tp(ID.SIGIL_OF_PURITY,  'Superior Sigil of Purity', 1),
 ]);
 
@@ -887,7 +894,7 @@ const GIFT_OF_THE_DREAMER = forge(ID.GIFT_OF_THE_DREAMER, 'Gift of The Dreamer',
 const GIFT_OF_THE_BIFROST = forge(ID.GIFT_OF_THE_BIFROST, 'Gift of The Bifrost', 1, [
   { ...GIFT_OF_ENERGY },
   { ...GIFT_OF_COLOR },
-  tp(ID.ICY_RUNESTONE,         'Icy Runestone',                100),
+  vendor(ID.ICY_RUNESTONE,         'Icy Runestone',                100),
   tp(ID.SIGIL_OF_NULLIFICATION,'Superior Sigil of Nullification', 1),
 ]);
 
@@ -897,7 +904,7 @@ const GIFT_OF_FRENZY = forge(ID.GIFT_OF_FRENZY, 'Gift of Frenzy', 1, [
   { itemId: ID.GIFT_OF_WATER, name: 'Gift of Water', count: 1,
     source: 'collection', accountBound: true,
     note: 'Account-bound crafted item — obtained via Frenzy collection chain', inputs: [] },
-  tp(ID.ICY_RUNESTONE,   'Icy Runestone',          100),
+  vendor(ID.ICY_RUNESTONE,   'Icy Runestone',          100),
   tp(ID.SIGIL_OF_RAGE,   'Superior Sigil of Rage',  1),
 ]);
 
@@ -907,7 +914,7 @@ const GIFT_OF_KOTAKI = forge(ID.GIFT_OF_KOTAKI, "Gift of Kamohoali'i Kotaki", 1,
   { itemId: ID.SHARK_STATUE, name: 'Shark Statue', count: 1,
     source: 'collection', accountBound: true,
     note: "Account-bound crafted item — obtained via Kamohoali'i Kotaki collection chain", inputs: [] },
-  tp(ID.ICY_RUNESTONE,   'Icy Runestone',          100),
+  vendor(ID.ICY_RUNESTONE,   'Icy Runestone',          100),
   tp(ID.SIGIL_OF_AGONY,  'Superior Sigil of Agony', 1),
 ]);
 
@@ -927,13 +934,13 @@ const GIFT_OF_KRAITKIN = forge(ID.GIFT_OF_KRAITKIN, 'Gift of Kraitkin', 1, [
       tp(ID.ARMORED_SCALE,              'Armored Scale',                     250),
     ],
   },
-  tp(ID.ICY_RUNESTONE,   'Icy Runestone',          100),
+  vendor(ID.ICY_RUNESTONE,   'Icy Runestone',          100),
   tp(ID.SIGIL_OF_VENOM,  'Superior Sigil of Venom', 1),
 ]);
 
 // ── Gen 2 shared components ────────────────────────────────────────────────────
 
-const MYSTIC_TRIBUTE = forge(ID.MYSTIC_TRIBUTE, 'Mystic Tribute', 1, [
+export const MYSTIC_TRIBUTE = forge(ID.MYSTIC_TRIBUTE, 'Mystic Tribute', 1, [
   forge(ID.GIFT_OF_CONDENSED_MAGIC, 'Gift of Condensed Magic', 2, [
     forge(ID.GIFT_OF_BLOOD, 'Gift of Blood', 1, [
       tp(ID.VIAL_OF_POWERFUL_BLOOD, 'Vial of Powerful Blood', 100),
@@ -1014,7 +1021,7 @@ export const LEGENDARY_RECIPES = [
   {
     id: 'legendary_twilight',
     name: 'Twilight',
-    itemId: null,
+    itemId: 30704,   // [API verified Oct 2026]
     rarity: 'Legendary', weaponType: 'Greatsword', generation: 1,
     inputs: [
       precursor(ID.DUSK, 'Dusk'),
@@ -1028,7 +1035,7 @@ export const LEGENDARY_RECIPES = [
   {
     id: 'legendary_sunrise',
     name: 'Sunrise',
-    itemId: null,
+    itemId: 30703,   // [API verified Oct 2026]
     rarity: 'Legendary', weaponType: 'Greatsword', generation: 1,
     inputs: [
       precursor(ID.DAWN, 'Dawn'),
@@ -1052,7 +1059,7 @@ export const LEGENDARY_RECIPES = [
     inputs: [
       // ── Twilight ────────────────────────────────────────────────────────────
       {
-        itemId: null,
+        itemId: 30704,   // [API verified Oct 2026] — lets the engine compare TP price vs. crafting
         name: 'Twilight',
         count: 1,
         source: 'tp',
@@ -1067,7 +1074,7 @@ export const LEGENDARY_RECIPES = [
       },
       // ── Sunrise ─────────────────────────────────────────────────────────────
       {
-        itemId: null,
+        itemId: 30703,   // [API verified Oct 2026] — lets the engine compare TP price vs. crafting
         name: 'Sunrise',
         count: 1,
         source: 'tp',
@@ -1440,7 +1447,7 @@ export const LEGENDARY_RECIPES = [
             note: 'Crafted (Weaponsmith 500) — recipe from Box of Recipes: Tooth of Frostfang',
             inputs: [
               tp(ID.GLACIAL_LODESTONE,        'Glacial Lodestone',        10),
-              tp(ID.ICY_RUNESTONE,             'Icy Runestone',            10),
+              vendor(ID.ICY_RUNESTONE,             'Icy Runestone',            10),
               tp(ID.SNOW_DIAMOND,              'Snow Diamond',              1),
               tp(ID.PILE_OF_CRYSTALLINE_DUST,  'Pile of Crystalline Dust', 10),
             ],
@@ -1858,7 +1865,7 @@ export const LEGENDARY_RECIPES = [
   {
     id: 'legendary_quip',
     name: 'Quip',
-    itemId: null,
+    itemId: 30693,   // [API verified Oct 2026]
     rarity: 'Legendary', weaponType: 'Pistol', generation: 1,
     inputs: [
       // ── Chaos Gun precursor — 3-tier Legendary Crafting collection ────────
@@ -2266,7 +2273,7 @@ export const LEGENDARY_RECIPES = [
   {
     id: 'legendary_minstrel',
     name: 'The Minstrel',
-    itemId: null,
+    itemId: 30688,   // [API verified Oct 2026]
     rarity: 'Legendary', weaponType: 'Focus', generation: 1,
     inputs: [
       precursor(ID.THE_BARD, 'The Bard'),
@@ -2280,7 +2287,7 @@ export const LEGENDARY_RECIPES = [
   {
     id: 'legendary_flameseeker',
     name: 'The Flameseeker Prophecies',
-    itemId: null,
+    itemId: 30696,   // [API verified Oct 2026]
     rarity: 'Legendary', weaponType: 'Shield', generation: 1,
     inputs: [
       precursor(ID.THE_CHOSEN, 'The Chosen'),
@@ -2294,7 +2301,7 @@ export const LEGENDARY_RECIPES = [
   {
     id: 'legendary_rodgort',
     name: 'Rodgort',
-    itemId: null,
+    itemId: 30700,   // [API verified Oct 2026]
     rarity: 'Legendary', weaponType: 'Torch', generation: 1,
     inputs: [
       precursor(ID.RODGORTS_FLAME, "Rodgort's Flame"),
@@ -2308,7 +2315,7 @@ export const LEGENDARY_RECIPES = [
   {
     id: 'legendary_howler',
     name: 'Howler',
-    itemId: null,
+    itemId: 30702,   // [API verified Oct 2026]
     rarity: 'Legendary', weaponType: 'Warhorn', generation: 1,
     inputs: [
       precursor(ID.HOWL, 'Howl'),
@@ -2512,7 +2519,7 @@ export const LEGENDARY_RECIPES = [
   {
     id: 'legendary_kudzu',
     name: 'Kudzu',
-    itemId: null,
+    itemId: 30685,   // [API verified Oct 2026]
     rarity: 'Legendary', weaponType: 'Long Bow', generation: 1,
     inputs: [
       precursor(ID.LEAF_OF_KUDZU, 'Leaf of Kudzu'),
@@ -2526,7 +2533,7 @@ export const LEGENDARY_RECIPES = [
   {
     id: 'legendary_predator',
     name: 'The Predator',
-    itemId: null,
+    itemId: 30694,   // [API verified Oct 2026]
     rarity: 'Legendary', weaponType: 'Rifle', generation: 1,
     inputs: [
       precursor(ID.THE_HUNTER, 'The Hunter'),
@@ -2540,7 +2547,7 @@ export const LEGENDARY_RECIPES = [
   {
     id: 'legendary_dreamer',
     name: 'The Dreamer',
-    itemId: null,
+    itemId: 30686,   // [API verified Oct 2026]
     rarity: 'Legendary', weaponType: 'Short Bow', generation: 1,
     inputs: [
       precursor(ID.THE_LOVER, 'The Lover'),
@@ -2746,7 +2753,7 @@ export const LEGENDARY_RECIPES = [
   {
     id: 'legendary_frenzy',
     name: 'Frenzy',
-    itemId: null,
+    itemId: 30697,   // [API verified Oct 2026]
     rarity: 'Legendary', weaponType: 'Harpoon Gun', generation: 1,
     inputs: [
       precursor(ID.RAGE, 'Rage'),
@@ -2760,7 +2767,7 @@ export const LEGENDARY_RECIPES = [
   {
     id: 'legendary_kotaki',
     name: "Kamohoali'i Kotaki",
-    itemId: null,
+    itemId: 30691,   // [API verified Oct 2026]
     rarity: 'Legendary', weaponType: 'Spear', generation: 1,
     inputs: [
       precursor(ID.CARCHARIAS, 'Carcharias'),
@@ -2981,35 +2988,46 @@ export const LEGENDARY_RECIPES = [
 
 ];
 
+// ── Precursor collection achievement names ────────────────────────────────────
+// Exact in-game names of the Tier III precursor collections, carried over from
+// RogueAIO's wiki-verified LegendaryTemplateCatalog. Shown on the precursor row
+// so players know which collection to open. Where the achievement ID is also
+// known (achievementId on the node), live progress is shown instead.
+export const PRECURSOR_ACHIEVEMENT_NAMES = {
+  legendary_twilight:     'Twilight III: Dusk',
+  legendary_sunrise:      'Sunrise III: Dawn',
+  legendary_bolt:         'Bolt III: Zap',
+  legendary_frostfang:    'Frostfang III: Tooth of Frostfang',
+  legendary_incinerator:  'Incinerator III: Spark',
+  legendary_moot:         'The Moot III: The Energizer',
+  legendary_quip:         'Quip III: Chaos Gun',
+  legendary_meteorlogicus:'Meteorlogicus III: Storm',
+  legendary_minstrel:     'The Minstrel III: The Bard',
+  legendary_flameseeker:  'The Flameseeker Prophecies III: The Chosen',
+  legendary_rodgort:      "Rodgort III: Rodgort's Flame",
+  legendary_howler:       'Howler III: Howl',
+  legendary_juggernaut:   'The Juggernaut III: The Colossus',
+  legendary_kudzu:        'Kudzu III: Leaf of Kudzu',
+  legendary_predator:     'The Predator III: The Hunter',
+  legendary_dreamer:      'The Dreamer III: The Lover',
+  legendary_bifrost:      'The Bifrost III: The Legend',
+  legendary_frenzy:       'Frenzy III: Rage',
+  legendary_kotaki:       "Kamohoali'i Kotaki III: Carcharias",
+  legendary_kraitkin:     'Kraitkin III: Venom',
+};
+for (const r of LEGENDARY_RECIPES) {
+  const name = PRECURSOR_ACHIEVEMENT_NAMES[r.id];
+  const first = r.inputs?.[0];
+  if (name && first && !first.achievementName) first.achievementName = name;
+}
+
 // ── Cost Calculation ───────────────────────────────────────────────────────────
-export function calcLegendaryMissingCost(node, neededCount, priceMap, ownedMap, visited = new Set()) {
+// Kept for backward compatibility. The Mystic Forge tab now uses
+// evaluateLegendaryTree() from legendary-cost.js, which shares one depleting
+// owned-materials pool across the whole tree (see that file's header).
+export function calcLegendaryMissingCost(node, neededCount, priceMap, ownedMap) {
   const count = neededCount ?? node.count ?? 1;
-  if (['wvw', 'exploration', 'heroics', 'collection', 'karma'].includes(node.source)) return 0;
-
-  const itemId = node.itemId;
-  const owned  = itemId ? (ownedMap[itemId] || 0) : 0;
-  const shortfall = Math.max(0, count - owned);
-  if (shortfall === 0) return 0;
-
-  if (node.accountBound && node.inputs?.length > 0 && !visited.has(node.name)) {
-    const v2 = new Set(visited).add(node.name);
-    return node.inputs.reduce((sum, inp) =>
-      sum + calcLegendaryMissingCost(inp, inp.count * shortfall, priceMap, ownedMap, v2), 0);
-  }
-
-  if (node.inputs?.length > 0 && !visited.has(node.name)) {
-    const tpSell = itemId ? (priceMap[itemId]?.sells?.unit_price || 0) : 0;
-    const tpCost = tpSell * shortfall;
-    const v2 = new Set(visited).add(node.name);
-    const craftCost = node.inputs.reduce((sum, inp) =>
-      sum + calcLegendaryMissingCost(inp, inp.count * shortfall, priceMap, ownedMap, v2), 0);
-    if (tpSell > 0 && tpCost <= craftCost) return tpCost;
-    if (craftCost > 0) return craftCost;
-    return tpCost;
-  }
-
-  const tpSell = itemId ? (priceMap[itemId]?.sells?.unit_price || 0) : 0;
-  return tpSell * shortfall;
+  return evaluateLegendaryTree([{ ...node, count }], priceMap, ownedMap).gold;
 }
 
 export function resolveLegendaryIds(recipes, itemMap) {
@@ -3019,8 +3037,10 @@ export function resolveLegendaryIds(recipes, itemMap) {
   }
   function resolveNode(node) {
     const resolved = { ...node };
-    if (!resolved.itemId && resolved.name) {
-      resolved.itemId = nameToId[resolved.name] ?? null;
+    // Gen 2/3 data carries the exact in-game name in `idName` when the display
+    // name differs (e.g. "HOPE (Precursor)"); prefer it for the lookup.
+    if (!resolved.itemId && (resolved.idName || resolved.name)) {
+      resolved.itemId = nameToId[resolved.idName] ?? nameToId[resolved.name] ?? null;
     }
     if (resolved.itemId && itemMap[resolved.itemId]) {
       resolved.icon = itemMap[resolved.itemId].icon ?? null;
@@ -3036,6 +3056,6 @@ export function resolveLegendaryIds(recipes, itemMap) {
 export const LEGENDARY_WEAPON_TYPES = [
   'All', 'Greatsword', 'Sword', 'Axe', 'Dagger', 'Mace',
   'Short Bow', 'Long Bow', 'Rifle', 'Pistol', 'Warhorn',
-  'Staff', 'Scepter', 'Focus', 'Shield', 'Torch',
+  'Hammer', 'Staff', 'Scepter', 'Focus', 'Shield', 'Torch',
   'Spear', 'Trident', 'Harpoon Gun',
 ];

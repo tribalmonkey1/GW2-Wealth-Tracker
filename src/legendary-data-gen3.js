@@ -23,11 +23,13 @@ const GIFT_OF_FORTUNE_GEN3 = {
   name: 'Gift of Fortune',
   itemId: null, idName: 'Gift of Fortune',
   count: 1, source: 'forge', accountBound: true,
+  // PLACEHOLDER — per the wiki (Oct 2026) Gen 3 uses Draconic Tribute in this slot
+  // (38 Mystic Clover + Gift of Condensed Might/Magic + more). Not yet modeled.
+  note: 'Placeholder — Gen 3 actually uses Draconic Tribute here; recipe not yet modeled',
   inputs: [
     { name: 'Mystic Clover',     itemId: 19675, count: 77,  source: 'tp',    inputs: [] },
     { name: 'Glob of Ectoplasm', itemId: 19721, count: 250, source: 'tp',    inputs: [] },
     { name: 'Mystic Coin',       itemId: 19976, count: 77,  source: 'tp',    inputs: [] },
-    { name: 'Crystal',           itemId: null, idName: 'Crystal', count: 77, source: 'tp', inputs: [] },
   ],
 };
 
@@ -106,7 +108,8 @@ function antiqueSummoningStone(count) {
 function collectionPrecursor(baseName, note) {
   return {
     name: `${baseName} (Precursor)`,
-    itemId: null, idName: baseName,
+    // idName intentionally null: baseName is the LEGENDARY's name (see gen2 note).
+    itemId: null, idName: null,
     count: 1, source: 'collection', accountBound: true,
     note: note || 'Gen 3 precursor — 3-stage collection (account-bound)',
     inputs: [
@@ -158,6 +161,7 @@ export const LEGENDARY_RECIPES_GEN3 = [
     rarity: 'Legendary',
     weaponType: 'Staff',
     generation: 3,
+    dataStatus: 'unverified', // tribute slot + gift recipes not wiki-verified — see file header
     expansion: 'End of Dragons',
     inputs: [
       collectionPrecursor("Aurene's Insight"),
@@ -178,6 +182,7 @@ export const LEGENDARY_RECIPES_GEN3 = [
     rarity: 'Legendary',
     weaponType: 'Scepter',
     generation: 3,
+    dataStatus: 'unverified', // tribute slot + gift recipes not wiki-verified — see file header
     expansion: 'End of Dragons',
     inputs: [
       collectionPrecursor("Aurene's Persuasion"),
@@ -198,6 +203,7 @@ export const LEGENDARY_RECIPES_GEN3 = [
     rarity: 'Legendary',
     weaponType: 'Dagger',
     generation: 3,
+    dataStatus: 'unverified', // tribute slot + gift recipes not wiki-verified — see file header
     expansion: 'End of Dragons',
     inputs: [
       collectionPrecursor("Aurene's Bite"),
@@ -218,6 +224,7 @@ export const LEGENDARY_RECIPES_GEN3 = [
     rarity: 'Legendary',
     weaponType: 'Sword',
     generation: 3,
+    dataStatus: 'unverified', // tribute slot + gift recipes not wiki-verified — see file header
     expansion: 'End of Dragons',
     inputs: [
       collectionPrecursor("Aurene's Fang"),
@@ -238,6 +245,7 @@ export const LEGENDARY_RECIPES_GEN3 = [
     rarity: 'Legendary',
     weaponType: 'Axe',
     generation: 3,
+    dataStatus: 'unverified', // tribute slot + gift recipes not wiki-verified — see file header
     expansion: 'End of Dragons',
     inputs: [
       collectionPrecursor("Aurene's Claw"),
@@ -258,6 +266,7 @@ export const LEGENDARY_RECIPES_GEN3 = [
     rarity: 'Legendary',
     weaponType: 'Shield',
     generation: 3,
+    dataStatus: 'unverified', // tribute slot + gift recipes not wiki-verified — see file header
     expansion: 'End of Dragons',
     inputs: [
       collectionPrecursor("Aurene's Scale"),
@@ -278,6 +287,7 @@ export const LEGENDARY_RECIPES_GEN3 = [
     rarity: 'Legendary',
     weaponType: 'Rifle',
     generation: 3,
+    dataStatus: 'unverified', // tribute slot + gift recipes not wiki-verified — see file header
     expansion: 'End of Dragons',
     inputs: [
       collectionPrecursor("Aurene's Breath"),
@@ -298,6 +308,7 @@ export const LEGENDARY_RECIPES_GEN3 = [
     rarity: 'Legendary',
     weaponType: 'Short Bow',
     generation: 3,
+    dataStatus: 'unverified', // tribute slot + gift recipes not wiki-verified — see file header
     expansion: 'End of Dragons',
     inputs: [
       collectionPrecursor("Aurene's Wing"),
@@ -318,6 +329,7 @@ export const LEGENDARY_RECIPES_GEN3 = [
     rarity: 'Legendary',
     weaponType: 'Warhorn',
     generation: 3,
+    dataStatus: 'unverified', // tribute slot + gift recipes not wiki-verified — see file header
     expansion: 'End of Dragons',
     inputs: [
       collectionPrecursor("Aurene's Tail"),
@@ -338,6 +350,7 @@ export const LEGENDARY_RECIPES_GEN3 = [
     rarity: 'Legendary',
     weaponType: 'Greatsword',
     generation: 3,
+    dataStatus: 'unverified', // tribute slot + gift recipes not wiki-verified — see file header
     expansion: 'End of Dragons',
     inputs: [
       collectionPrecursor("Aurene's Rending"),
@@ -358,6 +371,7 @@ export const LEGENDARY_RECIPES_GEN3 = [
     rarity: 'Legendary',
     weaponType: 'Hammer',
     generation: 3,
+    dataStatus: 'unverified', // tribute slot + gift recipes not wiki-verified — see file header
     expansion: 'End of Dragons',
     inputs: [
       collectionPrecursor("Aurene's Weight"),
@@ -378,6 +392,7 @@ export const LEGENDARY_RECIPES_GEN3 = [
     rarity: 'Legendary',
     weaponType: 'Focus',
     generation: 3,
+    dataStatus: 'unverified', // tribute slot + gift recipes not wiki-verified — see file header
     expansion: 'End of Dragons',
     inputs: [
       collectionPrecursor("Aurene's Voice"),
@@ -398,6 +413,7 @@ export const LEGENDARY_RECIPES_GEN3 = [
     rarity: 'Legendary',
     weaponType: 'Pistol',
     generation: 3,
+    dataStatus: 'unverified', // tribute slot + gift recipes not wiki-verified — see file header
     expansion: 'End of Dragons',
     inputs: [
       collectionPrecursor("Aurene's Argument"),
@@ -418,6 +434,7 @@ export const LEGENDARY_RECIPES_GEN3 = [
     rarity: 'Legendary',
     weaponType: 'Torch',
     generation: 3,
+    dataStatus: 'unverified', // tribute slot + gift recipes not wiki-verified — see file header
     expansion: 'End of Dragons',
     inputs: [
       collectionPrecursor("Aurene's Gaze"),
@@ -438,6 +455,7 @@ export const LEGENDARY_RECIPES_GEN3 = [
     rarity: 'Legendary',
     weaponType: 'Long Bow',
     generation: 3,
+    dataStatus: 'unverified', // tribute slot + gift recipes not wiki-verified — see file header
     expansion: 'End of Dragons',
     inputs: [
       collectionPrecursor("Aurene's Wisdom"),
@@ -458,6 +476,7 @@ export const LEGENDARY_RECIPES_GEN3 = [
     rarity: 'Legendary',
     weaponType: 'Mace',
     generation: 3,
+    dataStatus: 'unverified', // tribute slot + gift recipes not wiki-verified — see file header
     expansion: 'End of Dragons',
     inputs: [
       collectionPrecursor("Aurene's Courage"),

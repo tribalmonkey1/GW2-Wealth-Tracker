@@ -20,8 +20,8 @@ import {
   LEGENDARY_RECIPES,
   LEGENDARY_WEAPON_TYPES,
   resolveLegendaryIds,
-  calcLegendaryMissingCost,
 } from "./legendary-data.js";
+import { evaluateLegendaryTree } from "./legendary-cost.js";
 import {
   LEGENDARY_RECIPES_GEN2,
   LEGENDARY_GEN2_EXPANSIONS,
@@ -408,6 +408,8 @@ const SOURCE_BADGE = {
   collection:  { label: '📜 Collection',        color: 'var(--gold2)', bg: 'rgba(200,150,42,.15)' },
   karma:       { label: '🔮 Karma',             color: '#9855c8', bg: 'rgba(152,85,200,.15)' },
   forge:       { label: '⚗ Mystic Forge',       color: '#a060e0', bg: 'rgba(160,90,220,.15)' },
+  vendor:      { label: '🏪 Vendor',             color: 'var(--gold2)', bg: 'rgba(200,150,42,.15)' },
+  spirit_shard:{ label: '🔮 Spirit Shards',      color: 'var(--blue2)', bg: 'rgba(90,160,210,.15)' },
 };
 
 function SourceBadge({ source, accountBound }) {
@@ -423,71 +425,83 @@ function SourceBadge({ source, accountBound }) {
 }
 
 // ── Single ingredient node in the legendary tree ───────────────────────────────
-function LegendaryIngredientNode({ node, priceMap, ownedMap, depth = 0, parentShortfall = 1, legendaryAchievements = {} }) {
+// Renders one node of the annotated tree from evaluateLegendaryTree() — no cost
+// math happens here. `n.used` is how much of YOUR inventory this row was
+// allocated from the shared pool (an item owned once is only counted once).
+const rowCell = { minWidth: 100, textAlign: 'right' };
+
+function LegendaryCostCell({ n }) {
+  if (n.mode === 'owned') return <span style={{ ...rowCell, fontSize: 12, color: 'var(--green2)' }}>✓ owned</span>;
+  if (n.inactive) return <span style={{ ...rowCell, fontSize: 11, color: 'var(--text3)' }}>—</span>;
+  if (n.mode === 'unpriced' || (n.unpriced > 0 && n.gold === 0 && n.shards === 0))
+    return <span style={{ ...rowCell, fontSize: 11, color: 'var(--red)' }} title="No TP or vendor price available yet">no price</span>;
+  const parts = [];
+  if (n.gold > 0) parts.push(<Gold key="g" v={n.gold} size={12} />);
+  if (n.shards > 0) parts.push(<span key="s" style={{ fontSize: 11, color: 'var(--blue2)', whiteSpace: 'nowrap' }}>🔮 {n.shards.toLocaleString()}</span>);
+  if (parts.length === 0) {
+    const label = n.mode === 'currency' ? 'non-gold currency' : 'no gold cost';
+    return <span style={{ ...rowCell, fontSize: 11, color: 'var(--text3)' }}>{label}</span>;
+  }
+  return <span style={{ ...rowCell, display: 'inline-flex', gap: 6, justifyContent: 'flex-end', alignItems: 'center' }}>{parts}</span>;
+}
+
+function LegendaryIngredientNode({ n, depth = 0, legendaryAchievements = {} }) {
   const [open, setOpen] = React.useState(depth === 0);
+  const hasChildren = n.children?.length > 0;
+  const haveEnough = n.shortfall === 0;
 
-  const itemId = node.itemId;
-  const owned  = itemId ? (ownedMap[itemId] || 0) : 0;
-  const needed = (node.count || 1) * parentShortfall;
-  const shortfall = Math.max(0, needed - owned);
-  const hasChildren = node.inputs?.length > 0;
-
-  // Cumulative cost for this node (includes all descendants)
-  const totalMissingCost = React.useMemo(() =>
-    calcLegendaryMissingCost(node, needed, priceMap, ownedMap),
-    [node, needed, priceMap, ownedMap]
-  );
-
-  const tpSell = itemId ? (priceMap[itemId]?.sells?.unit_price || 0) : 0;
-  const haveEnough = shortfall === 0;
-  // A collection node with crafted sub-ingredients can carry real gold cost — only label it
-  // "no gold cost" when nothing underneath it actually costs anything.
-  const isNoGold = ['wvw', 'exploration', 'heroics', 'collection', 'karma'].includes(node.source) && totalMissingCost === 0;
-
-  // Color coding
-  const nameColor = haveEnough ? 'var(--green2)'
-    : shortfall > 0 && tpSell === 0 && !hasChildren && !isNoGold ? 'var(--red)'
+  const nameColor = n.inactive ? 'var(--text3)'
+    : haveEnough ? 'var(--green2)'
+    : n.mode === 'unpriced' ? 'var(--red)'
     : 'var(--text2)';
 
-  const costColor = totalMissingCost > 100000 ? 'var(--red)'
-    : totalMissingCost > 10000 ? 'var(--gold2)'
-    : 'var(--green2)';
-
   return (
-    <div style={{ marginLeft: depth * 18, borderLeft: depth > 0 ? '2px solid rgba(200,150,42,.2)' : 'none', paddingLeft: depth > 0 ? 10 : 0, marginTop: 3 }}>
+    <div style={{ marginLeft: depth * 18, borderLeft: depth > 0 ? '2px solid rgba(200,150,42,.2)' : 'none', paddingLeft: depth > 0 ? 10 : 0, marginTop: 3, opacity: n.inactive ? 0.55 : 1 }}>
       <div
         style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', borderRadius: 3, cursor: hasChildren ? 'pointer' : 'default', transition: 'background .1s' }}
         onMouseEnter={e => { if (hasChildren) e.currentTarget.style.background = 'var(--bg3)'; }}
         onMouseLeave={e => { e.currentTarget.style.background = ''; }}
         onClick={() => hasChildren && setOpen(o => !o)}
       >
-        {/* Icon */}
-        {node.icon
-          ? <img src={node.icon} style={{ width: 24, height: 24, borderRadius: 3, border: '1px solid var(--border2)', flexShrink: 0 }} alt="" />
+        {n.icon
+          ? <img src={n.icon} style={{ width: 24, height: 24, borderRadius: 3, border: '1px solid var(--border2)', flexShrink: 0 }} alt="" />
           : <div style={{ width: 24, height: 24, background: 'var(--bg4)', borderRadius: 3, border: '1px solid var(--border2)', flexShrink: 0 }} />
         }
 
-        {/* Name + count */}
         <div style={{ flex: 1, minWidth: 0 }}>
           <span style={{ fontSize: depth === 0 ? 14 : 13, fontWeight: depth === 0 ? 600 : 400, color: nameColor }}>
-            {node.name}
+            {n.name}
           </span>
-          <span style={{ fontSize: 12, color: 'var(--text3)', marginLeft: 6 }}>×{needed}</span>
-          {node.note && <span style={{ fontSize: 10, color: 'var(--text3)', marginLeft: 8, fontStyle: 'italic' }}>{node.note}</span>}
+          <span style={{ fontSize: 12, color: 'var(--text3)', marginLeft: 6 }}>×{n.needed.toLocaleString()}</span>
+          {n.mode === 'buy' && hasChildren && !n.inactive && (
+            <span style={{ fontSize: 10, color: 'var(--gold2)', marginLeft: 8 }}>cheaper to buy than craft</span>
+          )}
+          {n.mode === 'craft' && n.buyGold > 0 && (
+            <span style={{ fontSize: 10, color: 'var(--green2)', marginLeft: 8 }}>cheaper to craft than buy</span>
+          )}
+          {n.note && <span style={{ fontSize: 10, color: 'var(--text3)', marginLeft: 8, fontStyle: 'italic' }}>{n.note}</span>}
         </div>
 
-        {/* Source badge */}
-        <SourceBadge source={node.source} accountBound={node.accountBound} />
+        <SourceBadge source={n.source} accountBound={n.accountBound} />
 
-        {/* Achievement progress (for Spark of Sentience, Gift of Valor) */}
-        {node.achievementId && (() => {
-          const ach = legendaryAchievements[node.achievementId];
+        {/* Precursor collection name (when no live achievement ID is wired up yet) */}
+        {n.achievementName && !n.achievementId && (
+          <span style={{ fontSize:10, fontFamily:'Cinzel,serif', letterSpacing:1, padding:'1px 7px', borderRadius:3, background:'rgba(200,150,42,.1)', border:'1px solid rgba(200,150,42,.3)', color:'var(--gold2)', whiteSpace:'nowrap' }}
+            title="Precursor collection — open your Achievements panel to track it">
+            📜 {n.achievementName}
+          </span>
+        )}
+
+        {/* Achievement progress */}
+        {n.achievementId && (() => {
+          const ach = legendaryAchievements[n.achievementId];
           const done = ach?.done || false;
           const current = ach?.current ?? null;
-          const max = node.achievementBitCount || ach?.max || null;
+          const max = n.achievementBitCount || ach?.max || null;
+          const label = n.achievementName ? `${n.achievementName} — ` : 'Achievement — ';
           if (current === null && !done) return (
             <span style={{ fontSize:10, fontFamily:'Cinzel,serif', letterSpacing:1, padding:'1px 7px', borderRadius:3, background:'rgba(200,150,42,.1)', border:'1px solid rgba(200,150,42,.3)', color:'var(--gold2)', whiteSpace:'nowrap' }}>
-              Achievement — {max ? `0/${max}` : 'progress unknown'}
+              {label}{max ? `0/${max}` : 'progress unknown'}
             </span>
           );
           return done
@@ -497,57 +511,57 @@ function LegendaryIngredientNode({ node, priceMap, ownedMap, depth = 0, parentSh
               </span>;
         })()}
 
-        {/* Owned / needed */}
-        <span style={{ fontSize: 12, color: haveEnough ? 'var(--green2)' : 'var(--red)', minWidth: 60, textAlign: 'right', flexShrink: 0 }}>
-          {owned}/{needed}
+        {/* Owned (allocated to this row) / needed */}
+        <span style={{ fontSize: 12, color: haveEnough ? 'var(--green2)' : 'var(--red)', minWidth: 60, textAlign: 'right', flexShrink: 0 }}
+          title="Owned items are shared across the whole recipe — each item is only counted once">
+          {n.used.toLocaleString()}/{n.needed.toLocaleString()}
         </span>
 
-        {/* Total missing cost (cumulative) */}
-        {isNoGold
-          ? <span style={{ fontSize: 11, color: 'var(--text3)', minWidth: 100, textAlign: 'right' }}>no gold cost</span>
-          : haveEnough
-            ? <span style={{ fontSize: 12, color: 'var(--green2)', minWidth: 100, textAlign: 'right' }}>✓ owned</span>
-            : totalMissingCost > 0
-              ? <span style={{ minWidth: 100, textAlign: 'right' }}><Gold v={totalMissingCost} size={12} /></span>
-              : <span style={{ fontSize: 11, color: 'var(--text3)', minWidth: 100, textAlign: 'right' }}>—</span>
-        }
+        <LegendaryCostCell n={n} />
 
-        {/* Expand toggle */}
         {hasChildren && <span style={{ color: 'var(--text3)', fontSize: 11, flexShrink: 0 }}>{open ? '▲' : '▼'}</span>}
       </div>
 
-      {/* Children */}
-      {open && hasChildren && node.inputs.map((child, i) => (
-        <LegendaryIngredientNode
-          key={i}
-          node={child}
-          priceMap={priceMap}
-          ownedMap={ownedMap}
-          depth={depth + 1}
-          parentShortfall={shortfall > 0 ? 1 : 0}
-          legendaryAchievements={legendaryAchievements}
-        />
+      {open && hasChildren && n.children.map((child, i) => (
+        <LegendaryIngredientNode key={i} n={child} depth={depth + 1} legendaryAchievements={legendaryAchievements} />
       ))}
     </div>
   );
 }
 
 // ── Full legendary recipe card ─────────────────────────────────────────────────
+const DATA_STATUS_BADGE = {
+  partial:    { label: 'Partially verified', title: 'Shared gifts are verified; the weapon gift and precursor stages are still being checked against the wiki', color: 'var(--gold2)' },
+  unverified: { label: 'Unverified data',    title: 'Recipe structure not yet checked against the wiki — treat costs as rough estimates', color: 'var(--red2)' },
+};
+
 function LegendaryRecipeCard({ recipe, itemMap, priceMap, ownedMap, legendaryAchievements = {} }) {
   const [open, setOpen] = React.useState(false);
 
-  const totalCost = React.useMemo(() =>
-    recipe.inputs.reduce((sum, inp) => sum + calcLegendaryMissingCost(inp, inp.count, priceMap, ownedMap), 0),
+  // One pass, one shared owned-materials pool for the whole legendary.
+  const evaluated = React.useMemo(
+    () => evaluateLegendaryTree(recipe.inputs, priceMap, ownedMap),
     [recipe, priceMap, ownedMap]
   );
+  const totalCost = evaluated.gold;
+  const totalShards = evaluated.shards;
+  const unpriced = evaluated.unpriced;
+  const allOwned = totalCost === 0 && totalShards === 0 && unpriced === 0 && evaluated.nodes.every(n => n.shortfall === 0 || n.mode === 'free');
 
   const outputId = recipe.itemId;
   const outputSell = outputId ? (priceMap[outputId]?.sells?.unit_price || 0) : 0;
   const icon = outputId ? itemMap[outputId]?.icon : null;
+  const status = DATA_STATUS_BADGE[recipe.dataStatus];
+
+  const costDisplay = (size) => allOwned
+    ? <span style={{ color: 'var(--green2)', fontSize: size }}>✓ Have all mats</span>
+    : <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center', color: totalCost > 5000000 ? 'var(--red)' : totalCost > 1000000 ? 'var(--gold2)' : 'var(--green2)', fontSize: size }}>
+        <Gold v={totalCost} size={size} />
+        {totalShards > 0 && <span style={{ fontSize: size - 2, color: 'var(--blue2)', whiteSpace: 'nowrap' }}>+ 🔮 {totalShards.toLocaleString()}</span>}
+      </span>;
 
   return (
     <div className="ci" style={{ marginBottom: 8 }}>
-      {/* Header */}
       <div className="ci-hdr" onClick={() => setOpen(o => !o)}>
         {icon
           ? <img className="iico" src={icon} alt="" />
@@ -558,25 +572,27 @@ function LegendaryRecipeCard({ recipe, itemMap, priceMap, ownedMap, legendaryAch
           <span style={{ fontSize: 11, color: 'var(--text3)', marginLeft: 10, fontFamily: 'Cinzel,serif' }}>{recipe.weaponType}</span>
           {recipe.note && <span style={{ fontSize: 10, color: 'var(--gold)', marginLeft: 10, fontStyle: 'italic' }}>{recipe.note}</span>}
         </div>
-        <span style={{ fontSize: 10, fontFamily: 'Cinzel,serif', letterSpacing: 1, padding: '2px 8px', borderRadius: 3, background: 'rgba(159,77,255,.15)', border: '1px solid rgba(159,77,255,.4)', color: '#9f4dff', flexShrink: 0 }}>
-          Gen {recipe.generation}
-        </span>
+        {status && (
+          <span title={status.title} style={{ fontSize: 10, fontFamily: 'Cinzel,serif', letterSpacing: 1, padding: '2px 8px', borderRadius: 3, border: `1px solid ${status.color}`, color: status.color, flexShrink: 0 }}>
+            ⚠ {status.label}
+          </span>
+        )}
+        {recipe.generation && (
+          <span style={{ fontSize: 10, fontFamily: 'Cinzel,serif', letterSpacing: 1, padding: '2px 8px', borderRadius: 3, background: 'rgba(159,77,255,.15)', border: '1px solid rgba(159,77,255,.4)', color: '#9f4dff', flexShrink: 0 }}>
+            Gen {recipe.generation}
+          </span>
+        )}
         {recipe.expansion && (
           <span style={{ fontSize: 10, fontFamily: 'Cinzel,serif', letterSpacing: 1, padding: '2px 8px', borderRadius: 3, background: 'rgba(200,150,42,.1)', border: '1px solid rgba(200,150,42,.3)', color: 'var(--gold2)', flexShrink: 0 }}>
             {recipe.expansion}
           </span>
         )}
 
-        {/* Cost summary */}
         <div className="ci-stats">
           <div className="ci-stat">
             <span className="ci-stat-lbl">TOTAL MISSING COST</span>
-            {totalCost > 0
-              ? <span style={{ color: totalCost > 5000000 ? 'var(--red)' : totalCost > 1000000 ? 'var(--gold2)' : 'var(--green2)', fontSize: 14 }}>
-                  <Gold v={totalCost} size={14} />
-                </span>
-              : <span style={{ color: 'var(--green2)', fontSize: 14 }}>✓ Have all mats</span>
-            }
+            {costDisplay(14)}
+            {unpriced > 0 && <span style={{ fontSize: 10, color: 'var(--red)' }}>{unpriced} item{unpriced !== 1 ? 's' : ''} unpriced</span>}
           </div>
           {outputSell > 0 && (
             <div className="ci-stat" style={{ borderLeft: '1px solid var(--border)', paddingLeft: 14 }}>
@@ -588,10 +604,8 @@ function LegendaryRecipeCard({ recipe, itemMap, priceMap, ownedMap, legendaryAch
         <span style={{ color: 'var(--text3)', fontSize: 13, flexShrink: 0 }}>{open ? '▲' : '▼'}</span>
       </div>
 
-      {/* Expanded ingredient tree */}
       {open && (
         <div className="ci-body" style={{ padding: '12px 16px' }}>
-          {/* Column headers */}
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '4px 8px', marginBottom: 4, fontSize: 10, fontFamily: 'Cinzel,serif', letterSpacing: 1, color: 'var(--text3)', borderBottom: '1px solid var(--border)' }}>
             <span style={{ flex: 1 }}>INGREDIENT</span>
             <span style={{ width: 120 }}>SOURCE</span>
@@ -599,24 +613,17 @@ function LegendaryRecipeCard({ recipe, itemMap, priceMap, ownedMap, legendaryAch
             <span style={{ width: 100, textAlign: 'right' }}>MISSING COST</span>
             <span style={{ width: 20 }} />
           </div>
-          {recipe.inputs.map((inp, i) => (
-            <LegendaryIngredientNode
-              key={i}
-              node={inp}
-              priceMap={priceMap}
-              ownedMap={ownedMap}
-              depth={0}
-              parentShortfall={1}
-              legendaryAchievements={legendaryAchievements}
-            />
+          {evaluated.nodes.map((n, i) => (
+            <LegendaryIngredientNode key={i} n={n} depth={0} legendaryAchievements={legendaryAchievements} />
           ))}
-          {/* Total */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, paddingTop: 10, borderTop: '2px solid var(--border2)', fontWeight: 600 }}>
             <span style={{ fontFamily: 'Cinzel,serif', fontSize: 11, letterSpacing: 1, color: 'var(--text3)' }}>TOTAL MISSING COST (all levels)</span>
-            {totalCost > 0
-              ? <Gold v={totalCost} size={14} />
-              : <span style={{ color: 'var(--green2)', fontSize: 13 }}>✓ You have all materials</span>
-            }
+            {costDisplay(14)}
+          </div>
+          <div style={{ marginTop: 6, fontSize: 11, color: 'var(--text3)', fontStyle: 'italic', lineHeight: 1.5 }}>
+            Owned materials are counted once across the whole recipe. Vendor items (e.g. Icy Runestones, 1g each) are included in gold;
+            Spirit Shard purchases (🔮) are listed separately. Prices are TP instant-buy.
+            {unpriced > 0 && <> <span style={{ color: 'var(--red)' }}>{unpriced} item{unpriced !== 1 ? 's have' : ' has'} no price yet and {unpriced !== 1 ? 'are' : 'is'} not included.</span></>}
           </div>
         </div>
       )}
@@ -1171,9 +1178,9 @@ export default function MysticForgeTab({ data, priceMap, ownedMap, velocitySumma
       {subTab === "legendary" && (
         <div>
           <div style={{ marginBottom: 14, fontSize: 13, color: "var(--text3)", fontStyle: "italic", lineHeight: 1.6 }}>
-            Full ingredient chains for Gen 1 Legendary weapons. Missing cost is cumulative — each ingredient
-            shows the total gold needed for it and all its sub-components you don't own.
-            Account-bound steps (WvW, Map Completion, Hero Points) show no gold cost.
+            Full ingredient chains for Gen 1, 2 and 3 legendary weapons. Missing cost is cumulative — each ingredient
+            shows the gold needed for it and everything under it that you don't own, and owned materials are only counted once
+            per legendary. Account-bound steps (WvW, Map Completion, Hero Points) show no gold cost; Spirit Shard purchases show as 🔮.
           </div>
 
           {/* Controls */}
@@ -1239,6 +1246,7 @@ export default function MysticForgeTab({ data, priceMap, ownedMap, velocitySumma
                 itemMap={itemMap}
                 priceMap={priceMap}
                 ownedMap={ownedMap}
+                legendaryAchievements={legendaryAchievements}
               />
             ))
           }
