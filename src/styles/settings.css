@@ -1,0 +1,139 @@
+/* Settings window (SettingsPanel.jsx) — sidebar-sections layout.
+   Uses the same palette tokens as app.css; every button/field in Settings
+   goes through these classes so the panel has one consistent look. */
+
+.st-overlay { position: fixed; inset: 0; z-index: 900; background: rgba(0,0,0,.65); display: flex; align-items: center; justify-content: center; padding: 24px; }
+.st-modal { width: min(1120px, 100%); height: min(820px, 100%); background: var(--bg2); border: 1px solid var(--border2); border-radius: 8px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,.7); font-family: var(--font-body); color: var(--text); }
+
+.st-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 24px; border-bottom: 1px solid var(--border); }
+.st-title { font-family: var(--font-ui); font-size: 16px; letter-spacing: 3px; color: var(--gold2); }
+
+.st-body { display: flex; flex: 1; min-height: 0; }
+.st-nav { width: 240px; flex-shrink: 0; border-right: 1px solid var(--border); padding: 16px 12px; display: flex; flex-direction: column; gap: 4px; background: #120f0c; }
+.st-nav-item { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border-radius: 4px; border: none; background: transparent; color: var(--text2); font-family: var(--font-ui); font-size: 12px; letter-spacing: 1px; cursor: pointer; text-align: left; width: 100%; }
+.st-nav-item:hover { background: var(--bg3); color: var(--text); }
+.st-nav-item.active { background: var(--bg4); color: var(--gold2); }
+.st-nav-item .st-nav-label { display: flex; align-items: center; gap: 10px; }
+.st-nav-count { font-family: var(--font-body); font-size: 13px; color: var(--text3); letter-spacing: 0; }
+.st-nav-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--gold2); }
+.st-nav-dot.bad { background: var(--red2); }
+.st-nav-version { margin-top: auto; padding: 0 12px; font-size: 13px; color: var(--text3); }
+
+.st-pane { flex: 1; min-width: 0; overflow-y: auto; padding: 28px 36px; display: flex; flex-direction: column; gap: 24px; }
+.st-pane h2 { font-family: var(--font-ui); font-size: 18px; font-weight: 600; letter-spacing: 2px; color: var(--text); margin-bottom: 4px; }
+.st-lede { font-size: 16px; color: var(--text2); }
+.st-divider { height: 1px; background: var(--border); flex-shrink: 0; }
+
+.st-field { display: flex; flex-direction: column; gap: 8px; }
+.st-field-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.st-label { font-family: var(--font-ui); font-size: 12px; letter-spacing: 1px; color: var(--gold2); }
+.st-label .st-opt { color: var(--text3); letter-spacing: 0; font-family: var(--font-body); font-size: 14px; }
+.st-help { font-size: 15px; color: var(--text2); line-height: 1.5; }
+.st-help.dim { color: var(--text3); font-size: 14px; }
+.st-help code { font-size: 13px; color: var(--text2); }
+.st-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.st-row-between { display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+.st-row-between > :first-child { flex: 1 1 280px; min-width: 0; }
+.st-modal button:focus-visible, .st-modal input:focus-visible, .st-modal select:focus-visible { outline: 2px solid var(--gold2); outline-offset: 2px; }
+
+.st-input, .st-select { height: 44px; background: var(--bg3); border: 1px solid var(--border); border-radius: 4px; padding: 0 12px; color: var(--text); font-size: 15px; font-family: var(--font-body); }
+.st-input:focus, .st-select:focus { outline: none; border-color: var(--gold); }
+/* Dropdowns match the buttons beside them (transparent, border2, text2, gold on hover).
+   appearance:none stops Linux webkit2gtk drawing the GTK theme's white box. */
+.st-select { appearance: none; -webkit-appearance: none; color-scheme: dark; background-color: transparent; border-color: var(--border2); color: var(--text2); padding-right: 36px; cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23b8a888' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 12px center; }
+.st-select:hover { border-color: var(--gold); color: var(--gold2); }
+.st-select option { background: var(--bg2); color: var(--text); }
+.st-input.mono { font-family: ui-monospace, Consolas, monospace; font-size: 14px; }
+.st-input.grow { flex: 1; min-width: 200px; }
+.st-range { flex: 1; accent-color: var(--gold); }
+.st-value { width: 48px; text-align: right; font-family: ui-monospace, Consolas, monospace; color: var(--gold2); }
+
+.st-btn { height: 44px; padding: 0 16px; background: transparent; border: 1px solid var(--border2); border-radius: 4px; color: var(--text2); font-family: var(--font-ui); font-size: 11px; letter-spacing: 1px; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.st-btn:hover:not(:disabled) { border-color: var(--gold); color: var(--gold2); }
+.st-btn:disabled { opacity: .5; cursor: not-allowed; }
+.st-btn.primary { background: var(--gold); border-color: var(--gold); color: var(--bg); font-weight: 600; font-size: 12px; padding: 0 22px; }
+.st-btn.primary:hover:not(:disabled) { background: var(--gold2); border-color: var(--gold2); color: var(--bg); }
+.st-btn.danger { border-color: #a33f36; color: var(--red2); }
+.st-btn.danger:hover:not(:disabled) { background: rgba(224,90,90,.1); border-color: var(--red2); color: var(--red2); }
+.st-btn.icon { width: 40px; height: 40px; padding: 0; }
+.st-btn.small { height: 36px; }
+.st-link { background: none; border: none; padding: 0; color: var(--gold2); font: inherit; font-size: 14px; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.st-link:hover { color: var(--gold3); }
+
+.st-status { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--text3); }
+.st-status .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+.st-status.ok { color: var(--green2); }
+.st-status.warn { color: var(--gold2); }
+.st-status.bad { color: var(--red2); }
+
+.st-chips { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.st-pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; font-size: 14px; }
+.st-pill.ok { background: #17301a; color: var(--green2); }
+.st-pill.bad { background: #3a1714; color: var(--red2); }
+.st-pill.wait { background: var(--bg4); color: var(--text2); }
+.st-chip { padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border); color: var(--text2); font-size: 14px; }
+.st-chip.missing { border-color: #a33f36; color: var(--red2); text-decoration: line-through; }
+
+.st-msg { font-size: 14px; }
+.st-msg.ok { color: var(--green2); }
+.st-msg.bad { color: var(--red2); }
+.st-msg.pre { white-space: pre-wrap; font-family: ui-monospace, Consolas, monospace; font-size: 13px; line-height: 1.6; }
+
+.st-card { border: 1px solid var(--border); border-radius: 6px; padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; }
+.st-card.danger { background: #1a0f0d; border-color: #5a2a24; }
+.st-card-title { font-family: var(--font-ui); font-size: 13px; letter-spacing: 2px; color: var(--text); }
+.st-card.danger .st-card-title { color: var(--red2); }
+.st-sub { font-size: 14px; color: var(--text2); display: block; }
+
+.st-table { border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.st-tr { display: grid; grid-template-columns: 2fr 1.2fr 1.4fr 100px; gap: 12px; align-items: center; padding: 8px 16px; font-size: 16px; }
+.st-tr + .st-tr { border-top: 1px solid var(--border); }
+.st-tr.head { background: var(--bg3); font-family: var(--font-ui); font-size: 11px; letter-spacing: 1px; color: var(--text3); padding: 10px 16px; }
+.st-tr .muted { color: var(--text2); }
+.st-tr .actions { display: flex; justify-content: flex-end; gap: 6px; }
+.st-empty { padding: 16px; font-size: 15px; color: var(--text3); font-style: italic; }
+
+.st-drawer { border: 1px dashed var(--border2); border-radius: 6px; }
+.st-drawer-toggle { width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; background: transparent; border: none; color: var(--text2); font-family: var(--font-ui); font-size: 12px; letter-spacing: 2px; cursor: pointer; }
+.st-drawer-toggle:hover { color: var(--gold2); }
+.st-drawer-body { padding: 0 18px 18px; display: flex; flex-direction: column; gap: 12px; }
+.st-checks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 24px; font-size: 15px; }
+.st-check { display: flex; gap: 8px; align-items: flex-start; }
+.st-check svg { margin-top: 4px; flex-shrink: 0; }
+.st-check.ok { color: var(--green2); }
+.st-check.bad { color: var(--red2); }
+.st-check.warn { color: var(--gold2); }
+.st-check.dim { color: var(--text3); }
+
+.st-update { background: rgba(200,150,42,.08); border: 1px solid rgba(200,150,42,.35); border-radius: 6px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
+.st-update-title { font-size: 17px; font-weight: 600; color: var(--gold2); }
+.st-update-body { font-size: 14px; color: var(--text2); white-space: pre-wrap; max-height: 140px; overflow-y: auto; }
+.st-changelog { max-height: 340px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; background: var(--bg3); padding: 12px 16px; }
+.st-release { padding-bottom: 12px; margin-bottom: 12px; border-bottom: 1px solid var(--border); }
+.st-release:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+.st-release-name { font-size: 15px; font-weight: 600; color: var(--gold2); }
+.st-release-date { font-size: 12px; color: var(--text3); margin-bottom: 4px; }
+.st-release-body { font-size: 14px; color: var(--text2); }
+
+.st-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 24px; border-top: 1px solid var(--border); background: #120f0c; flex-wrap: wrap; }
+.st-foot-state { display: inline-flex; align-items: center; gap: 8px; font-size: 15px; color: var(--text3); }
+.st-foot-state.dirty { color: var(--gold2); }
+.st-foot-state .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.st-foot-actions { display: flex; gap: 10px; }
+
+.st-file-hidden { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+
+@media (max-width: 760px) {
+  .st-overlay { padding: 0; }
+  .st-modal { height: 100%; border-radius: 0; }
+  .st-body { flex-direction: column; }
+  .st-nav { width: auto; flex-direction: row; overflow-x: auto; border-right: none; border-bottom: 1px solid var(--border); padding: 8px; }
+  .st-nav-item { width: auto; white-space: nowrap; }
+  .st-nav-version { display: none; }
+  .st-pane { padding: 20px 16px; }
+  .st-checks { grid-template-columns: 1fr; }
+  .st-tr { grid-template-columns: 1.5fr 1fr 96px; }
+  .st-tr > :nth-child(3) { display: none; }
+}

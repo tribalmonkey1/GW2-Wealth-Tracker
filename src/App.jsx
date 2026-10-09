@@ -35,7 +35,6 @@ import { RecommendedTab } from "./tabs/RecommendedTab.jsx";
 import { UnlearnedRecipesTab } from "./tabs/UnlearnedRecipesTab.jsx";
 import { CraftingTab } from "./tabs/CraftingTab.jsx";
 import { SettingsPanel } from "./tabs/SettingsPanel.jsx";
-import { ImportExportPanel } from "./tabs/ImportExportPanel.jsx";
 import { ResetConfirmDialog } from "./tabs/ResetConfirmDialog.jsx";
 import { DeleteFriendConfirmDialog } from "./tabs/DeleteFriendConfirmDialog.jsx";
 import { FlipMarketTab } from "./tabs/FlipMarketTab.jsx";
@@ -122,7 +121,6 @@ export default function App() {
   const [dataSettled, setDataSettled] = useState(false);
   const [error, setError] = useState(null);
   const [dbStats, setDbStats] = useState(null);
-  const [showMigration, setShowMigration] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [resetType, setResetType] = useState(null); // 'market' | 'personal'
   const [migrationStatus, setMigrationStatus] = useState(null);
@@ -188,6 +186,8 @@ export default function App() {
   const [expanded, setExpanded] = useState({});
   const [historyItem, setHistoryItem] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [settingsSection, setSettingsSection] = useState("account"); // which Settings sidebar section opens
+  const openSettings = (section) => { setSettingsSection(section || "account"); setShowSettings(true); };
   const [noApiKey, setNoApiKey] = useState(false);
   const [apiKey, setApiKey] = useState("");
   const [settingsApiKey, setSettingsApiKey] = useState("");
@@ -2167,7 +2167,7 @@ export default function App() {
       <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
         v{appVersion}
         {updateInfo && (
-          <span onClick={() => setShowSettings(true)} title={`v${updateInfo.version} available`}
+          <span onClick={() => openSettings("about")} title={`v${updateInfo.version} available`}
             style={{ cursor: "pointer", color: "var(--gold2)", background: "rgba(200,150,42,.15)", border: "1px solid rgba(200,150,42,.4)", borderRadius: 3, padding: "1px 7px" }}>
             ⬆ Update available
           </span>
@@ -2177,19 +2177,7 @@ export default function App() {
     {dbStats && (
       <span title={dbStats.db_path}>💾 {Number(dbStats.size_mb).toFixed(2)}MB · {(dbStats.price_history_count || 0).toLocaleString()} price · {(dbStats.velocity_count || 0).toLocaleString()} velocity snapshots</span>
     )}
-    <button onClick={() => setShowMigration(v => !v)}
-    style={{ fontSize: 10, color: "var(--gold2)", background: "transparent", border: "1px solid var(--border)", borderRadius: 3, padding: "1px 8px", cursor: "pointer", fontFamily: "Cinzel,serif", letterSpacing: 1 }}>
-    {showMigration ? "✕ Close" : "📥 Import / Export"}
-    </button>
-    <button onClick={() => { setResetType("market"); setShowResetConfirm(true); }}
-    style={{ fontSize: 10, color: "var(--red2,#e05555)", background: "transparent", border: "1px solid var(--red2,#e05555)", borderRadius: 3, padding: "1px 8px", cursor: "pointer", fontFamily: "Cinzel,serif", letterSpacing: 1 }}>
-    🗑 Reset Market DB
-    </button>
-    <button onClick={() => { setResetType("personal"); setShowResetConfirm(true); }}
-    style={{ fontSize: 10, color: "var(--red2,#e05555)", background: "transparent", border: "1px solid var(--red2,#e05555)", borderRadius: 3, padding: "1px 8px", cursor: "pointer", fontFamily: "Cinzel,serif", letterSpacing: 1 }}>
-    🗑 Reset Personal DB
-    </button>
-    <button onClick={() => setShowSettings(v => !v)}
+    <button onClick={() => (showSettings ? setShowSettings(false) : openSettings())}
     style={{ fontSize: 10, color: "var(--gold2)", background: "transparent", border: "1px solid var(--border)", borderRadius: 3, padding: "1px 8px", cursor: "pointer", fontFamily: "Cinzel,serif", letterSpacing: 1 }}>
     ⚙ Settings
     </button>
@@ -2203,7 +2191,7 @@ export default function App() {
         setShowResetConfirm={setShowResetConfirm}
         setDbStats={setDbStats}
         setMigrationStatus={setMigrationStatus}
-        setShowMigration={setShowMigration}
+        setShowMigration={(v) => { if (v) openSettings("maintenance"); }} // result shows under Settings → Maintenance
         settingsNasSsh={settingsNasSsh}
       />
     )}
@@ -2251,13 +2239,11 @@ export default function App() {
         setApiKey={setApiKey}
         settingsDrfToken={settingsDrfToken} setSettingsDrfToken={setSettingsDrfToken}
         setDrfToken={setDrfToken} drfStatus={drfStatus} drfStatusDetail={drfStatusDetail}
-      />
-    )}
-    {showMigration && (
-      <ImportExportPanel
-        migrationStatus={migrationStatus}
-        setMigrationStatus={setMigrationStatus}
-        setDbStats={setDbStats}
+        dbStats={dbStats} setDbStats={setDbStats}
+        migrationStatus={migrationStatus} setMigrationStatus={setMigrationStatus}
+        onRequestReset={(type) => { setResetType(type); setShowResetConfirm(true); }}
+        initialSection={settingsSection}
+        onClose={() => setShowSettings(false)}
       />
     )}
 
