@@ -63,7 +63,7 @@ export function MaterialsTab({
           style={{ cursor: "pointer", fontSize: 11, padding: "2px 8px", borderRadius: 3, fontFamily: "Cinzel,serif", letterSpacing: 1,
             border: `1px solid ${alertSort === k ? "var(--gold)" : "var(--border)"}`,
                                                                                                             color: alertSort === k ? "var(--gold2)" : "var(--text3)",
-                                                                                                            background: alertSort === k ? "rgba(200,150,42,0.1)" : "transparent" }}>
+                                                                                                            background: alertSort === k ? "rgba(var(--gold-rgb),0.1)" : "transparent" }}>
                                                                                                             {label}
                                                                                                             </span>
         ))}
@@ -94,7 +94,7 @@ export function MaterialsTab({
             <span><Gold v={a.periodMax} size={13} /></span>
             <span style={{
               fontSize: 11, padding: "2px 8px", borderRadius: 3, textAlign: "center",
-              background: a.isNewHigh ? "rgba(90,200,90,0.15)" : "rgba(200,150,42,0.15)",
+              background: a.isNewHigh ? "rgba(90,200,90,0.15)" : "rgba(var(--gold-rgb),0.15)",
                                                                                   color: a.isNewHigh ? "var(--green2)" : "var(--gold2)",
                                                                                   fontFamily: "Cinzel,serif", letterSpacing: 1, whiteSpace: "nowrap",
             }}>

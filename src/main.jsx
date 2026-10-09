@@ -1,6 +1,11 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App.jsx";
+import { ThemeBackdrop } from "./components/ThemeBackdrop.jsx";
+import { startThemeWatcher } from "./lib/theme.js";
+import "./styles/themes.css";
+
+startThemeWatcher();
 
 class ErrorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { error: null }; }
@@ -17,6 +22,7 @@ class ErrorBoundary extends React.Component {
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <ErrorBoundary>
+  <ThemeBackdrop />
   <App />
   </ErrorBoundary>
 );

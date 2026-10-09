@@ -54,7 +54,7 @@ export function FriendFilterDropdown({ friends, friendFilter, setFriendFilter })
         onClick={() => setOpen(o => !o)}
         style={{
           fontSize: 12,
-          borderColor: friendFilter.enabled ? "#9f4dff" : undefined,
+          borderColor: friendFilter.enabled ? "var(--r-legendary)" : undefined,
           color: friendFilter.enabled ? "#c9a0ff" : undefined,
         }}
       >
@@ -63,7 +63,7 @@ export function FriendFilterDropdown({ friends, friendFilter, setFriendFilter })
       {open && (
         <div style={{
           position: "absolute", top: "calc(100% + 4px)", left: 0, zIndex: 50,
-          background: "var(--bg4)", border: "1px solid #9f4dff", borderRadius: 5,
+          background: "var(--bg4)", border: "1px solid var(--r-legendary)", borderRadius: 5,
           padding: "10px 14px", minWidth: 240, boxShadow: "0 10px 40px rgba(0,0,0,.8)",
         }}>
           <label style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: friendFilter.enabled ? 8 : 0, fontSize: 13, cursor: "pointer", fontWeight: 600 }}>

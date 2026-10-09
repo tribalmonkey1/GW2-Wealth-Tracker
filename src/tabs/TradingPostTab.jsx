@@ -103,7 +103,7 @@ export function TradingPostTab({
               // Stale detection: listed > 3 days, no sales in history, low fills
               const isStale = r.ageMs > 3*86400000 && r.mySolds.length === 0 && (r.sellFills == null || r.sellFills < 0.2);
               return (
-                <div key={r.id} className="lp-row" style={{ borderLeft: r.isUndercut ? "3px solid var(--red2)" : isStale ? "3px solid rgba(200,150,42,.3)" : "3px solid transparent" }}>
+                <div key={r.id} className="lp-row" style={{ borderLeft: r.isUndercut ? "3px solid var(--red2)" : isStale ? "3px solid rgba(var(--gold-rgb),.3)" : "3px solid transparent" }}>
                 {r.item?.icon
                   ? <img src={r.item.icon} style={{ width:36, height:36, borderRadius:3, border:"1px solid var(--border2)", flexShrink:0 }} alt="" />
                   : <div style={{ width:36, height:36, borderRadius:3, background:"var(--bg4)", flexShrink:0 }} />

@@ -2,7 +2,8 @@
  * Settings window — sidebar-sections layout.
  *
  * Opens as a modal over the tracker with a left-hand section list (Account &
- * Data, Alerts, Sound & Voice, Friends, Maintenance, About & Updates) and a
+ * Data, Alerts, Sound & Voice, Friends, Appearance, Maintenance, About &
+ * Updates) and a
  * sticky footer that tracks unsaved edits (Discard / Save Changes). Import /
  * Export and the two database resets live under Maintenance now instead of
  * in the app header.
@@ -10,7 +11,8 @@
  * What still saves through the footer (unchanged keys/behaviour): api_key,
  * drfToken, nas_ssh (+ set_market_db_path), alert_threshold,
  * gem_alert_threshold_gold, customSoundPath, piperVoiceFile, piperSpeakerId.
- * Friends, recipe rescans, import/export, resets and updates act immediately,
+ * Friends, Appearance (themes), recipe rescans, import/export, resets and
+ * updates act immediately,
  * exactly as before.
  *
  * Caller is responsible for the `showSettings &&` gate (see App.jsx) and
@@ -21,6 +23,9 @@ import { invoke } from "@tauri-apps/api/core";
 import { renderMarkdown } from "../lib/markdown.jsx";
 import { importFromBrowser, exportAllData, getDbStats } from "../lib/storage.js";
 import { playAlert } from "../lib/alertSound.js";
+import { THEMES, SEASONAL_THEMES, getChosenTheme, setChosenTheme, getSeasonalAuto, setSeasonalAuto, parseMonthDay, useActiveTheme } from "../lib/theme.js";
+import halloween1Thumb from "../assets/themes/halloween1-thumb.webp";
+import halloween2Thumb from "../assets/themes/halloween2-thumb.webp";
 import "../styles/settings.css";
 
 // Permissions the tracker reads (same list as the first-run screen in App.jsx).
@@ -52,6 +57,7 @@ const ICONS = {
   friends: ["M13 8a4 4 0 1 0-8 0 4 4 0 0 0 8 0", "M2 21a7 7 0 0 1 14 0", "M17 11a3 3 0 1 0 0-6", "M22 21a5 5 0 0 0-4-5"],
   maintenance: ["M21 12a9 9 0 1 1-3-6.7L21 8", "M21 3v5h-5"],
   about: ["M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0", "M12 8v4", "M12 16h.01"],
+  appearance: ["M12 21a9 9 0 1 1 9-9c0 2.2-1.6 3-3.2 3H15.5a2 2 0 0 0-1.5 3.3c.7.9.1 2.7-2 2.7z", "M7.5 11.5h.01", "M10 7.5h.01", "M14.5 7.5h.01"],
   close: ["M6 6l12 12", "M18 6L6 18"],
   refresh: ["M21 12a9 9 0 1 1-3-6.7L21 8", "M21 3v5h-5"],
   trash: ["M4 7h16", "M9 7V4h6v3", "M6 7l1 13h10l1-13"],
@@ -69,6 +75,7 @@ const SECTIONS = [
   { id: "alerts", label: "Alerts" },
   { id: "sound", label: "Sound & Voice" },
   { id: "friends", label: "Friends" },
+  { id: "appearance", label: "Appearance" },
   { id: "maintenance", label: "Maintenance" },
   { id: "about", label: "About & Updates" },
 ];
@@ -629,6 +636,111 @@ function AboutSection(p) {
   );
 }
 
+// ── Appearance (themes) ─────────────────────────────────────────────────────
+// Acts immediately like Friends/Maintenance; stored per computer (theme.js).
+const SEASON_THUMBS = { halloween1: halloween1Thumb, halloween2: halloween2Thumb };
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const fmtMonthDay = md => { const n = parseMonthDay(md); return n == null ? md : `${MONTHS[Math.floor(n / 100) - 1]} ${n % 100}`; };
+
+function AppearanceSection() {
+  const active = useActiveTheme();
+  const [chosen, setChosen] = useState(getChosenTheme);
+  const [auto, setAuto] = useState(getSeasonalAuto);
+  const [startTxt, setStartTxt] = useState(auto.start);
+  const [endTxt, setEndTxt] = useState(auto.end);
+
+  const pick = id => { setChosenTheme(id); setChosen(id); };
+  const updateAuto = patch => { const next = { ...auto, ...patch }; setAuto(next); setSeasonalAuto(next); };
+  const commitDate = (field, txt) => {
+    if (parseMonthDay(txt) == null) return;
+    updateAuto({ [field]: txt.trim() });
+  };
+  const startBad = parseMonthDay(startTxt) == null, endBad = parseMonthDay(endTxt) == null;
+  const overridden = active !== chosen;
+  const activeName = [...THEMES, ...SEASONAL_THEMES].find(t => t.id === active)?.name;
+
+  return (
+    <>
+      <div>
+        <h2>Appearance</h2>
+        <p className="st-lede">Pick a color scheme. Changes apply right away and don't need Save.</p>
+      </div>
+
+      {overridden && (
+        <div className="st-msg">{activeName} is showing because the seasonal auto-switch is on (until {fmtMonthDay(auto.end)}). Your pick comes back after that.</div>
+      )}
+
+      <div className="st-field">
+        <span className="st-label">COLOR SCHEME</span>
+        <div className="ap-grid">
+          {THEMES.map(t => (
+            <button key={t.id} className={`ap-tile ${chosen === t.id ? "on" : ""}`} aria-pressed={chosen === t.id} onClick={() => pick(t.id)}>
+              <span className="ap-preview" style={{ background: t.swatch.bg }}>
+                <span className="ap-bar" style={{ background: t.swatch.acc2 }} />
+                <span className="ap-cards">
+                  <span style={{ background: t.swatch.panel, borderTopColor: t.swatch.acc }} />
+                  <span style={{ background: t.swatch.panel, borderTopColor: t.swatch.acc }} />
+                </span>
+                <span className="ap-lines">
+                  <span style={{ background: t.swatch.text, flex: 2 }} />
+                  <span style={{ background: t.swatch.acc, flex: 1 }} />
+                  <span style={{ background: t.swatch.dim, flex: 1 }} />
+                </span>
+              </span>
+              <span className="ap-name">{t.name}</span>
+              <span className="ap-desc">{t.desc}</span>
+              {chosen === t.id && <span className="ap-on">● SELECTED</span>}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="st-divider" />
+
+      <div className="st-field">
+        <span className="st-label">SEASONAL THEMES</span>
+        <p className="st-help dim">Pick one to use it now, or let it switch on by itself during the festival below.</p>
+        <div className="ap-grid seasonal">
+          {SEASONAL_THEMES.map(t => (
+            <button key={t.id} className={`ap-tile ${chosen === t.id ? "on" : ""}`} aria-pressed={chosen === t.id} onClick={() => pick(t.id)}>
+              <span className="ap-thumb"><img src={SEASON_THUMBS[t.id]} alt="" /></span>
+              <span className="ap-name">{t.name}</span>
+              <span className="ap-desc">{t.desc}</span>
+              {chosen === t.id && <span className="ap-on">● SELECTED</span>}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="st-card">
+        <div className="st-card-title">HALLOWEEN AUTO-SWITCH</div>
+        <label className="ap-toggle">
+          <input type="checkbox" checked={auto.enabled} onChange={e => updateAuto({ enabled: e.target.checked })} />
+          <span>Switch to a Halloween theme automatically between these dates, then back to my color scheme</span>
+        </label>
+        <div className="st-row">
+          <label className="ap-inline">Theme
+            <select className="st-select" value={auto.theme} onChange={e => updateAuto({ theme: e.target.value })} disabled={!auto.enabled}>
+              {SEASONAL_THEMES.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          </label>
+          <label className="ap-inline">Starts
+            <input className="st-input ap-date" value={startTxt} placeholder="MM-DD" disabled={!auto.enabled} aria-invalid={startBad}
+              onChange={e => { setStartTxt(e.target.value); commitDate("start", e.target.value); }} />
+          </label>
+          <label className="ap-inline">Ends
+            <input className="st-input ap-date" value={endTxt} placeholder="MM-DD" disabled={!auto.enabled} aria-invalid={endBad}
+              onChange={e => { setEndTxt(e.target.value); commitDate("end", e.target.value); }} />
+          </label>
+        </div>
+        {(startBad || endBad) && auto.enabled
+          ? <div className="st-msg bad">Use month-day, like 10-15 for Oct 15.</div>
+          : <div className="st-help dim">Festival dates change each year, so set them to match. Currently {fmtMonthDay(auto.start)} – {fmtMonthDay(auto.end)}.</div>}
+      </div>
+    </>
+  );
+}
+
 // ── Main window ─────────────────────────────────────────────────────────────
 
 export function SettingsPanel(props) {
@@ -731,7 +843,7 @@ export function SettingsPanel(props) {
     return null;
   };
 
-  const Pane = { account: AccountSection, alerts: AlertsSection, sound: SoundSection, friends: FriendsSection, maintenance: MaintenanceSection, about: AboutSection }[section] || AccountSection;
+  const Pane = { account: AccountSection, alerts: AlertsSection, sound: SoundSection, friends: FriendsSection, appearance: AppearanceSection, maintenance: MaintenanceSection, about: AboutSection }[section] || AccountSection;
 
   return (
     <div className="st-overlay" onMouseDown={e => { if (e.target === e.currentTarget) requestClose(); }}>

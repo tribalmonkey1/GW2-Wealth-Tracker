@@ -1,5 +1,5 @@
 /* GW2 Wealth Tracker — global styles. (Split out of App.jsx's css template string.) */
-@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Pirata+One&display=swap');
 :root {
   --bg:#0e0c09; --bg2:#161310; --bg3:#1e1a14; --bg4:#252018; --bg5:#2e2718;
   --border:#3a3020; --border2:#4a3f28;
@@ -7,6 +7,13 @@
   --copper:#b87333; --text:#e8dcc8; --text2:#b8a888; --text3:#786858;
   --green:#5a9e5a; --green2:#7ade7a; --red:#c05050; --red2:#e05a5a;
   --blue:#5a8aaf; --blue2:#7ab4d4;
+  --gold-rgb:200,150,42; --scheme:dark;
+  --sell:#e8a850; --buy:#7ab87a;
+  --r-junk:#aaa; --r-basic:#fff; --r-fine:#62a4da; --r-masterwork:#1a9306; --r-rare:#fcd00b;
+  --r-exotic:#ffa405; --r-ascended:#fb3e8d; --r-legendary:#9f4dff;
+  --coin-g:#e8b84b; --coin-g-bg:#3a2e00; --coin-s:#c0c0d8; --coin-s-bg:#2a2a3a; --coin-c:#b87333; --coin-c-bg:#2a1a0a;
+  --panel-solid:#120f0c;
+  --font-title: 'Cinzel', serif;
   --font-ui: 'Cinzel', serif;
   --font-body: 'Crimson Pro', Georgia, serif;
 }
@@ -19,7 +26,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--font-body);
 .hdr { text-align: center; padding: 32px 0 20px; border-bottom: 1px solid var(--border2); margin-bottom: 20px; position: relative; }
 .hdr::before,.hdr::after { content:'⬡'; color:var(--gold); font-size:12px; position:absolute; top:50%; transform:translateY(-50%); opacity:.4; }
 .hdr::before{left:0;} .hdr::after{right:0;}
-.hdr h1 { font-family:var(--font-ui); font-size:32px; font-weight:700; color:var(--gold2); letter-spacing:4px; text-transform:uppercase; text-shadow:0 0 40px rgba(200,150,42,.35); }
+.hdr h1 { font-family:var(--font-title); font-size:32px; font-weight:700; color:var(--gold2); letter-spacing:4px; text-transform:uppercase; text-shadow:0 0 40px rgba(var(--gold-rgb),.35); }
 .hdr p { color:var(--text3); font-size:14px; letter-spacing:1px; margin-top:5px; font-style:italic; }
 
 /* ── Status bar ── */
@@ -34,13 +41,13 @@ body { background: var(--bg); color: var(--text); font-family: var(--font-body);
 .cd-bar { height:100%; border-radius:2px; transition:width 1s linear; }
 .cd-p { background:var(--gold); } .cd-r { background:var(--blue); }
 .rbtn { font-family:var(--font-ui); font-size:11px; letter-spacing:1px; padding:6px 14px; border:1px solid var(--border2); border-radius:4px; cursor:pointer; color:var(--gold); background:transparent; transition:all .15s; }
-.rbtn:hover { background:rgba(200,150,42,.1); border-color:var(--gold); }
+.rbtn:hover { background:rgba(var(--gold-rgb),.1); border-color:var(--gold); }
 .rbtn:disabled { opacity:.4; cursor:not-allowed; }
 
 /* ── Alert banner ── */
 .alert-banner { background:#2a1e00; border:1px solid var(--gold); border-radius:5px; padding:10px 16px; margin-bottom:14px; font-size:14px; color:var(--gold2); }
 .alert-banner strong { font-family:var(--font-ui); font-size:11px; letter-spacing:2px; display:block; margin-bottom:6px; }
-.alert-item { display:flex; align-items:center; gap:10px; padding:4px 0; border-bottom:1px solid rgba(200,150,42,.15); }
+.alert-item { display:flex; align-items:center; gap:10px; padding:4px 0; border-bottom:1px solid rgba(var(--gold-rgb),.15); }
 .alert-item:last-child { border-bottom:none; }
 
 /* ── Summary cards ── */
@@ -78,11 +85,11 @@ tbody td { padding:11px 14px; color:var(--text2); vertical-align:middle; }
 .tfoot td { border-top:2px solid var(--border2)!important; font-weight:600; color:var(--text)!important; background:var(--bg4); padding:11px 14px; }
 
 /* ── Rarity ── */
-.rj{color:#aaa;} .rB{color:#fff;} .rF{color:#62a4da;} .rM{color:#1a9306;}
-.rR{color:#fcd00b;} .rE{color:#ffa405;} .rA{color:#fb3e8d;} .rL{color:#9f4dff;}
-.rar-Junk{color:#aaa;} .rar-Basic{color:#fff;} .rar-Fine{color:#62a4da;}
-.rar-Masterwork{color:#1a9306;} .rar-Rare{color:#fcd00b;} .rar-Exotic{color:#ffa405;}
-.rar-Ascended{color:#fb3e8d;} .rar-Legendary{color:#9f4dff;}
+.rj{color:var(--r-junk);} .rB{color:var(--r-basic);} .rF{color:var(--r-fine);} .rM{color:var(--r-masterwork);}
+.rR{color:var(--r-rare);} .rE{color:var(--r-exotic);} .rA{color:var(--r-ascended);} .rL{color:var(--r-legendary);}
+.rar-Junk{color:var(--r-junk);} .rar-Basic{color:var(--r-basic);} .rar-Fine{color:var(--r-fine);}
+.rar-Masterwork{color:var(--r-masterwork);} .rar-Rare{color:var(--r-rare);} .rar-Exotic{color:var(--r-exotic);}
+.rar-Ascended{color:var(--r-ascended);} .rar-Legendary{color:var(--r-legendary);}
 
 /* ── Item cell ── */
 .ic { display:flex; align-items:center; gap:9px; }
@@ -92,8 +99,8 @@ tbody td { padding:11px 14px; color:var(--text2); vertical-align:middle; }
 
 /* ── Price display ── */
 .p2 { display:flex; flex-direction:column; gap:2px; }
-.psell { color:#e8a850; font-size:14px; }
-.pbuy { color:#7ab87a; font-size:13px; }
+.psell { color:var(--sell); font-size:14px; }
+.pbuy { color:var(--buy); font-size:13px; }
 .plbl { font-size:11px; color:var(--text3); }
 
 /* ── Tooltip ── */
@@ -140,14 +147,14 @@ tbody td { padding:11px 14px; color:var(--text2); vertical-align:middle; }
 .ci-stat { display:flex; flex-direction:column; gap:3px; min-width:88px; text-align:right; }
 .ci-stat-lbl { font-family:var(--font-ui); font-size:10px; letter-spacing:1.5px; color:var(--text3); white-space:nowrap; }
 
-.sell-path { margin-top:12px; padding:10px; background:rgba(200,150,42,.06); border:1px solid rgba(200,150,42,.2); border-radius:4px; }
+.sell-path { margin-top:12px; padding:10px; background:rgba(var(--gold-rgb),.06); border:1px solid rgba(var(--gold-rgb),.2); border-radius:4px; }
 .sell-path-lbl { font-family:var(--font-ui); font-size:10px; letter-spacing:2px; color:var(--gold); margin-bottom:8px; }
-.sell-path-item { display:flex; justify-content:space-between; align-items:center; padding:3px 0; font-size:13px; color:var(--text2); border-bottom:1px solid rgba(200,150,42,.1); }
+.sell-path-item { display:flex; justify-content:space-between; align-items:center; padding:3px 0; font-size:13px; color:var(--text2); border-bottom:1px solid rgba(var(--gold-rgb),.1); }
 .sell-path-item:last-child { border-bottom:none; }
 
 .cheap-path { margin-top:10px; padding:10px; background:rgba(90,160,90,.05); border:1px solid rgba(90,160,90,.2); border-radius:4px; }
 .cheap-path-lbl { font-family:var(--font-ui); font-size:10px; letter-spacing:2px; color:var(--green); margin-bottom:8px; }
-.src-vendor { color:var(--gold2); font-size:11px; background:rgba(200,150,42,.15); padding:1px 5px; border-radius:2px; }
+.src-vendor { color:var(--gold2); font-size:11px; background:rgba(var(--gold-rgb),.15); padding:1px 5px; border-radius:2px; }
 .src-tp { color:var(--blue2); font-size:11px; background:rgba(90,160,210,.15); padding:1px 5px; border-radius:2px; }
 .src-owned { color:var(--green); font-size:11px; background:rgba(90,160,90,.15); padding:1px 5px; border-radius:2px; }
 
@@ -161,7 +168,7 @@ tbody td { padding:11px 14px; color:var(--text2); vertical-align:middle; }
 .disc-tabs { display:flex; gap:4px; flex-wrap:wrap; margin-bottom:18px; }
 .dtab { font-family:var(--font-ui); font-size:11px; letter-spacing:1px; padding:6px 14px; border:1px solid var(--border); border-radius:4px; cursor:pointer; color:var(--text3); background:transparent; transition:all .15s; }
 .dtab:hover { color:var(--text2); border-color:var(--border2); }
-.dtab.on { color:var(--gold2); border-color:var(--gold); background:rgba(200,150,42,.08); }
+.dtab.on { color:var(--gold2); border-color:var(--gold); background:rgba(var(--gold-rgb),.08); }
 .dtab-ct { opacity:.5; margin-left:5px; }
 
 .sort-pills { display:flex; gap:8px; align-items:center; font-size:12px; color:var(--text3); font-family:var(--font-ui); letter-spacing:1px; flex-wrap:wrap; }
@@ -192,7 +199,7 @@ tbody td { padding:11px 14px; color:var(--text2); vertical-align:middle; }
 
 /* ── Chart in crafting tab ── */
 .cbtn { font-family:var(--font-ui); font-size:10px; letter-spacing:1px; padding:3px 8px; border:1px solid var(--border); border-radius:3px; cursor:pointer; color:var(--text3); background:transparent; transition:all .15s; white-space:nowrap; }
-.cbtn:hover,.cbtn.on { color:var(--gold2); border-color:var(--gold); background:rgba(200,150,42,.08); }
+.cbtn:hover,.cbtn.on { color:var(--gold2); border-color:var(--gold); background:rgba(var(--gold-rgb),.08); }
 
 /* ── Price history mini chart ── */
 .hist-wrap { background:var(--bg4); border:1px solid var(--border2); border-radius:5px; padding:14px 16px; min-width:520px; }
@@ -223,7 +230,7 @@ tbody td { padding:11px 14px; color:var(--text2); vertical-align:middle; }
 .bt-occ-actions { display: flex; gap: 2px; flex-shrink: 0; }
 .bt-icon-btn { background: transparent; border: none; cursor: pointer; font-size: 13px; opacity: .45; padding: 2px 3px; line-height: 1; transition: opacity .15s; }
 .bt-icon-btn:hover { opacity: .8; }
-.bt-icon-btn.on { opacity: 1; filter: drop-shadow(0 0 3px rgba(200,150,42,.6)); }
+.bt-icon-btn.on { opacity: 1; filter: drop-shadow(0 0 3px rgba(var(--gold-rgb),.6)); }
 
 .bt-pop-lbl { font-family: Cinzel,serif; font-size: 10px; letter-spacing: 2px; color: var(--text3); margin-bottom: 6px; }
 .bt-pop-row { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--text2); padding: 3px 0; cursor: pointer; white-space: nowrap; }
@@ -234,7 +241,7 @@ tbody td { padding:11px 14px; color:var(--text2); vertical-align:middle; }
 .tl-row { display: flex; align-items: stretch; border-bottom: 1px solid var(--border); }
 .tl-row-label { width: 150px; flex-shrink: 0; font-size: 13px; color: var(--text2); padding: 10px; display: flex; align-items: center; }
 .tl-track { position: relative; flex: 1; }
-.tl-block { position: absolute; background: var(--bg5); border: 1px solid rgba(200,150,42,0.45); border-radius: 4px; padding: 0 6px; z-index: 3; display: flex; align-items: center; overflow: hidden; }
+.tl-block { position: absolute; background: var(--bg5); border: 1px solid rgba(var(--gold-rgb),0.45); border-radius: 4px; padding: 0 6px; z-index: 3; display: flex; align-items: center; overflow: hidden; }
 .tl-occ-line { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text1); white-space: nowrap; padding: 1px 0; width: 100%; min-width: 0; }
 .tl-occ-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .tl-nowline { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--red2,#e05555); z-index: 5; box-shadow: 0 0 6px var(--red2,#e05555); pointer-events: none; }
@@ -242,7 +249,7 @@ tbody td { padding:11px 14px; color:var(--text2); vertical-align:middle; }
    the nowline/blocks (z-index 1 vs. the nowline's 5) in both the section
    tracks and, via inline borderLeft on each header cell in BossTimersTab.jsx,
    the header row above them. */
-.tl-gridline { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(200,150,42,.14); pointer-events: none; z-index: 1; }
+.tl-gridline { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(var(--gold-rgb),.14); pointer-events: none; z-index: 1; }
 
 /* Shared horizontal scroll for the whole Timeline view (header + every
    zone/section together — see BossTimersTab.jsx). overflow-x:scroll (not

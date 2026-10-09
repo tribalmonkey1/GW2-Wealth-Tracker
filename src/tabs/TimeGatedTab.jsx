@@ -123,8 +123,8 @@ export function TimeGatedTab({
               <div style={{
                 width: 36, height: 36, borderRadius: "50%", flexShrink: 0,
                 display: "flex", alignItems: "center", justifyContent: "center",
-                background: done ? "rgba(60,160,60,0.2)" : "rgba(200,150,42,0.1)",
-                    border: `2px solid ${done ? "var(--green2)" : "rgba(200,150,42,0.4)"}`,
+                background: done ? "rgba(60,160,60,0.2)" : "rgba(var(--gold-rgb),0.1)",
+                    border: `2px solid ${done ? "var(--green2)" : "rgba(var(--gold-rgb),0.4)"}`,
                     fontSize: 18,
               }}>
               {done ? "✓" : "·"}
@@ -144,8 +144,8 @@ export function TimeGatedTab({
                 <span key={d.name} style={{
                   fontSize: 10, fontFamily: "Cinzel,serif", letterSpacing: 1,
                   padding: "2px 8px", borderRadius: 3,
-                  background: d.qualifies ? "rgba(200,150,42,0.12)" : "rgba(80,80,80,0.15)",
-                                                                                                 border: `1px solid ${d.qualifies ? "rgba(200,150,42,0.4)" : "rgba(100,100,100,0.3)"}`,
+                  background: d.qualifies ? "rgba(var(--gold-rgb),0.12)" : "rgba(80,80,80,0.15)",
+                                                                                                 border: `1px solid ${d.qualifies ? "rgba(var(--gold-rgb),0.4)" : "rgba(100,100,100,0.3)"}`,
                                                                                                  color: d.qualifies ? "var(--gold2)" : "var(--text3)",
                 }}>{d.name} {d.level > 0 ? d.level : ""}</span>
               ))}
@@ -167,7 +167,7 @@ export function TimeGatedTab({
               <div style={{ minWidth: 110, textAlign: "right" }}>
               {done
                 ? <span style={{ fontSize: 11, fontFamily: "Cinzel,serif", letterSpacing: 1, color: "var(--green2)", background: "rgba(60,160,60,0.12)", border: "1px solid rgba(60,160,60,0.3)", padding: "4px 10px", borderRadius: 3 }}>✓ CRAFTED</span>
-                : <span style={{ fontSize: 11, fontFamily: "Cinzel,serif", letterSpacing: 1, color: "var(--gold2)", background: "rgba(200,150,42,0.1)", border: "1px solid rgba(200,150,42,0.3)", padding: "4px 10px", borderRadius: 3 }}>⚡ AVAILABLE</span>
+                : <span style={{ fontSize: 11, fontFamily: "Cinzel,serif", letterSpacing: 1, color: "var(--gold2)", background: "rgba(var(--gold-rgb),0.1)", border: "1px solid rgba(var(--gold-rgb),0.3)", padding: "4px 10px", borderRadius: 3 }}>⚡ AVAILABLE</span>
               }
               </div>
               </div>

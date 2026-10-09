@@ -103,7 +103,7 @@ export function PriceChart({ itemId, itemName }) {
         fontSize: 10, fontFamily: "Cinzel,serif", letterSpacing: 1,
         padding: "2px 8px", borderRadius: 3, cursor: "pointer",
         border: period === p.key ? "1px solid var(--gold2)" : "1px solid var(--border)",
-                       background: period === p.key ? "rgba(200,150,42,0.15)" : "transparent",
+                       background: period === p.key ? "rgba(var(--gold-rgb),0.15)" : "transparent",
                        color: period === p.key ? "var(--gold2)" : "var(--text3)",
       }}>
       {p.label}
@@ -181,7 +181,7 @@ export function PriceChart({ itemId, itemName }) {
         fontSize: 10, fontFamily: "Cinzel,serif", letterSpacing: 1,
         padding: "2px 8px", borderRadius: 3, cursor: "pointer",
         border: period === p.key ? "1px solid var(--gold2)" : "1px solid var(--border)",
-                       background: period === p.key ? "rgba(200,150,42,0.15)" : "transparent",
+                       background: period === p.key ? "rgba(var(--gold-rgb),0.15)" : "transparent",
                        color: period === p.key ? "var(--gold2)" : "var(--text3)",
       }}>
       {p.label}
@@ -204,7 +204,7 @@ export function PriceChart({ itemId, itemName }) {
     ))}
 
     {/* Fill */}
-    <polygon points={fillPts} fill="rgba(200,150,42,0.08)" />
+    <polygon points={fillPts} style={{ fill: "rgba(var(--gold-rgb),0.08)" }} />
 
     {/* Line */}
     <polyline fill="none" stroke="var(--gold)" strokeWidth="1.5" points={pts} />

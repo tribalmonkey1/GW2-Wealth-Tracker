@@ -16,9 +16,9 @@ export const Gold = ({ v, size = 14 }) => {
   return (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 2, fontSize: size, color: col }}>
     {neg && <span>−</span>}
-    {g > 0 && <><b>{g}</b><span style={{ fontSize: 10, background: "#3a2e00", color: "var(--gold2)", padding: "0 3px", borderRadius: 2, fontFamily: "Cinzel,serif" }}>g</span></>}
-    {s > 0 && <><b>{s}</b><span style={{ fontSize: 10, background: "#2a2a3a", color: "#c0c0d8", padding: "0 3px", borderRadius: 2, fontFamily: "Cinzel,serif" }}>s</span></>}
-    <b>{c}</b><span style={{ fontSize: 10, background: "#2a1a0a", color: "var(--copper)", padding: "0 3px", borderRadius: 2, fontFamily: "Cinzel,serif" }}>c</span>
+    {g > 0 && <><b>{g}</b><span style={{ fontSize: 10, background: "var(--coin-g-bg)", color: "var(--coin-g)", padding: "0 3px", borderRadius: 2, fontFamily: "Cinzel,serif" }}>g</span></>}
+    {s > 0 && <><b>{s}</b><span style={{ fontSize: 10, background: "var(--coin-s-bg)", color: "var(--coin-s)", padding: "0 3px", borderRadius: 2, fontFamily: "Cinzel,serif" }}>s</span></>}
+    <b>{c}</b><span style={{ fontSize: 10, background: "var(--coin-c-bg)", color: "var(--coin-c)", padding: "0 3px", borderRadius: 2, fontFamily: "Cinzel,serif" }}>c</span>
     </span>
   );
 };

@@ -98,7 +98,7 @@ export function FlipMarketTab({
             ⏳ PENDING FLIPS — {pendingFlips.length} open position{pendingFlips.length > 1 ? "s" : ""}
             </div>
             {pendingEnriched.map(pf => (
-              <div key={pf.id} className="lp-row" style={{ borderLeft: pf.isSellNow ? "3px solid var(--gold2)" : "3px solid rgba(80,120,200,0.4)", background: pf.isSellNow ? "rgba(200,150,42,0.05)" : undefined }}>
+              <div key={pf.id} className="lp-row" style={{ borderLeft: pf.isSellNow ? "3px solid var(--gold2)" : "3px solid rgba(80,120,200,0.4)", background: pf.isSellNow ? "rgba(var(--gold-rgb),0.05)" : undefined }}>
               {pf.item?.icon
                 ? <img src={pf.item.icon} style={{ width:36, height:36, borderRadius:3, border:"1px solid var(--border2)", flexShrink:0 }} alt="" />
                 : <div style={{ width:36, height:36, background:"var(--bg4)", borderRadius:3, flexShrink:0 }} />
@@ -107,7 +107,7 @@ export function FlipMarketTab({
               <div style={{ fontSize:15, fontWeight:600, color:"var(--text1)", display:"flex", alignItems:"center", gap:8 }}>
               {pf.itemName || pf.item?.name || `Item ${pf.itemId}`}
               {pf.isSellNow && (
-                <span style={{ fontSize:10, fontFamily:"Cinzel,serif", letterSpacing:1, padding:"2px 8px", borderRadius:3, background:"rgba(200,150,42,.2)", border:"1px solid rgba(200,150,42,.5)", color:"var(--gold2)" }}>
+                <span style={{ fontSize:10, fontFamily:"Cinzel,serif", letterSpacing:1, padding:"2px 8px", borderRadius:3, background:"rgba(var(--gold-rgb),.2)", border:"1px solid rgba(var(--gold-rgb),.5)", color:"var(--gold2)" }}>
                 💰 SELL NOW — at spike
                 </span>
               )}
@@ -130,7 +130,7 @@ export function FlipMarketTab({
               </div>
               <div style={{ display:"flex", flexDirection:"column", gap:4, alignItems:"flex-end" }}>
               {pf.isSellNow && (
-                <button className="rbtn" style={{ fontSize:11, color:"var(--gold2)", borderColor:"rgba(200,150,42,.4)" }}
+                <button className="rbtn" style={{ fontSize:11, color:"var(--gold2)", borderColor:"rgba(var(--gold-rgb),.4)" }}
                 onClick={() => {
                   const profit = pf.currentProfit * pf.qty;
                   flipHistoryAdd({ itemId: pf.itemId, itemName: pf.itemName, buyPrice: pf.buyPrice, qty: pf.qty, sellPrice: pf.curSell, buyTime: pf.buyTime, sellTime: Date.now(), profit, failedFlip: false });

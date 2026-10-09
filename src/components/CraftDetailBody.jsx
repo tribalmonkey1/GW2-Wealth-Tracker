@@ -78,14 +78,14 @@ export function CraftDetailBody({ ci, itemMap, priceMap, ownedMap, resolvedRecip
             padding: "7px 10px",
             marginLeft: depth * 20,
             borderRadius: 3,
-            background: depth === 0 ? "rgba(200,150,42,0.06)" : "rgba(200,150,42,0.03)",
-            borderLeft: `2px solid rgba(200,150,42,${0.5 - depth * 0.15})`,
+            background: depth === 0 ? "rgba(var(--gold-rgb),0.06)" : "rgba(var(--gold-rgb),0.03)",
+            borderLeft: `2px solid rgba(var(--gold-rgb),${0.5 - depth * 0.15})`,
             marginBottom: 2,
           }}>
             <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8 }}>
               {item?.icon && <img className="iico-sm" src={item.icon} alt="" />}
               <span className={`rar-${item?.rarity}`} style={{ fontWeight: 600 }}>{item?.name || `Item ${child.itemId}`}</span>
-              {!fulfilledFromOwned && <span style={{ fontSize: 10, fontFamily: "Cinzel,serif", letterSpacing: 1, color: canMakeIt.canFulfill ? "var(--gold2)" : "var(--red)", padding: "1px 6px", borderRadius: 2, border: `1px solid ${canMakeIt.canFulfill ? "rgba(200,150,42,0.4)" : "rgba(200,80,80,0.4)"}`, background: canMakeIt.canFulfill ? "rgba(200,150,42,0.1)" : "rgba(200,80,80,0.1)" }}>CRAFT</span>}
+              {!fulfilledFromOwned && <span style={{ fontSize: 10, fontFamily: "Cinzel,serif", letterSpacing: 1, color: canMakeIt.canFulfill ? "var(--gold2)" : "var(--red)", padding: "1px 6px", borderRadius: 2, border: `1px solid ${canMakeIt.canFulfill ? "rgba(var(--gold-rgb),0.4)" : "rgba(200,80,80,0.4)"}`, background: canMakeIt.canFulfill ? "rgba(var(--gold-rgb),0.1)" : "rgba(200,80,80,0.1)" }}>CRAFT</span>}
             </div>
             <span style={{ width: 60, color: "var(--text3)", fontSize: 14 }}>×{child.count}</span>
             <span style={{ width: 110, fontSize: 13, color: statusCol }}>{statusLabel}</span>
@@ -132,7 +132,7 @@ export function CraftDetailBody({ ci, itemMap, priceMap, ownedMap, resolvedRecip
                 </span>
               )}
               {onOther && onOther.map(c => (
-                <span key={c.name} style={{ fontSize: 11, color: "var(--gold2)", background: "rgba(200,150,42,0.1)", border: "1px solid rgba(200,150,42,0.3)", borderRadius: 3, padding: "1px 6px", fontFamily: "Cinzel,serif", letterSpacing: 0.5 }}>
+                <span key={c.name} style={{ fontSize: 11, color: "var(--gold2)", background: "rgba(var(--gold-rgb),0.1)", border: "1px solid rgba(var(--gold-rgb),0.3)", borderRadius: 3, padding: "1px 6px", fontFamily: "Cinzel,serif", letterSpacing: 0.5 }}>
                   📦 {c.count} on {c.name}
                 </span>
               ))}
@@ -291,7 +291,7 @@ export function CraftDetailBody({ ci, itemMap, priceMap, ownedMap, resolvedRecip
               ))}
             </div>
           ))}
-          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6, paddingTop: 6, borderTop: "1px solid rgba(200,150,42,.2)", fontWeight: 600 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6, paddingTop: 6, borderTop: "1px solid rgba(var(--gold-rgb),.2)", fontWeight: 600 }}>
             <span style={{ fontSize: 12, color: "var(--gold)", fontFamily: "Cinzel,serif", letterSpacing: 1 }}>TOTAL</span>
             <Gold v={ci.matSellNet} />
           </div>

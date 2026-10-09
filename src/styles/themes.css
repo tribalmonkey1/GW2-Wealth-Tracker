@@ -1,0 +1,121 @@
+/* GW2 Wealth Tracker — color themes.
+   app.css :root holds the default (Tyrian Gold). Each theme below only
+   overrides tokens; components read var(--…) so they recolor automatically.
+   The active theme is set as <html data-theme="…"> by src/lib/theme.js. */
+
+/* ── 2 · Mistlock Azure ─────────────────────────────────────────────── */
+:root[data-theme="mists"] {
+  --bg:#090d13; --bg2:#0e131b; --bg3:#131a24; --bg4:#19222f; --bg5:#202b3a;
+  --border:#243143; --border2:#304159;
+  --gold:#4f9fd8; --gold2:#7cc4f0; --gold3:#b5e2fb; --gold-rgb:79,159,216;
+  --text:#dde7f2; --text2:#a5b5c8; --text3:#74869b;
+  --panel-solid:#0b1018;
+}
+
+/* ── 3 · Maguuma Jade ───────────────────────────────────────────────── */
+:root[data-theme="jade"] {
+  --bg:#090e0b; --bg2:#0e1511; --bg3:#131d17; --bg4:#19261e; --bg5:#203026;
+  --border:#25392c; --border2:#304f3b;
+  --gold:#3fae7a; --gold2:#6fd6a0; --gold3:#b0f0cc; --gold-rgb:63,174,122;
+  --text:#e0ece4; --text2:#a8bfb0; --text3:#75907e;
+  --panel-solid:#0b120e;
+}
+
+/* ── 4 · Ley-line Violet ────────────────────────────────────────────── */
+:root[data-theme="legendary"] {
+  --bg:#0d0a14; --bg2:#130f1c; --bg3:#1a1426; --bg4:#221a31; --bg5:#2a213c;
+  --border:#33284a; --border2:#45365f;
+  --gold:#9f6cf0; --gold2:#c29bff; --gold3:#e2ccff; --gold-rgb:159,108,240;
+  --text:#ebe3f6; --text2:#b9abcf; --text3:#857898;
+  --panel-solid:#100c18;
+}
+
+/* ── 5 · Divinity's Reach Parchment (light) ─────────────────────────── */
+:root[data-theme="parchment"] {
+  --scheme:light;
+  --bg:#f2e8d4; --bg2:#f7efdd; --bg3:#fbf6ea; --bg4:#efe3c9; --bg5:#e8d9b8;
+  --border:#dccaa6; --border2:#c4ab7c;
+  --gold:#8a5a12; --gold2:#6e4508; --gold3:#4f3205; --gold-rgb:138,90,18;
+  --copper:#9a5226;
+  --text:#2b2216; --text2:#4f4231; --text3:#6e5d45;
+  --green:#2f7d32; --green2:#256b28; --red:#b3261e; --red2:#a32018;
+  --blue:#2a6496; --blue2:#1f5585;
+  --sell:#9a560a; --buy:#2f6e2f;
+  --r-junk:#6e6e6e; --r-basic:#2b2216; --r-fine:#23649f; --r-masterwork:#1d6e10; --r-rare:#8a6d00;
+  --r-exotic:#b45a00; --r-ascended:#b8235f; --r-legendary:#6f2fcc;
+  --coin-g:#8a6206; --coin-g-bg:#f3e2a8; --coin-s:#5a5a6e; --coin-s-bg:#e3e3ea; --coin-c:#8a4a20; --coin-c-bg:#f1dcc8;
+  --panel-solid:#ece0c6;
+}
+:root[data-theme="parchment"] .alert-banner { background:#fbeccb; }
+:root[data-theme="parchment"] .errbar { background:#fbe3e0; border-color:#e0a8a2; color:#8a2018; }
+:root[data-theme="parchment"] .bhave { background:#dff0dc; border-color:#9cc89a; }
+:root[data-theme="parchment"] .bmiss { background:#f8e0dc; border-color:#e0a8a2; }
+:root[data-theme="parchment"] .bdaily-done { background:#e4e4f6; border-color:#a8a8dc; color:#3a3a8a; }
+:root[data-theme="parchment"] .bdaily-avail { background:#f6e6c4; border-color:#d0b070; }
+:root[data-theme="parchment"] .miss-section { background:#fbe9e6; border-color:#e0b0aa; }
+:root[data-theme="parchment"] .toast { background:#dff0dc; border-color:#9cc89a; }
+:root[data-theme="parchment"] .st-overlay { background:rgba(60,40,10,.35); }
+:root[data-theme="parchment"] .st-pill.ok { background:#dff0dc; }
+:root[data-theme="parchment"] .st-pill.bad { background:#f8e0dc; }
+:root[data-theme="parchment"] .st-card.danger { background:#fbeeea; border-color:#e0b0aa; }
+:root[data-theme="parchment"] .chr-count { color:#fff; }
+
+/* ── Seasonal: shared Halloween bits ────────────────────────────────── */
+:root[data-theme^="halloween"] {
+  --font-title: 'Pirata One', 'Cinzel', serif;
+  --green:#8fd14f; --green2:#a6e06a;
+  --coin-g-bg:rgba(58,46,0,.85); --coin-s-bg:rgba(42,42,58,.85); --coin-c-bg:rgba(42,26,10,.85);
+}
+:root[data-theme^="halloween"] body { background: var(--bg); }
+:root[data-theme^="halloween"] .app { position: relative; z-index: 1; }
+:root[data-theme^="halloween"] .hdr::before,
+:root[data-theme^="halloween"] .hdr::after { display: none; }
+:root[data-theme^="halloween"] .hdr h1 { letter-spacing: 3px; text-shadow: 0 0 34px rgba(var(--gold-rgb),.8), 0 2px 6px rgba(0,0,0,.9); }
+:root[data-theme^="halloween"] .hdr p { color: var(--text2); text-shadow: 0 1px 4px rgba(0,0,0,.9); }
+:root[data-theme^="halloween"] .nav { background: rgba(14,10,18,.6); border-radius: 5px 5px 0 0; }
+:root[data-theme^="halloween"] .tw { background: var(--bg2); }
+:root[data-theme^="halloween"] .card::before { background: linear-gradient(90deg, #ffd23f 0 33%, #f07a1a 33% 66%, #fff4e0 66%); }
+:root[data-theme^="halloween"] .ntab.on { box-shadow: inset 0 3px 0 #f07a1a; }
+
+/* ── Halloween 1 · Harvest Moon (official GW2 moonlight wallpaper) ──── */
+:root[data-theme="halloween1"] {
+  --bg:#0f0b12; --bg2:rgba(18,13,22,.85); --bg3:rgba(22,16,26,.82); --bg4:rgba(34,25,38,.92); --bg5:rgba(44,33,48,.92);
+  --border:rgba(170,140,100,.32); --border2:rgba(240,200,110,.45);
+  --gold:#e8b44a; --gold2:#ffd36a; --gold3:#fff0b8; --gold-rgb:232,180,74;
+  --text:#f4ebde; --text2:#d6cabb; --text3:#ab9e90;
+  --blue:#8f88d0; --blue2:#a9a2e0;
+  --panel-solid:rgba(16,11,20,.94);
+}
+:root[data-theme="halloween1"] .hdr { text-align: left; padding: 120px 0 30px; }
+:root[data-theme="halloween1"] .hdr h1 { font-size: 58px; }
+:root[data-theme="halloween1"] .hdr-meta { justify-content: flex-start !important; }
+
+/* ── Halloween 2 · Pumpkin Fiend ────────────────────────────────────── */
+:root[data-theme="halloween2"] {
+  --bg:#140b16; --bg2:rgba(30,16,32,.88); --bg3:rgba(34,18,36,.86); --bg4:rgba(46,24,46,.94); --bg5:rgba(58,30,58,.94);
+  --border:rgba(146,60,167,.35); --border2:rgba(255,178,31,.42);
+  --gold:#ffa21f; --gold2:#ffc93a; --gold3:#ffe9a0; --gold-rgb:255,162,31;
+  --text:#f7ecdc; --text2:#d8c6c8; --text3:#ad97a8;
+  --blue:#b070d0; --blue2:#c27ad8;
+  --panel-solid:rgba(22,11,24,.95);
+}
+:root[data-theme="halloween2"] .hdr { padding: 168px 0 20px; }
+:root[data-theme="halloween2"] .hdr h1 { font-size: 48px; }
+
+/* ── Backdrop layers (ThemeBackdrop.jsx) ────────────────────────────── */
+.theme-backdrop { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+.theme-backdrop img { display: block; }
+.tb-moon-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 100% 0%; }
+.tb-moon-shade { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(10,7,14,.12) 0%, rgba(10,7,14,.30) 18%, rgba(10,7,14,.60) 36%, rgba(10,7,14,.82) 100%); }
+.tb-moon-title { position: absolute; inset: 0; background: radial-gradient(ellipse 55% 300px at 0% 90px, rgba(10,7,14,.6), rgba(10,7,14,0)); }
+.tb-pumpkin-bg { position: absolute; inset: 0; background: radial-gradient(ellipse 70% 45% at 50% 100%, rgba(146,60,167,.28), rgba(146,60,167,0) 70%), linear-gradient(180deg, #2a1423 0%, #1a0d1c 45%, #0f0912 100%); }
+/* The pumpkin banner scrolls with the page, so it lives at the top of .app's
+   parent rather than in the fixed layer. */
+.tb-banner { position: absolute; top: 0; left: 0; right: 0; height: 250px; z-index: 0; pointer-events: none; overflow: hidden;
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 60%, transparent 100%); mask-image: linear-gradient(180deg, #000 0%, #000 55%, transparent 100%); }
+.tb-banner img { width: 100%; height: 100%; object-fit: cover; object-position: center 34%; display: block; }
+
+/* Dialogs stay opaque over the art so nothing shows through them. */
+:root[data-theme^="halloween"] .st-modal { background: var(--bg); }
+:root[data-theme^="halloween"] .st-nav,
+:root[data-theme^="halloween"] .st-foot { background: rgba(0,0,0,.25); }

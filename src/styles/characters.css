@@ -52,9 +52,9 @@ button.chr-slot:focus-visible { outline:2px solid var(--gold3); outline-offset:2
 .chr-slot.chr-sel { outline:2px solid var(--gold2); outline-offset:2px; }
 .chr-slot.chr-match { outline:2px solid var(--text); outline-offset:1px; }
 .chr-slot.chr-dim { opacity:.25; }
-.chr-r-Junk { border-color:#aaa; } .chr-r-Basic { border-color:#ddd; } .chr-r-Fine { border-color:#62a4da; }
-.chr-r-Masterwork { border-color:#1a9306; } .chr-r-Rare { border-color:#fcd00b; } .chr-r-Exotic { border-color:#ffa405; }
-.chr-r-Ascended { border-color:#fb3e8d; } .chr-r-Legendary { border-color:#9f4dff; }
+.chr-r-Junk { border-color:var(--r-junk); } .chr-r-Basic { border-color:var(--r-basic); } .chr-r-Fine { border-color:var(--r-fine); }
+.chr-r-Masterwork { border-color:var(--r-masterwork); } .chr-r-Rare { border-color:var(--r-rare); } .chr-r-Exotic { border-color:var(--r-exotic); }
+.chr-r-Ascended { border-color:var(--r-ascended); } .chr-r-Legendary { border-color:var(--r-legendary); }
 
 /* Paper doll */
 .chr-doll { display:grid; grid-template-columns:52px minmax(0, 1fr) 52px; gap:14px; }

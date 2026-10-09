@@ -16,7 +16,7 @@ export function FlipRow({ r, side, flipCol, chartItem, setChartItem, onTrack }) 
       display:"grid", gridTemplateColumns: flipCol,
       padding:"8px 10px 8px 12px", alignItems:"center",
       borderLeft: side === "buy" ? "3px solid var(--green2)" : "3px solid var(--gold2)",
-          background: side === "buy" ? "rgba(60,160,60,0.04)" : "rgba(200,150,42,0.04)",
+          background: side === "buy" ? "rgba(60,160,60,0.04)" : "rgba(var(--gold-rgb),0.04)",
           borderBottom:"1px solid var(--border)"
     }}>
     {/* Icon */}

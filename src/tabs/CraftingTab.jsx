@@ -265,12 +265,12 @@ export function CraftingTab({
         {sorted.slice(craftPage*PAGE_SIZE, (craftPage+1)*PAGE_SIZE).map(ci => {
           const isOpen = expanded[ci.recipeId];
           return (
-            <div key={ci.recipeId} className="ci" style={{ borderLeft: ci.isFriendOnly ? "3px solid #9f4dff" : undefined }}>
+            <div key={ci.recipeId} className="ci" style={{ borderLeft: ci.isFriendOnly ? "3px solid var(--r-legendary)" : undefined }}>
             <div className="ci-hdr" onClick={() => setExpanded(e => ({ ...e, [ci.recipeId]: !e[ci.recipeId] }))}>
             {ci.icon ? <img className="iico" src={ci.icon} alt="" /> : <div className="iico-ph" />}
             <span className={`ci-name rar-${ci.rarity}`}>{ci.name}</span>
             {variantLabel[ci.recipeId] && (
-              <span title="This item has multiple valid recipes with different materials/costs" style={{ fontSize: 10, fontFamily: "Cinzel,serif", letterSpacing: 1, padding: "2px 8px", borderRadius: 3, background: "rgba(159,77,255,.12)", border: "1px solid rgba(159,77,255,.4)", color: "#9f4dff", flexShrink: 0 }}>
+              <span title="This item has multiple valid recipes with different materials/costs" style={{ fontSize: 10, fontFamily: "Cinzel,serif", letterSpacing: 1, padding: "2px 8px", borderRadius: 3, background: "rgba(159,77,255,.12)", border: "1px solid rgba(159,77,255,.4)", color: "var(--r-legendary)", flexShrink: 0 }}>
               ⚗ {variantLabel[ci.recipeId]}
               </span>
             )}

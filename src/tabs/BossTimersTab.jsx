@@ -1154,7 +1154,7 @@ export default function BossTimersTab({ bossAlerts, goldCopper, drfConnected = f
               {headerCols.map((label, i) => (
                 <div key={i} style={{
                   width: COL_WIDTH, flexShrink: 0, fontSize: 11, color: "var(--text3)", fontFamily: "Cinzel,serif",
-                  letterSpacing: 1, textAlign: "center", borderLeft: "1px solid rgba(200,150,42,.18)",
+                  letterSpacing: 1, textAlign: "center", borderLeft: "1px solid rgba(var(--gold-rgb),.18)",
                 }}>
                   {label}
                 </div>

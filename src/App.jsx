@@ -73,6 +73,7 @@ import { DEFAULT_RARITY_FILTER, passesRarityFilter, RarityDropdown } from "./Rar
 import { DEFAULT_FRIEND_FILTER, passesFriendFilter, FriendFilterDropdown } from "./FriendFilter.jsx";
 import { useBossAlerts } from "./lib/useBossAlerts.js";
 import { useDrfLiveFeed } from "./lib/drfClient.js";
+import { useActiveTheme, SEASONAL_THEMES } from "./lib/theme.js";
 
 // ── Timing / config constants ───────────────────────────────────────────────
 const PRICE_REFRESH_MS = 60_000;
@@ -114,6 +115,8 @@ function addCounts(target, counts) {
 }
 
 export default function App() {
+  const activeTheme = useActiveTheme();
+  const seasonalTheme = SEASONAL_THEMES.find(t => t.id === activeTheme);
   const [loadState, setLoadState] = useState({ phase: "loading", pct: 0, msg: "Initializing..." });
   const [data, setData] = useState(null);
   // Flips true once the staged startup load has produced a full owned-items map (bags
@@ -2160,15 +2163,15 @@ export default function App() {
     <>
     <div className="app">
     <div className="hdr">
-    <h1>⚜ GW2 Wealth Tracker ⚜</h1>
-    <p>Account Ledger & Crafting Profit Calculator</p>
-    <div style={{ marginTop: 8, fontSize: 11, color: "var(--text3)", fontFamily: "Cinzel,serif", letterSpacing: 1, display: "flex", gap: 10, justifyContent: "center", alignItems: "center", flexWrap: "wrap" }}>
+    <h1>{seasonalTheme ? "GW2 Wealth Tracker" : "⚜ GW2 Wealth Tracker ⚜"}</h1>
+    <p>{seasonalTheme ? seasonalTheme.tagline : "Account Ledger & Crafting Profit Calculator"}</p>
+    <div className="hdr-meta" style={{ marginTop: 8, fontSize: 11, color: "var(--text3)", fontFamily: "Cinzel,serif", letterSpacing: 1, display: "flex", gap: 10, justifyContent: "center", alignItems: "center", flexWrap: "wrap" }}>
     {appVersion && (
       <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
         v{appVersion}
         {updateInfo && (
           <span onClick={() => openSettings("about")} title={`v${updateInfo.version} available`}
-            style={{ cursor: "pointer", color: "var(--gold2)", background: "rgba(200,150,42,.15)", border: "1px solid rgba(200,150,42,.4)", borderRadius: 3, padding: "1px 7px" }}>
+            style={{ cursor: "pointer", color: "var(--gold2)", background: "rgba(var(--gold-rgb),.15)", border: "1px solid rgba(var(--gold-rgb),.4)", borderRadius: 3, padding: "1px 7px" }}>
             ⬆ Update available
           </span>
         )}
@@ -2249,7 +2252,7 @@ export default function App() {
 
 
     {loadState.phase === "refreshing" && (
-      <div style={{ background: "rgba(200,150,42,0.08)", border: "1px solid rgba(200,150,42,0.25)", borderRadius: 6, padding: "8px 16px", marginBottom: 12, display: "flex", alignItems: "center", gap: 10, fontSize: 12, color: "var(--gold2)", fontFamily: "Cinzel,serif", letterSpacing: 1 }}>
+      <div style={{ background: "rgba(var(--gold-rgb),0.08)", border: "1px solid rgba(var(--gold-rgb),0.25)", borderRadius: 6, padding: "8px 16px", marginBottom: 12, display: "flex", alignItems: "center", gap: 10, fontSize: 12, color: "var(--gold2)", fontFamily: "Cinzel,serif", letterSpacing: 1 }}>
       <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "var(--gold2)", animation: "pulse 1.2s ease-in-out infinite" }} />
       UPDATING LIVE DATA — prices, inventory & daily crafts refreshing in background...
       </div>
@@ -2278,7 +2281,7 @@ export default function App() {
         window.__gw2ApiKey = key;
         setLoadState({ phase: "loading", pct: 0, msg: "Initializing..." });
         fullLoad();
-      }} style={{ alignSelf: "flex-end", fontSize: 12, color: "#fff", background: "var(--gold3,#7a5c1e)", border: "none", borderRadius: 4, padding: "8px 20px", cursor: "pointer", fontFamily: "Cinzel,serif", letterSpacing: 1 }}>
+      }} style={{ alignSelf: "flex-end", fontSize: 12, fontWeight: 600, color: "var(--bg)", background: "var(--gold2)", border: "none", borderRadius: 4, padding: "8px 20px", cursor: "pointer", fontFamily: "Cinzel,serif", letterSpacing: 1 }}>
       SAVE & CONTINUE {"\u2192"}
       </button>
       </div>

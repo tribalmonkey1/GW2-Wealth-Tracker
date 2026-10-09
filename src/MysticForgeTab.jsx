@@ -55,9 +55,9 @@ const Gold = ({ v, size = 14 }) => {
   return (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 2, fontSize: size, color: col }}>
       {neg && <span>−</span>}
-      {g > 0 && <><b>{g}</b><span style={{ fontSize: 10, background: "#3a2e00", color: "var(--gold2)", padding: "0 3px", borderRadius: 2 }}>g</span></>}
-      {s > 0 && <><b>{s}</b><span style={{ fontSize: 10, background: "#2a2a3a", color: "#c0c0d8", padding: "0 3px", borderRadius: 2 }}>s</span></>}
-      <b>{c}</b><span style={{ fontSize: 10, background: "#2a1a0a", color: "var(--copper)", padding: "0 3px", borderRadius: 2 }}>c</span>
+      {g > 0 && <><b>{g}</b><span style={{ fontSize: 10, background: "var(--coin-g-bg)", color: "var(--coin-g)", padding: "0 3px", borderRadius: 2 }}>g</span></>}
+      {s > 0 && <><b>{s}</b><span style={{ fontSize: 10, background: "var(--coin-s-bg)", color: "var(--coin-s)", padding: "0 3px", borderRadius: 2 }}>s</span></>}
+      <b>{c}</b><span style={{ fontSize: 10, background: "var(--coin-c-bg)", color: "var(--coin-c)", padding: "0 3px", borderRadius: 2 }}>c</span>
     </span>
   );
 };
@@ -181,7 +181,7 @@ function IngredientRow({ inp, itemMap, ownedMap, spiritShards }) {
         {!canAfford && <span style={{ marginLeft: 4, opacity: .8 }}>(need more)</span>}
       </span>;
     }
-    if (inp.effectiveSource === 'vendor') return <span style={{ fontSize: 10, color: "var(--gold2)", background: "rgba(200,150,42,.15)", padding: "1px 6px", borderRadius: 3 }}>🏪 Vendor</span>;
+    if (inp.effectiveSource === 'vendor') return <span style={{ fontSize: 10, color: "var(--gold2)", background: "rgba(var(--gold-rgb),.15)", padding: "1px 6px", borderRadius: 3 }}>🏪 Vendor</span>;
     if (inp.effectiveSource === 'owned') return <span style={{ fontSize: 10, color: "var(--green2)", background: "rgba(60,160,60,.15)", padding: "1px 6px", borderRadius: 3 }}>✓ Owned</span>;
     if (inp.effectiveSource === 'forge') return <span style={{ fontSize: 10, color: "#a060e0", background: "rgba(160,90,220,.15)", padding: "1px 6px", borderRadius: 3 }}>⚗ Mystic Forge</span>;
     return null;
@@ -218,7 +218,7 @@ function MiniChainNode({ recipe, depth = 0, forgeRecipeMap, itemMap, priceMap, o
   const rarity = recipe.itemData?.rarity || recipe.rarity;
 
   return (
-    <div style={{ marginLeft: depth * 20, borderLeft: depth > 0 ? "2px solid rgba(200,150,42,.25)" : "none", paddingLeft: depth > 0 ? 12 : 0, marginTop: 4 }}>
+    <div style={{ marginLeft: depth * 20, borderLeft: depth > 0 ? "2px solid rgba(var(--gold-rgb),.25)" : "none", paddingLeft: depth > 0 ? 12 : 0, marginTop: 4 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, cursor: hasForgeInputs ? "pointer" : "default", padding: "4px 0" }}
         onClick={() => hasForgeInputs && setExpanded(e => !e)}>
         {icon ? <img src={icon} style={{ width: 28, height: 28, borderRadius: 3, border: "1px solid var(--border2)" }} alt="" /> : <div style={{ width: 28, height: 28, background: "var(--bg4)", borderRadius: 3 }} />}
@@ -271,7 +271,7 @@ function ForgeRecipeCard({ item, itemMap, priceMap, ownedMap, spiritShards, tren
           )}
         </div>
         {item.hasUnresolved && (
-          <span style={{ fontSize: 10, color: "var(--gold)", background: "rgba(200,150,42,.1)", border: "1px solid rgba(200,150,42,.3)", borderRadius: 3, padding: "1px 6px" }}>⚠ Some IDs pending</span>
+          <span style={{ fontSize: 10, color: "var(--gold)", background: "rgba(var(--gold-rgb),.1)", border: "1px solid rgba(var(--gold-rgb),.3)", borderRadius: 3, padding: "1px 6px" }}>⚠ Some IDs pending</span>
         )}
         <div className="ci-stats">
           {(() => {
@@ -358,7 +358,7 @@ function EquipmentRefCard({ recipe, itemMap, priceMap, ownedMap, spiritShards })
           {recipe.weaponType && <span style={{ fontSize: 11, color: "var(--text3)", marginLeft: 8 }}>{recipe.weaponType}</span>}
           {recipe.type && <span style={{ fontSize: 11, color: "var(--text3)", marginLeft: 8 }}>{recipe.type}</span>}
         </div>
-        <span style={{ fontSize: 10, fontFamily: "Cinzel,serif", letterSpacing: 1, padding: "2px 8px", borderRadius: 3, background: `rgba(${recipe.rarity === 'Ascended' ? '251,62,141' : '255,164,5'},.15)`, color: recipe.rarity === 'Ascended' ? "#fb3e8d" : "#ffa405", border: `1px solid ${recipe.rarity === 'Ascended' ? 'rgba(251,62,141,.4)' : 'rgba(255,164,5,.4)'}` }}>
+        <span style={{ fontSize: 10, fontFamily: "Cinzel,serif", letterSpacing: 1, padding: "2px 8px", borderRadius: 3, background: `rgba(${recipe.rarity === 'Ascended' ? '251,62,141' : '255,164,5'},.15)`, color: recipe.rarity === 'Ascended' ? "var(--r-ascended)" : "var(--r-exotic)", border: `1px solid ${recipe.rarity === 'Ascended' ? 'rgba(251,62,141,.4)' : 'rgba(255,164,5,.4)'}` }}>
           {recipe.rarity}
         </span>
         {recipe.isGenericInput && <span style={{ fontSize: 10, color: "var(--text3)", fontFamily: "Cinzel,serif" }}>⚠ Generic Input</span>}
@@ -406,10 +406,10 @@ const SOURCE_BADGE = {
   wvw:         { label: '⚔ WvW',              color: '#e07830', bg: 'rgba(224,120,48,.15)' },
   exploration: { label: '🗺 Map Completion',   color: '#7ac878', bg: 'rgba(122,200,120,.15)' },
   heroics:     { label: '⚡ Hero Points',       color: 'var(--blue2)', bg: 'rgba(90,160,210,.15)' },
-  collection:  { label: '📜 Collection',        color: 'var(--gold2)', bg: 'rgba(200,150,42,.15)' },
+  collection:  { label: '📜 Collection',        color: 'var(--gold2)', bg: 'rgba(var(--gold-rgb),.15)' },
   karma:       { label: '🔮 Karma',             color: '#9855c8', bg: 'rgba(152,85,200,.15)' },
   forge:       { label: '⚗ Mystic Forge',       color: '#a060e0', bg: 'rgba(160,90,220,.15)' },
-  vendor:      { label: '🏪 Vendor',             color: 'var(--gold2)', bg: 'rgba(200,150,42,.15)' },
+  vendor:      { label: '🏪 Vendor',             color: 'var(--gold2)', bg: 'rgba(var(--gold-rgb),.15)' },
   spirit_shard:{ label: '🔮 Spirit Shards',      color: 'var(--blue2)', bg: 'rgba(90,160,210,.15)' },
 };
 
@@ -457,7 +457,7 @@ function LegendaryIngredientNode({ n, depth = 0, legendaryAchievements = {} }) {
     : 'var(--text2)';
 
   return (
-    <div style={{ marginLeft: depth * 18, borderLeft: depth > 0 ? '2px solid rgba(200,150,42,.2)' : 'none', paddingLeft: depth > 0 ? 10 : 0, marginTop: 3, opacity: n.inactive ? 0.55 : 1 }}>
+    <div style={{ marginLeft: depth * 18, borderLeft: depth > 0 ? '2px solid rgba(var(--gold-rgb),.2)' : 'none', paddingLeft: depth > 0 ? 10 : 0, marginTop: 3, opacity: n.inactive ? 0.55 : 1 }}>
       <div
         style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', borderRadius: 3, cursor: hasChildren ? 'pointer' : 'default', transition: 'background .1s' }}
         onMouseEnter={e => { if (hasChildren) e.currentTarget.style.background = 'var(--bg3)'; }}
@@ -487,7 +487,7 @@ function LegendaryIngredientNode({ n, depth = 0, legendaryAchievements = {} }) {
 
         {/* Precursor collection name (when no live achievement ID is wired up yet) */}
         {n.achievementName && !n.achievementId && (
-          <span style={{ fontSize:10, fontFamily:'Cinzel,serif', letterSpacing:1, padding:'1px 7px', borderRadius:3, background:'rgba(200,150,42,.1)', border:'1px solid rgba(200,150,42,.3)', color:'var(--gold2)', whiteSpace:'nowrap' }}
+          <span style={{ fontSize:10, fontFamily:'Cinzel,serif', letterSpacing:1, padding:'1px 7px', borderRadius:3, background:'rgba(var(--gold-rgb),.1)', border:'1px solid rgba(var(--gold-rgb),.3)', color:'var(--gold2)', whiteSpace:'nowrap' }}
             title="Precursor collection — open your Achievements panel to track it">
             📜 {n.achievementName}
           </span>
@@ -501,13 +501,13 @@ function LegendaryIngredientNode({ n, depth = 0, legendaryAchievements = {} }) {
           const max = n.achievementBitCount || ach?.max || null;
           const label = n.achievementName ? `${n.achievementName} — ` : 'Achievement — ';
           if (current === null && !done) return (
-            <span style={{ fontSize:10, fontFamily:'Cinzel,serif', letterSpacing:1, padding:'1px 7px', borderRadius:3, background:'rgba(200,150,42,.1)', border:'1px solid rgba(200,150,42,.3)', color:'var(--gold2)', whiteSpace:'nowrap' }}>
+            <span style={{ fontSize:10, fontFamily:'Cinzel,serif', letterSpacing:1, padding:'1px 7px', borderRadius:3, background:'rgba(var(--gold-rgb),.1)', border:'1px solid rgba(var(--gold-rgb),.3)', color:'var(--gold2)', whiteSpace:'nowrap' }}>
               {label}{max ? `0/${max}` : 'progress unknown'}
             </span>
           );
           return done
             ? <span style={{ fontSize:10, fontFamily:'Cinzel,serif', letterSpacing:1, padding:'1px 7px', borderRadius:3, background:'rgba(60,160,60,.15)', border:'1px solid rgba(60,160,60,.4)', color:'var(--green2)', whiteSpace:'nowrap' }}>✓ Achievement Done</span>
-            : <span style={{ fontSize:10, fontFamily:'Cinzel,serif', letterSpacing:1, padding:'1px 7px', borderRadius:3, background:'rgba(200,150,42,.1)', border:'1px solid rgba(200,150,42,.3)', color:'var(--gold2)', whiteSpace:'nowrap' }}>
+            : <span style={{ fontSize:10, fontFamily:'Cinzel,serif', letterSpacing:1, padding:'1px 7px', borderRadius:3, background:'rgba(var(--gold-rgb),.1)', border:'1px solid rgba(var(--gold-rgb),.3)', color:'var(--gold2)', whiteSpace:'nowrap' }}>
                 Achievement: {current}/{max} — {max - current} more needed
               </span>;
         })()}
@@ -579,12 +579,12 @@ function LegendaryRecipeCard({ recipe, itemMap, priceMap, ownedMap, legendaryAch
           </span>
         )}
         {recipe.generation && (
-          <span style={{ fontSize: 10, fontFamily: 'Cinzel,serif', letterSpacing: 1, padding: '2px 8px', borderRadius: 3, background: 'rgba(159,77,255,.15)', border: '1px solid rgba(159,77,255,.4)', color: '#9f4dff', flexShrink: 0 }}>
+          <span style={{ fontSize: 10, fontFamily: 'Cinzel,serif', letterSpacing: 1, padding: '2px 8px', borderRadius: 3, background: 'rgba(159,77,255,.15)', border: '1px solid rgba(159,77,255,.4)', color: 'var(--r-legendary)', flexShrink: 0 }}>
             {recipe.badge || `Gen ${recipe.generation}`}
           </span>
         )}
         {recipe.expansion && (
-          <span style={{ fontSize: 10, fontFamily: 'Cinzel,serif', letterSpacing: 1, padding: '2px 8px', borderRadius: 3, background: 'rgba(200,150,42,.1)', border: '1px solid rgba(200,150,42,.3)', color: 'var(--gold2)', flexShrink: 0 }}>
+          <span style={{ fontSize: 10, fontFamily: 'Cinzel,serif', letterSpacing: 1, padding: '2px 8px', borderRadius: 3, background: 'rgba(var(--gold-rgb),.1)', border: '1px solid rgba(var(--gold-rgb),.3)', color: 'var(--gold2)', flexShrink: 0 }}>
             {recipe.expansion}
           </span>
         )}
@@ -739,7 +739,7 @@ export default function MysticForgeTab({ data, priceMap, ownedMap, velocitySumma
           <button key={key} onClick={() => setSubTab(key)}
             style={{ fontSize: 12, fontFamily: "Cinzel,serif", letterSpacing: 1, padding: "6px 16px", borderRadius: 4, cursor: "pointer",
               border: subTab === key ? "1px solid var(--gold2)" : "1px solid var(--border)",
-              background: subTab === key ? "rgba(200,150,42,.15)" : "transparent",
+              background: subTab === key ? "rgba(var(--gold-rgb),.15)" : "transparent",
               color: subTab === key ? "var(--gold2)" : "var(--text3)" }}>
             {label}
           </button>
@@ -761,7 +761,7 @@ export default function MysticForgeTab({ data, priceMap, ownedMap, velocitySumma
                 <button key={sc} onClick={() => setMatSubcat(sc)}
                   style={{ fontSize: 10, fontFamily: "Cinzel,serif", letterSpacing: 1, padding: "4px 10px", borderRadius: 3, cursor: "pointer",
                     border: matSubcat === sc ? "1px solid var(--gold)" : "1px solid var(--border)",
-                    background: matSubcat === sc ? "rgba(200,150,42,.1)" : "transparent",
+                    background: matSubcat === sc ? "rgba(var(--gold-rgb),.1)" : "transparent",
                     color: matSubcat === sc ? "var(--gold2)" : "var(--text3)" }}>
                   {sc}
                 </button>
@@ -830,7 +830,7 @@ export default function MysticForgeTab({ data, priceMap, ownedMap, velocitySumma
                   : <div style={{ width: 40, height: 40, background: "var(--bg4)", borderRadius: 4 }} />
                 }
                 <div>
-                  <div style={{ fontSize: 16, fontWeight: 600, color: "#9f4dff" }}>Mystic Clover</div>
+                  <div style={{ fontSize: 16, fontWeight: 600, color: "var(--r-legendary)" }}>Mystic Clover</div>
                   <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>Required for all legendary items · 77 per weapon typically</div>
                 </div>
                 <div style={{ marginLeft: "auto", display: "flex", gap: 24 }}>
@@ -861,7 +861,7 @@ export default function MysticForgeTab({ data, priceMap, ownedMap, velocitySumma
                     <div style={{ fontSize: 12, color: "var(--text3)", lineHeight: 1.6 }}>
                       Purchase from <strong style={{ color: "var(--text2)" }}>Miyani</strong> at Trader's Forum or Memory of Old Lion's Arch.
                       Costs <strong style={{ color: "#7ab4d4" }}>3 Spirit Shards</strong> + gold ingredients per clover.
-                      <span style={{ marginLeft: 8, padding: "1px 8px", borderRadius: 3, background: "rgba(200,150,42,0.12)", border: "1px solid rgba(200,150,42,0.35)", color: "var(--gold2)", fontSize: 11, fontFamily: "Cinzel,serif", letterSpacing: 1 }}>
+                      <span style={{ marginLeft: 8, padding: "1px 8px", borderRadius: 3, background: "rgba(var(--gold-rgb),0.12)", border: "1px solid rgba(var(--gold-rgb),0.35)", color: "var(--gold2)", fontSize: 11, fontFamily: "Cinzel,serif", letterSpacing: 1 }}>
                         LIMIT {weeklyCap}/WEEK
                       </span>
                     </div>
@@ -961,7 +961,7 @@ export default function MysticForgeTab({ data, priceMap, ownedMap, velocitySumma
             <div className="ci" style={{ marginBottom: 12 }}>
               <div style={{ padding: "16px 20px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-                  <div style={{ width: 36, height: 36, borderRadius: "50%", background: "rgba(200,150,42,0.12)", border: "2px solid var(--gold2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: "50%", background: "rgba(var(--gold-rgb),0.12)", border: "2px solid var(--gold2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>
                     🎲
                   </div>
                   <div style={{ flex: 1 }}>
@@ -969,7 +969,7 @@ export default function MysticForgeTab({ data, priceMap, ownedMap, velocitySumma
                       Random Mystic Forge — ~1.33 clovers / attempt
                     </div>
                     <div style={{ fontSize: 12, color: "var(--text3)", lineHeight: 1.6 }}>
-                      No weekly cap. Output is random — each attempt yields either <strong style={{ color: "#9f4dff" }}>10 Mystic Clovers</strong> or
+                      No weekly cap. Output is random — each attempt yields either <strong style={{ color: "var(--r-legendary)" }}>10 Mystic Clovers</strong> or
                       {" "}<strong style={{ color: "var(--red)" }}>10 T6 fine materials</strong> (roughly 1-in-3 gives clovers).
                       Expected average: 1.33 clovers per attempt.
                       Costs <strong style={{ color: "#7ab4d4" }}>1 Spirit Shard</strong> (via 10 Philosopher's Stones) per attempt.
@@ -1033,7 +1033,7 @@ export default function MysticForgeTab({ data, priceMap, ownedMap, velocitySumma
                   </div>
                 </div>
 
-                <div style={{ marginTop: 12, padding: "8px 12px", background: "rgba(200,150,42,.06)", borderRadius: 4, border: "1px solid rgba(200,150,42,.2)", fontSize: 12, color: "var(--text3)" }}>
+                <div style={{ marginTop: 12, padding: "8px 12px", background: "rgba(var(--gold-rgb),.06)", borderRadius: 4, border: "1px solid rgba(var(--gold-rgb),.2)", fontSize: 12, color: "var(--text3)" }}>
                   ⚠ Output is <strong style={{ color: "var(--gold2)" }}>random</strong>. Each attempt: ~33% chance of 10 Mystic Clovers, ~67% chance of 10 T6 materials.
                   The 1.33 average is over many attempts — short runs can be very unlucky.
                   Use the guaranteed method weekly first, then random forge for the remainder.
@@ -1089,11 +1089,11 @@ export default function MysticForgeTab({ data, priceMap, ownedMap, velocitySumma
               <div key={recipe.id} className="ci" style={{ marginBottom: 8 }}>
                 <div style={{ padding: "14px 20px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-                    <div style={{ width: 36, height: 36, borderRadius: "50%", background: recipe.outputTier === 'Rare' ? "rgba(252,208,11,.15)" : "rgba(98,164,218,.15)", border: `2px solid ${recipe.outputTier === 'Rare' ? "#fcd00b" : "#62a4da"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>
+                    <div style={{ width: 36, height: 36, borderRadius: "50%", background: recipe.outputTier === 'Rare' ? "rgba(252,208,11,.15)" : "rgba(98,164,218,.15)", border: `2px solid ${recipe.outputTier === 'Rare' ? "var(--r-rare)" : "var(--r-fine)"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>
                       🪆
                     </div>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 15, fontWeight: 600, color: recipe.outputTier === 'Rare' ? "#fcd00b" : "#62a4da", marginBottom: 4 }}>
+                      <div style={{ fontSize: 15, fontWeight: 600, color: recipe.outputTier === 'Rare' ? "var(--r-rare)" : "var(--r-fine)", marginBottom: 4 }}>
                         {recipe.name}
                       </div>
                       <div style={{ fontSize: 12, color: "var(--text3)" }}>{recipe.description}</div>
@@ -1121,7 +1121,7 @@ export default function MysticForgeTab({ data, priceMap, ownedMap, velocitySumma
                       </div>
                     </div>
                   </div>
-                  <div style={{ marginTop: 12, padding: "8px 12px", background: "rgba(200,150,42,.06)", borderRadius: 4, border: "1px solid rgba(200,150,42,.2)", fontSize: 12, color: "var(--text3)" }}>
+                  <div style={{ marginTop: 12, padding: "8px 12px", background: "rgba(var(--gold-rgb),.06)", borderRadius: 4, border: "1px solid rgba(var(--gold-rgb),.2)", fontSize: 12, color: "var(--text3)" }}>
                     ⚠ Output is <strong style={{ color: "var(--gold2)" }}>random</strong> — profit shown is the average across all {recipe.outputTier.toLowerCase()} miniatures.
                     Individual rare minis vary widely in price. This is a speculation play, not guaranteed profit.
                   </div>
@@ -1197,9 +1197,9 @@ export default function MysticForgeTab({ data, priceMap, ownedMap, velocitySumma
               <button key={g} onClick={() => { setLegendaryGen(g); setLegendaryExpansion("All"); }}
                 style={{ fontSize: 10, fontFamily: "Cinzel,serif", letterSpacing: 1, padding: "4px 12px",
                   borderRadius: 3, cursor: "pointer",
-                  border: legendaryGen === g ? "1px solid #9f4dff" : "1px solid var(--border)",
+                  border: legendaryGen === g ? "1px solid var(--r-legendary)" : "1px solid var(--border)",
                   background: legendaryGen === g ? "rgba(159,77,255,.12)" : "transparent",
-                  color: legendaryGen === g ? "#9f4dff" : "var(--text3)" }}>
+                  color: legendaryGen === g ? "var(--r-legendary)" : "var(--text3)" }}>
                 {g === "All" ? "All" : `Gen ${g}`}
               </button>
             ))}
@@ -1211,7 +1211,7 @@ export default function MysticForgeTab({ data, priceMap, ownedMap, velocitySumma
                     style={{ fontSize: 10, fontFamily: "Cinzel,serif", letterSpacing: 1, padding: "4px 10px",
                       borderRadius: 3, cursor: "pointer",
                       border: legendaryExpansion === exp ? "1px solid var(--gold2)" : "1px solid var(--border)",
-                      background: legendaryExpansion === exp ? "rgba(200,150,42,.1)" : "transparent",
+                      background: legendaryExpansion === exp ? "rgba(var(--gold-rgb),.1)" : "transparent",
                       color: legendaryExpansion === exp ? "var(--gold2)" : "var(--text3)" }}>
                     {exp}
                   </button>
@@ -1226,9 +1226,9 @@ export default function MysticForgeTab({ data, priceMap, ownedMap, velocitySumma
               <button key={wt} onClick={() => setLegendaryWeaponType(wt)}
                 style={{ fontSize: 10, fontFamily: "Cinzel,serif", letterSpacing: 1, padding: "4px 10px",
                   borderRadius: 3, cursor: "pointer",
-                  border: legendaryWeaponType === wt ? "1px solid #9f4dff" : "1px solid var(--border)",
+                  border: legendaryWeaponType === wt ? "1px solid var(--r-legendary)" : "1px solid var(--border)",
                   background: legendaryWeaponType === wt ? "rgba(159,77,255,.12)" : "transparent",
-                  color: legendaryWeaponType === wt ? "#9f4dff" : "var(--text3)" }}>
+                  color: legendaryWeaponType === wt ? "var(--r-legendary)" : "var(--text3)" }}>
                 {wt}
               </button>
             ))}
@@ -1274,9 +1274,9 @@ export default function MysticForgeTab({ data, priceMap, ownedMap, velocitySumma
               {ARMOR_GENERATIONS.map(g => (
                 <button key={g} onClick={() => setArmorGenFilter(g)}
                   style={{ fontSize: 10, fontFamily: "Cinzel,serif", padding: "3px 8px", borderRadius: 3, cursor: "pointer",
-                    border: armorGenFilter === g ? "1px solid #9f4dff" : "1px solid var(--border)",
+                    border: armorGenFilter === g ? "1px solid var(--r-legendary)" : "1px solid var(--border)",
                     background: armorGenFilter === g ? "rgba(159,77,255,.12)" : "transparent",
-                    color: armorGenFilter === g ? "#9f4dff" : "var(--text3)" }}>
+                    color: armorGenFilter === g ? "var(--r-legendary)" : "var(--text3)" }}>
                   {g}
                 </button>
               ))}
@@ -1287,7 +1287,7 @@ export default function MysticForgeTab({ data, priceMap, ownedMap, velocitySumma
                 <button key={w} onClick={() => setArmorWeightFilter(w)}
                   style={{ fontSize: 10, fontFamily: "Cinzel,serif", padding: "3px 8px", borderRadius: 3, cursor: "pointer",
                     border: armorWeightFilter === w ? "1px solid var(--gold2)" : "1px solid var(--border)",
-                    background: armorWeightFilter === w ? "rgba(200,150,42,.1)" : "transparent",
+                    background: armorWeightFilter === w ? "rgba(var(--gold-rgb),.1)" : "transparent",
                     color: armorWeightFilter === w ? "var(--gold2)" : "var(--text3)" }}>
                   {w}
                 </button>
@@ -1330,9 +1330,9 @@ export default function MysticForgeTab({ data, priceMap, ownedMap, velocitySumma
             {LEGENDARY_OTHER_CATEGORIES.map(cat => (
               <button key={cat} onClick={() => setOtherCategoryFilter(cat)}
                 style={{ fontSize: 11, fontFamily: "Cinzel,serif", letterSpacing: 1, padding: "5px 14px", borderRadius: 4, cursor: "pointer",
-                  border: otherCategoryFilter === cat ? "1px solid #9f4dff" : "1px solid var(--border)",
+                  border: otherCategoryFilter === cat ? "1px solid var(--r-legendary)" : "1px solid var(--border)",
                   background: otherCategoryFilter === cat ? "rgba(159,77,255,.12)" : "transparent",
-                  color: otherCategoryFilter === cat ? "#9f4dff" : "var(--text3)" }}>
+                  color: otherCategoryFilter === cat ? "var(--r-legendary)" : "var(--text3)" }}>
                 {cat}
               </button>
             ))}

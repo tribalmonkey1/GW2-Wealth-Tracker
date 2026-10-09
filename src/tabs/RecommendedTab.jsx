@@ -244,7 +244,7 @@ export function RecommendedTab({
           const totalListed = listings.reduce((s, l) => s + l.quantity, 0);
 
           return (
-            <div key={ci.recipeId} className="ci" style={{ marginBottom: 6, borderLeft: ci.isFriendOnly ? "3px solid #9f4dff" : undefined }}>
+            <div key={ci.recipeId} className="ci" style={{ marginBottom: 6, borderLeft: ci.isFriendOnly ? "3px solid var(--r-legendary)" : undefined }}>
             <div className="ci-hdr" onClick={() => ci.recipeId && setExpanded(e => ({ ...e, [ci.recipeId]: !e[ci.recipeId] }))}>
             {/* Rank badge */}
             <span style={{ fontFamily: "Cinzel,serif", fontSize: 12, color: rank < 3 ? "var(--gold2)" : "var(--text3)", width: 28, textAlign: "center", flexShrink: 0 }}>
@@ -255,7 +255,7 @@ export function RecommendedTab({
             {/* Disciplines */}
             <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
             {getRecipeDisciplines(ci).map(d => (
-              <span key={d} style={{ fontSize: 10, fontFamily: "Cinzel,serif", letterSpacing: 1, padding: "2px 7px", borderRadius: 3, background: "rgba(200,150,42,0.1)", border: "1px solid rgba(200,150,42,0.3)", color: "var(--gold2)" }}>{d}</span>
+              <span key={d} style={{ fontSize: 10, fontFamily: "Cinzel,serif", letterSpacing: 1, padding: "2px 7px", borderRadius: 3, background: "rgba(var(--gold-rgb),0.1)", border: "1px solid rgba(var(--gold-rgb),0.3)", color: "var(--gold2)" }}>{d}</span>
             ))}
             </div>
             {ci.isMaterial

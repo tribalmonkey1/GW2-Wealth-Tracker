@@ -114,12 +114,12 @@ export function UnlearnedRecipesTab({
           <span className={`ci-name rar-${ci.rarity}`}>{ci.name}</span>
           <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
           {getRecipeDisciplines(ci).map(d => (
-            <span key={d} style={{ fontSize: 10, fontFamily: "Cinzel,serif", letterSpacing: 1, padding: "2px 7px", borderRadius: 3, background: "rgba(200,150,42,0.1)", border: "1px solid rgba(200,150,42,0.3)", color: "var(--gold2)" }}>
+            <span key={d} style={{ fontSize: 10, fontFamily: "Cinzel,serif", letterSpacing: 1, padding: "2px 7px", borderRadius: 3, background: "rgba(var(--gold-rgb),0.1)", border: "1px solid rgba(var(--gold-rgb),0.3)", color: "var(--gold2)" }}>
             {d}{ci.minRating ? ` ${ci.minRating}` : ""}
             </span>
           ))}
           </div>
-          <span style={{ fontSize: 10, fontFamily: "Cinzel,serif", letterSpacing: 1, padding: "3px 8px", borderRadius: 3, background: "rgba(159,77,255,.12)", border: "1px solid rgba(159,77,255,.4)", color: "#9f4dff", whiteSpace: "nowrap" }}>🔒 Not Learned</span>
+          <span style={{ fontSize: 10, fontFamily: "Cinzel,serif", letterSpacing: 1, padding: "3px 8px", borderRadius: 3, background: "rgba(159,77,255,.12)", border: "1px solid rgba(159,77,255,.4)", color: "var(--r-legendary)", whiteSpace: "nowrap" }}>🔒 Not Learned</span>
           {ci.canCraft ? <span className="bhave">✓ Have Mats</span> : <span className="bmiss">✗ Missing Mats</span>}
           {ci.flags?.includes("LearnedFromItem") && (
             <span title="Learned from a consumable recipe sheet/scroll — check the wiki for where to find it" style={{ fontSize: 10, fontFamily: "Cinzel,serif", letterSpacing: 1, padding: "2px 7px", borderRadius: 3, background: "rgba(90,160,210,.12)", border: "1px solid rgba(90,160,210,.35)", color: "var(--blue2)" }}>📖 Recipe Sheet</span>
