@@ -73,7 +73,8 @@ import { DEFAULT_RARITY_FILTER, passesRarityFilter, RarityDropdown } from "./Rar
 import { DEFAULT_FRIEND_FILTER, passesFriendFilter, FriendFilterDropdown } from "./FriendFilter.jsx";
 import { useBossAlerts } from "./lib/useBossAlerts.js";
 import { useDrfLiveFeed } from "./lib/drfClient.js";
-import { useActiveTheme, SEASONAL_THEMES } from "./lib/theme.js";
+import { useActiveTheme, getFestival } from "./lib/theme.js";
+import { FestivalNotice } from "./components/FestivalNotice.jsx";
 
 // ── Timing / config constants ───────────────────────────────────────────────
 const PRICE_REFRESH_MS = 60_000;
@@ -116,7 +117,7 @@ function addCounts(target, counts) {
 
 export default function App() {
   const activeTheme = useActiveTheme();
-  const seasonalTheme = SEASONAL_THEMES.find(t => t.id === activeTheme);
+  const seasonalTheme = getFestival(activeTheme);
   const [loadState, setLoadState] = useState({ phase: "loading", pct: 0, msg: "Initializing..." });
   const [data, setData] = useState(null);
   // Flips true once the staged startup load has produced a full owned-items map (bags
@@ -2186,6 +2187,7 @@ export default function App() {
     </button>
     </div>
     </div>
+    <FestivalNotice key={activeTheme} themeId={activeTheme} />
 
     {/* Reset Database confirmation dialog */}
     {showResetConfirm && (

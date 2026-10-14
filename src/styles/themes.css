@@ -60,62 +60,108 @@
 :root[data-theme="parchment"] .st-card.danger { background:#fbeeea; border-color:#e0b0aa; }
 :root[data-theme="parchment"] .chr-count { color:#fff; }
 
-/* ── Seasonal: shared Halloween bits ────────────────────────────────── */
-:root[data-theme^="halloween"] {
-  --font-title: 'Pirata One', 'Cinzel', serif;
-  --green:#8fd14f; --green2:#a6e06a;
-  --coin-g-bg:rgba(58,46,0,.85); --coin-s-bg:rgba(42,42,58,.85); --coin-c-bg:rgba(42,26,10,.85);
-}
-:root[data-theme^="halloween"] body { background: var(--bg); }
-:root[data-theme^="halloween"] .app { position: relative; z-index: 1; }
-:root[data-theme^="halloween"] .hdr::before,
-:root[data-theme^="halloween"] .hdr::after { display: none; }
-:root[data-theme^="halloween"] .hdr h1 { letter-spacing: 3px; text-shadow: 0 0 34px rgba(var(--gold-rgb),.8), 0 2px 6px rgba(0,0,0,.9); }
-:root[data-theme^="halloween"] .hdr p { color: var(--text2); text-shadow: 0 1px 4px rgba(0,0,0,.9); }
-:root[data-theme^="halloween"] .nav { background: rgba(14,10,18,.6); border-radius: 5px 5px 0 0; }
-:root[data-theme^="halloween"] .tw { background: var(--bg2); }
-:root[data-theme^="halloween"] .card::before { background: linear-gradient(90deg, #ffd23f 0 33%, #f07a1a 33% 66%, #fff4e0 66%); }
-:root[data-theme^="halloween"] .ntab.on { box-shadow: inset 0 3px 0 #f07a1a; }
+/* ══ Festival themes ═══════════════════════════════════════════════════
+   Each festival sets its palette as raw RGB triplets; the shared rules below
+   turn those into panel colors. Two layouts, chosen in Settings → Appearance:
+     data-fest-style="banner"     Option 1: art strip across the top, solid panels
+     data-fest-style="wallpaper"  Option 2: art fills the window, see-through panels
+   Art and per-festival text live in src/lib/theme.js + ThemeBackdrop.jsx. */
 
-/* ── Halloween 1 · Harvest Moon (official GW2 moonlight wallpaper) ──── */
-:root[data-theme="halloween1"] {
-  --bg:#0f0b12; --bg2:rgba(18,13,22,.85); --bg3:rgba(22,16,26,.82); --bg4:rgba(34,25,38,.92); --bg5:rgba(44,33,48,.92);
-  --border:rgba(170,140,100,.32); --border2:rgba(240,200,110,.45);
-  --gold:#e8b44a; --gold2:#ffd36a; --gold3:#fff0b8; --gold-rgb:232,180,74;
-  --text:#f4ebde; --text2:#d6cabb; --text3:#ab9e90;
-  --blue:#8f88d0; --blue2:#a9a2e0;
-  --panel-solid:rgba(16,11,20,.94);
+:root[data-theme="lunarnewyear"] {
+  --bg:#0a1416; --p2:16,24,26; --p3:22,30,32; --p4:30,38,40; --bd:232,96,72;
+  --gold:#f0b85a; --gold2:#ffd68a; --gold3:#fff0c8; --gold-rgb:240,184,90;
+  --text:#f6ede2; --text2:#cdc2b4; --text3:#9c9288; --green:#7ad0a0; --blue:#ff7a5a; --blue2:#ff9a7a;
+  --fest-stripe: linear-gradient(90deg, #d8282a 0 50%, #f0b85a 50%);
+  --font-title: 'Cinzel Decorative', 'Cinzel', serif; --title-size: 42px; --fest-banner-pos: 30%;
 }
-:root[data-theme="halloween1"] .hdr { text-align: left; padding: 120px 0 30px; }
-:root[data-theme="halloween1"] .hdr h1 { font-size: 58px; }
-:root[data-theme="halloween1"] .hdr-meta { justify-content: flex-start !important; }
+:root[data-theme="superadventure"] {
+  --bg:#0a1820; --p2:14,30,40; --p3:20,36,46; --p4:28,44,54; --bd:255,210,63;
+  --gold:#ffd23f; --gold2:#ffe066; --gold3:#fff2a8; --gold-rgb:255,210,63;
+  --text:#f2f6ff; --text2:#bccad8; --text3:#8c9caa; --green:#6ad64a; --blue:#f2a0c0; --blue2:#f8bcd4;
+  --fest-stripe: repeating-linear-gradient(90deg, #e83a3a 0 8px, #ffd23f 8px 16px, #6ad64a 16px 24px, #5fb8ff 24px 32px);
+  --font-title: 'Press Start 2P', monospace; --title-size: 28px; --fest-banner-pos: 50%;
+}
+:root[data-theme="dragonbash"] {
+  --bg:#08141a; --p2:12,26,32; --p3:18,32,38; --p4:26,40,46; --bd:232,176,74;
+  --gold:#e8b04a; --gold2:#ffd27a; --gold3:#fff0c0; --gold-rgb:232,176,74;
+  --text:#f4ece2; --text2:#c8c0b4; --text3:#998f86; --green:#6ad0b0; --blue:#ff6a4a; --blue2:#ff8a6a;
+  --fest-stripe: linear-gradient(90deg, #c8282a 0 50%, #e8b04a 50%);
+  --font-title: 'Cinzel Decorative', 'Cinzel', serif; --title-size: 42px; --fest-banner-pos: 18%;
+}
+:root[data-theme="fourwinds"] {
+  --bg:#0b1a1e; --p2:14,30,34; --p3:20,36,40; --p4:28,44,48; --bd:242,178,90;
+  --gold:#f2b25a; --gold2:#ffd08a; --gold3:#ffeac8; --gold-rgb:242,178,90;
+  --text:#f6efe4; --text2:#cbc3b6; --text3:#9a948a; --green:#7ad0a0; --blue:#5ad0d8; --blue2:#7ae0e8;
+  --fest-stripe: linear-gradient(90deg, #e83a5a 0 25%, #ffd23f 25% 50%, #3ab0e8 50% 75%, #7ad04a 75%);
+  --font-title: 'Cinzel Decorative', 'Cinzel', serif; --title-size: 40px; --fest-banner-pos: 40%;
+}
+:root[data-theme="halloween"] {
+  --bg:#0a1215; --p2:14,24,28; --p3:20,30,34; --p4:28,38,42; --bd:240,144,42;
+  --gold:#f0902a; --gold2:#ffb347; --gold3:#ffd89a; --gold-rgb:240,144,42;
+  --text:#f3ece2; --text2:#c8bfb4; --text3:#9a928a; --green:#9ad14f; --green2:#b0e06a; --blue:#6ad0c8; --blue2:#8ae0d8;
+  --fest-stripe: linear-gradient(90deg, #ffd23f 0 33%, #f07a1a 33% 66%, #fff4e0 66%);
+  --font-title: 'Pirata One', 'Cinzel', serif; --title-size: 46px; --fest-banner-pos: 35%;
+}
+:root[data-theme="wintersday"] {
+  --bg:#071418; --p2:10,26,32; --p3:16,32,38; --p4:24,40,46; --bd:255,210,122;
+  --gold:#ffd27a; --gold2:#ffe4a8; --gold3:#fff4d8; --gold-rgb:255,210,122;
+  --text:#eef6fa; --text2:#c0ccd4; --text3:#8e9ca6; --green:#7ad0a0; --blue:#8ac8f0; --blue2:#aad8f6;
+  --fest-stripe: repeating-linear-gradient(90deg, #c8282a 0 10px, #f6f6f6 10px 20px);
+  --font-title: 'Cinzel Decorative', 'Cinzel', serif; --title-size: 42px; --fest-banner-pos: 28%;
+}
 
-/* ── Halloween 2 · Pumpkin Fiend ────────────────────────────────────── */
-:root[data-theme="halloween2"] {
-  --bg:#140b16; --bg2:rgba(30,16,32,.88); --bg3:rgba(34,18,36,.86); --bg4:rgba(46,24,46,.94); --bg5:rgba(58,30,58,.94);
-  --border:rgba(146,60,167,.35); --border2:rgba(255,178,31,.42);
-  --gold:#ffa21f; --gold2:#ffc93a; --gold3:#ffe9a0; --gold-rgb:255,162,31;
-  --text:#f7ecdc; --text2:#d8c6c8; --text3:#ad97a8;
-  --blue:#b070d0; --blue2:#c27ad8;
-  --panel-solid:rgba(22,11,24,.95);
+/* Shared festival palette wiring — Option 1 (banner): solid panels. */
+:root[data-fest] {
+  --bg2: rgb(var(--p2)); --bg3: rgb(var(--p3)); --bg4: rgb(var(--p4)); --bg5: rgb(var(--p4));
+  --border: rgba(var(--bd), .26); --border2: rgba(var(--bd), .45);
+  --panel-solid: rgb(var(--p2));
+  --coin-g-bg: rgba(58,46,0,.85); --coin-s-bg: rgba(42,42,58,.85); --coin-c-bg: rgba(42,26,10,.85);
 }
-:root[data-theme="halloween2"] .hdr { padding: 168px 0 20px; }
-:root[data-theme="halloween2"] .hdr h1 { font-size: 48px; }
+/* Option 2 (full background): see-through panels so the art shows around them. */
+:root[data-fest][data-fest-style="wallpaper"] {
+  --bg2: rgba(var(--p2), .91); --bg3: rgba(var(--p2), .88); --bg4: rgba(var(--p4), .96); --bg5: rgba(var(--p4), .96);
+  --panel-solid: rgba(var(--p2), .97);
+  /* Brighter secondary text so it holds up over busy art. */
+  --text2: color-mix(in srgb, var(--text) 90%, var(--bg));
+  --text3: color-mix(in srgb, var(--text) 76%, var(--bg));
+}
+/* A soft shadow under all text in full-background mode keeps it readable where it sits on the art. */
+:root[data-fest][data-fest-style="wallpaper"] .app { text-shadow: 0 1px 3px rgba(0,0,0,.85); }
+:root[data-fest][data-fest-style="wallpaper"] input, :root[data-fest][data-fest-style="wallpaper"] select { text-shadow: none; }
+
+:root[data-fest] body { background: var(--bg); }
+:root[data-fest] .app { position: relative; z-index: 1; }
+:root[data-fest] .hdr { padding: 34px 0 22px; }
+:root[data-fest] .hdr::before, :root[data-fest] .hdr::after { display: none; }
+:root[data-fest] .hdr h1 { font-variant-ligatures: none; font-feature-settings: 'liga' 0, 'dlig' 0, 'clig' 0; font-size: var(--title-size); letter-spacing: 3px; text-shadow: 0 0 30px rgba(var(--gold-rgb), .7), 0 2px 6px rgba(0,0,0,.95); }
+:root[data-fest][data-fest-style="wallpaper"] .hdr h1 { font-size: calc(var(--title-size) + 6px); }
+:root[data-theme="superadventure"] .hdr h1, :root[data-theme="halloween"] .hdr h1 { font-weight: 400; }
+:root[data-theme="superadventure"] .hdr h1 { line-height: 1.4; letter-spacing: 2px; text-shadow: 0 3px 0 rgba(0,0,0,.9), 0 0 24px rgba(0,0,0,.8); }
+:root[data-fest] .hdr p { color: var(--text); text-shadow: 0 1px 4px rgba(0,0,0,.95), 0 0 12px rgba(0,0,0,.8); }
+:root[data-fest] .hdr-meta { color: var(--text) !important; text-shadow: 0 1px 3px rgba(0,0,0,.95); }
+:root[data-fest] .card::before { background: var(--fest-stripe); }
+:root[data-fest] .ntab.on { position: relative; }
+:root[data-fest] .ntab.on::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--fest-stripe); border-radius: 4px 4px 0 0; }
+:root[data-fest][data-fest-style="wallpaper"] .nav { background: rgba(var(--p2), .82); border-radius: 5px 5px 0 0; }
+:root[data-fest][data-fest-style="wallpaper"] .tw { background: var(--bg2); }
+/* Dialogs stay opaque over the art. */
+:root[data-fest] .st-modal { background: var(--bg); }
+:root[data-fest] .st-nav, :root[data-fest] .st-foot { background: rgba(0,0,0,.25); }
+
+/* Festival notice under the header (FestivalNotice.jsx). */
+.fest-note { display: flex; align-items: center; gap: 14px; background: rgba(var(--p2), .92); border: 1px solid var(--gold); border-radius: 5px; padding: 10px 16px; margin-bottom: 14px; color: var(--text); font-size: 15px; }
+.fest-note-stripe { width: 26px; height: 8px; border-radius: 2px; background: var(--fest-stripe); flex-shrink: 0; }
+.fest-note-label { font-family: var(--font-ui); font-size: 11px; letter-spacing: 2px; color: var(--gold2); white-space: nowrap; }
+.fest-note-text { flex: 1; min-width: 0; }
+.fest-note-x { background: transparent; border: 1px solid var(--border2); color: var(--text2); border-radius: 4px; width: 32px; height: 32px; cursor: pointer; font-size: 16px; line-height: 1; flex-shrink: 0; }
+.fest-note-x:hover { color: var(--gold2); border-color: var(--gold); }
 
 /* ── Backdrop layers (ThemeBackdrop.jsx) ────────────────────────────── */
 .theme-backdrop { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
-.theme-backdrop img { display: block; }
-.tb-moon-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 100% 0%; }
-.tb-moon-shade { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(10,7,14,.12) 0%, rgba(10,7,14,.30) 18%, rgba(10,7,14,.60) 36%, rgba(10,7,14,.82) 100%); }
-.tb-moon-title { position: absolute; inset: 0; background: radial-gradient(ellipse 55% 300px at 0% 90px, rgba(10,7,14,.6), rgba(10,7,14,0)); }
-.tb-pumpkin-bg { position: absolute; inset: 0; background: radial-gradient(ellipse 70% 45% at 50% 100%, rgba(146,60,167,.28), rgba(146,60,167,0) 70%), linear-gradient(180deg, #2a1423 0%, #1a0d1c 45%, #0f0912 100%); }
-/* The pumpkin banner scrolls with the page, so it lives at the top of .app's
-   parent rather than in the fixed layer. */
-.tb-banner { position: absolute; top: 0; left: 0; right: 0; height: 250px; z-index: 0; pointer-events: none; overflow: hidden;
-  -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 60%, transparent 100%); mask-image: linear-gradient(180deg, #000 0%, #000 55%, transparent 100%); }
-.tb-banner img { width: 100%; height: 100%; object-fit: cover; object-position: center 34%; display: block; }
-
-/* Dialogs stay opaque over the art so nothing shows through them. */
-:root[data-theme^="halloween"] .st-modal { background: var(--bg); }
-:root[data-theme^="halloween"] .st-nav,
-:root[data-theme^="halloween"] .st-foot { background: rgba(0,0,0,.25); }
+.tb-wall-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block; }
+.tb-wall-shade { position: absolute; inset: 0; background: radial-gradient(ellipse 760px 170px at 50% 80px, rgba(0,0,0,.5), rgba(0,0,0,0) 100%), linear-gradient(180deg, rgba(0,0,0,.18) 0%, rgba(0,0,0,.42) 20%, rgba(0,0,0,.62) 40%, rgba(0,0,0,.72) 100%); }
+/* The banner scrolls with the page, so it is absolutely positioned at the top of the document. */
+.tb-banner { position: absolute; top: 0; left: 0; right: 0; height: 220px; z-index: 0; pointer-events: none; overflow: hidden;
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 55%, transparent 100%); mask-image: linear-gradient(180deg, #000 0%, #000 55%, transparent 100%); }
+.tb-banner img { width: 100%; height: 100%; object-fit: cover; object-position: center var(--fest-banner-pos, 35%); display: block; }
+.tb-banner::after { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse 760px 170px at 50% 80px, rgba(0,0,0,.5), rgba(0,0,0,0) 100%); }

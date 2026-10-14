@@ -1,5 +1,4 @@
 /* GW2 Wealth Tracker — global styles. (Split out of App.jsx's css template string.) */
-@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Pirata+One&display=swap');
 :root {
   --bg:#0e0c09; --bg2:#161310; --bg3:#1e1a14; --bg4:#252018; --bg5:#2e2718;
   --border:#3a3020; --border2:#4a3f28;

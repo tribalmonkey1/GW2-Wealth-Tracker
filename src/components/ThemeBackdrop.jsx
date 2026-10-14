@@ -1,33 +1,27 @@
 /**
- * Background art for the seasonal themes. Renders nothing for the plain color
- * schemes. Sits behind .app (z-index 0); see "Backdrop layers" in themes.css.
+ * Festival artwork behind the app. Renders nothing for the plain color schemes.
+ *   Option 1 (banner):    an art strip at the top of the page that scrolls away.
+ *   Option 2 (wallpaper): the art fixed behind the whole window, lightly shaded.
+ * Sits behind .app (z-index 0); see "Backdrop layers" in themes.css.
  */
 import React from "react";
-import { useActiveTheme } from "../lib/theme.js";
-import moonlight from "../assets/themes/halloween1-moonlight.webp";
-import pumpkin from "../assets/themes/halloween2-pumpkin.webp";
+import { useThemeState, isFestival } from "../lib/theme.js";
+import { FESTIVAL_ART } from "../lib/festivalArt.js";
 
 export function ThemeBackdrop() {
-  const theme = useActiveTheme();
+  const { id, style } = useThemeState();
+  if (!isFestival(id)) return null;
+  const src = FESTIVAL_ART[id];
 
-  if (theme === "halloween1") {
+  if (style === "wallpaper") {
     return (
       <div className="theme-backdrop" aria-hidden="true">
-        <img className="tb-moon-img" src={moonlight} alt="" />
-        <div className="tb-moon-shade" />
-        <div className="tb-moon-title" />
+        <img className="tb-wall-img" src={src} alt="" />
+        <div className="tb-wall-shade" />
       </div>
     );
   }
-
-  if (theme === "halloween2") {
-    return (
-      <>
-        <div className="theme-backdrop" aria-hidden="true"><div className="tb-pumpkin-bg" /></div>
-        <div className="tb-banner" aria-hidden="true"><img src={pumpkin} alt="" /></div>
-      </>
-    );
-  }
-
-  return null;
+  return (
+    <div className="tb-banner" aria-hidden="true"><img src={src} alt="" /></div>
+  );
 }

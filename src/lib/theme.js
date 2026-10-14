@@ -1,10 +1,17 @@
 /**
- * Color themes + seasonal themes.
+ * Color schemes + festival themes.
  *
- * The chosen theme and the seasonal auto-switch settings live in localStorage
- * (they're per-computer display preferences, and reading them synchronously at
- * startup avoids a flash of the default theme). The active theme is applied as
- * <html data-theme="…">; src/styles/themes.css does the rest.
+ * Everything here is a per-computer display preference, kept in localStorage
+ * and read synchronously at startup so there's no flash of the default theme.
+ *
+ *   gw2wt.theme      chosen theme id (a color scheme or a festival)
+ *   gw2wt.festStyle  "banner" (Option 1) or "wallpaper" (Option 2, full background)
+ *   gw2wt.festAuto   { enabled, festivals: { <id>: { on, start, end } } }  (MM-DD dates)
+ *
+ * Applied as attributes on <html>:
+ *   data-theme="<id>"  (absent for the default Tyrian Gold)
+ *   data-fest="<id>" data-fest-style="banner|wallpaper"  (festivals only)
+ * src/styles/themes.css does the rest.
  */
 import { useEffect, useState } from "react";
 
@@ -21,33 +28,87 @@ export const THEMES = [
     swatch: { bg: "#f2e8d4", panel: "#fbf6ea", acc: "#8a5a12", acc2: "#6e4508", text: "#2b2216", dim: "#6e5d45" } },
 ];
 
-export const SEASONAL_THEMES = [
-  { id: "halloween1", name: "Halloween 1", desc: "Harvest moon over the haunted woods.",
-    tagline: "Shadow of the Mad King · Something stirs beneath the harvest moon" },
-  { id: "halloween2", name: "Halloween 2", desc: "A burning pumpkin fiend with ember gold accents.",
-    tagline: "Shadow of the Mad King · The harvest bites back" },
+// Listed in calendar order. Default auto-switch dates are rough guesses:
+// ArenaNet moves festivals around every year, so users edit them in Settings.
+export const FESTIVALS = [
+  { id: "lunarnewyear",   name: "Lunar New Year",             tagline: "Lunar New Year · Lanterns over the city",
+    label: "LUNAR NEW YEAR", note: "Lucky envelopes are flowing. May your coffers overflow this year.", start: "01-27", end: "02-17" },
+  { id: "superadventure", name: "Super Adventure Festival",   tagline: "Super Adventure Festival · World 1, Zone 1",
+    label: "SUPER ADVENTURE FESTIVAL", note: "Press start! Time to grab some festival loot.", start: "03-31", end: "04-21" },
+  { id: "dragonbash",     name: "Dragon Bash",                tagline: "Dragon Bash · Fireworks and effigies",
+    label: "DRAGON BASH", note: "Light the effigies, race the moas, and open those Dragon Coffers.", start: "06-16", end: "07-07" },
+  { id: "fourwinds",      name: "Festival of the Four Winds", tagline: "Festival of the Four Winds · Kites over the bay",
+    label: "FESTIVAL OF THE FOUR WINDS", note: "The Zephyrites are in port. The trade winds are blowing your way.", start: "08-04", end: "08-25" },
+  { id: "halloween",      name: "Halloween",                  tagline: "Shadow of the Mad King · Trick or treat, Tyria",
+    label: "SHADOW OF THE MAD KING", note: "The Lunatic Court thanks you for your patronage.", start: "10-15", end: "11-05" },
+  { id: "wintersday",     name: "Wintersday",                 tagline: "Wintersday · Lights in the square",
+    label: "WINTERSDAY", note: "Snowflakes and Wintersday Gifts are piling up. Happy Wintersday!", start: "12-09", end: "01-06" },
 ];
 
-const ALL_IDS = new Set([...THEMES, ...SEASONAL_THEMES].map(t => t.id));
+export const FEST_STYLES = [
+  { id: "banner",    name: "Option 1 · Banner",          desc: "Art across the top, solid panels below." },
+  { id: "wallpaper", name: "Option 2 · Full background", desc: "Art fills the whole window behind see-through panels." },
+];
+
+const FEST_IDS = new Set(FESTIVALS.map(f => f.id));
+const ALL_IDS = new Set([...THEMES.map(t => t.id), ...FEST_IDS]);
 const KEY_THEME = "gw2wt.theme";
-const KEY_SEASONAL = "gw2wt.seasonalAuto";
+const KEY_STYLE = "gw2wt.festStyle";
+const KEY_AUTO = "gw2wt.festAuto";
+const KEY_OLD_AUTO = "gw2wt.seasonalAuto"; // 0.7.4 Halloween-only auto-switch
 const EVT = "gw2wt-theme-change";
 
-export const DEFAULT_SEASONAL = { enabled: false, theme: "halloween1", start: "10-15", end: "11-05" };
+export const isFestival = id => FEST_IDS.has(id);
+export const getFestival = id => FESTIVALS.find(f => f.id === id) || null;
 
 function read(key) { try { return localStorage.getItem(key); } catch { return null; } }
 function write(key, val) { try { localStorage.setItem(key, val); } catch { /* storage unavailable */ } }
+function remove(key) { try { localStorage.removeItem(key); } catch { /* storage unavailable */ } }
+
+function defaultAuto() {
+  const festivals = {};
+  for (const f of FESTIVALS) festivals[f.id] = { on: true, start: f.start, end: f.end };
+  return { enabled: false, festivals };
+}
+
+// One-time upgrade from the 0.7.4 themes (Halloween 1 / Halloween 2).
+function migrate() {
+  const t = read(KEY_THEME);
+  if (t === "halloween1" || t === "halloween2") {
+    write(KEY_THEME, "halloween");
+    if (!read(KEY_STYLE)) write(KEY_STYLE, t === "halloween1" ? "wallpaper" : "banner");
+  }
+  const old = read(KEY_OLD_AUTO);
+  if (old && !read(KEY_AUTO)) {
+    try {
+      const o = JSON.parse(old);
+      const a = defaultAuto();
+      a.enabled = !!o.enabled;
+      if (o.start && o.end) a.festivals.halloween = { on: true, start: o.start, end: o.end };
+      write(KEY_AUTO, JSON.stringify(a));
+    } catch { /* ignore a bad old value */ }
+  }
+  if (old) remove(KEY_OLD_AUTO);
+}
 
 export function getChosenTheme() {
   const t = read(KEY_THEME);
   return t && ALL_IDS.has(t) ? t : "tyrian";
 }
 
-export function getSeasonalAuto() {
+export function getFestStyle() {
+  return read(KEY_STYLE) === "wallpaper" ? "wallpaper" : "banner";
+}
+
+export function getFestAuto() {
+  const base = defaultAuto();
   try {
-    const v = JSON.parse(read(KEY_SEASONAL) || "null");
-    return v ? { ...DEFAULT_SEASONAL, ...v } : { ...DEFAULT_SEASONAL };
-  } catch { return { ...DEFAULT_SEASONAL }; }
+    const v = JSON.parse(read(KEY_AUTO) || "null");
+    if (!v) return base;
+    const festivals = { ...base.festivals };
+    for (const id of FEST_IDS) if (v.festivals?.[id]) festivals[id] = { ...base.festivals[id], ...v.festivals[id] };
+    return { enabled: !!v.enabled, festivals };
+  } catch { return base; }
 }
 
 // "MM-DD" → comparable number MMDD; null if malformed.
@@ -60,26 +121,37 @@ export function parseMonthDay(s) {
 }
 
 // True when `date` falls inside start..end (inclusive). Handles ranges that
-// wrap the new year, e.g. 12-15 → 01-05.
-export function inSeason(cfg, date = new Date()) {
-  const a = parseMonthDay(cfg.start), b = parseMonthDay(cfg.end);
+// wrap the new year, e.g. 12-09 → 01-06.
+export function inRange(start, end, date = new Date()) {
+  const a = parseMonthDay(start), b = parseMonthDay(end);
   if (a == null || b == null) return false;
   const now = (date.getMonth() + 1) * 100 + date.getDate();
   return a <= b ? (now >= a && now <= b) : (now >= a || now <= b);
 }
 
+/** The festival the auto-switch wants right now, or null. */
+export function activeFestivalByDate(date = new Date()) {
+  const a = getFestAuto();
+  if (!a.enabled) return null;
+  for (const f of FESTIVALS) {
+    const r = a.festivals[f.id];
+    if (r?.on && inRange(r.start, r.end, date)) return f.id;
+  }
+  return null;
+}
+
 /** The theme that should be showing right now. */
 export function resolveTheme(date = new Date()) {
-  const s = getSeasonalAuto();
-  if (s.enabled && ALL_IDS.has(s.theme) && inSeason(s, date)) return s.theme;
-  return getChosenTheme();
+  return activeFestivalByDate(date) || getChosenTheme();
 }
 
 export function applyTheme(id = resolveTheme()) {
   if (typeof document === "undefined") return id;
-  if (id === "tyrian") delete document.documentElement.dataset.theme;
-  else document.documentElement.dataset.theme = id;
-  window.dispatchEvent(new CustomEvent(EVT, { detail: id }));
+  const root = document.documentElement;
+  if (id === "tyrian") delete root.dataset.theme; else root.dataset.theme = id;
+  if (isFestival(id)) { root.dataset.fest = id; root.dataset.festStyle = getFestStyle(); }
+  else { delete root.dataset.fest; delete root.dataset.festStyle; }
+  window.dispatchEvent(new CustomEvent(EVT, { detail: { id, style: getFestStyle() } }));
   return id;
 }
 
@@ -89,24 +161,40 @@ export function setChosenTheme(id) {
   applyTheme();
 }
 
-export function setSeasonalAuto(cfg) {
-  write(KEY_SEASONAL, JSON.stringify({ ...DEFAULT_SEASONAL, ...cfg }));
+export function setFestStyle(style) {
+  write(KEY_STYLE, style === "wallpaper" ? "wallpaper" : "banner");
   applyTheme();
 }
 
-/** React hook: the theme currently applied (re-renders on change). */
-export function useActiveTheme() {
-  const [id, setId] = useState(() => (typeof document !== "undefined" && document.documentElement.dataset.theme) || "tyrian");
+export function setFestAuto(cfg) {
+  write(KEY_AUTO, JSON.stringify(cfg));
+  applyTheme();
+}
+
+function currentState() {
+  const root = typeof document !== "undefined" ? document.documentElement : null;
+  return { id: root?.dataset.theme || "tyrian", style: getFestStyle() };
+}
+
+/** React hook: { id, style } of the theme currently applied (re-renders on change). */
+export function useThemeState() {
+  const [state, setState] = useState(currentState);
   useEffect(() => {
-    const h = e => setId(e.detail);
+    const h = e => setState(e.detail);
     window.addEventListener(EVT, h);
     return () => window.removeEventListener(EVT, h);
   }, []);
-  return id;
+  return state;
 }
 
-/** Call once at startup: applies the theme and re-checks the season hourly. */
+/** React hook: id of the theme currently applied. */
+export function useActiveTheme() {
+  return useThemeState().id;
+}
+
+/** Call once at startup: migrates old settings, applies the theme, re-checks dates hourly. */
 export function startThemeWatcher() {
+  migrate();
   applyTheme();
   const timer = setInterval(() => {
     const want = resolveTheme();

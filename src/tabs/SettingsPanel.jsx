@@ -23,9 +23,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { renderMarkdown } from "../lib/markdown.jsx";
 import { importFromBrowser, exportAllData, getDbStats } from "../lib/storage.js";
 import { playAlert } from "../lib/alertSound.js";
-import { THEMES, SEASONAL_THEMES, getChosenTheme, setChosenTheme, getSeasonalAuto, setSeasonalAuto, parseMonthDay, useActiveTheme } from "../lib/theme.js";
-import halloween1Thumb from "../assets/themes/halloween1-thumb.webp";
-import halloween2Thumb from "../assets/themes/halloween2-thumb.webp";
+import { THEMES, FESTIVALS, FEST_STYLES, getChosenTheme, setChosenTheme, getFestStyle, setFestStyle, getFestAuto, setFestAuto, activeFestivalByDate, parseMonthDay, useThemeState } from "../lib/theme.js";
+import { FESTIVAL_THUMBS } from "../lib/festivalArt.js";
 import "../styles/settings.css";
 
 // Permissions the tracker reads (same list as the first-run screen in App.jsx).
@@ -638,36 +637,43 @@ function AboutSection(p) {
 
 // ── Appearance (themes) ─────────────────────────────────────────────────────
 // Acts immediately like Friends/Maintenance; stored per computer (theme.js).
-const SEASON_THUMBS = { halloween1: halloween1Thumb, halloween2: halloween2Thumb };
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const fmtMonthDay = md => { const n = parseMonthDay(md); return n == null ? md : `${MONTHS[Math.floor(n / 100) - 1]} ${n % 100}`; };
 
+function DateField({ label, value, disabled, onCommit }) {
+  const [txt, setTxt] = useState(value);
+  useEffect(() => { setTxt(value); }, [value]);
+  const bad = parseMonthDay(txt) == null;
+  return (
+    <input className="st-input ap-date" value={txt} placeholder="MM-DD" disabled={disabled} aria-label={label} aria-invalid={bad}
+      onChange={e => { setTxt(e.target.value); if (parseMonthDay(e.target.value) != null) onCommit(e.target.value.trim()); }} />
+  );
+}
+
 function AppearanceSection() {
-  const active = useActiveTheme();
+  const { id: active } = useThemeState();
   const [chosen, setChosen] = useState(getChosenTheme);
-  const [auto, setAuto] = useState(getSeasonalAuto);
-  const [startTxt, setStartTxt] = useState(auto.start);
-  const [endTxt, setEndTxt] = useState(auto.end);
+  const [style, setStyle] = useState(getFestStyle);
+  const [auto, setAuto] = useState(getFestAuto);
 
   const pick = id => { setChosenTheme(id); setChosen(id); };
-  const updateAuto = patch => { const next = { ...auto, ...patch }; setAuto(next); setSeasonalAuto(next); };
-  const commitDate = (field, txt) => {
-    if (parseMonthDay(txt) == null) return;
-    updateAuto({ [field]: txt.trim() });
-  };
-  const startBad = parseMonthDay(startTxt) == null, endBad = parseMonthDay(endTxt) == null;
-  const overridden = active !== chosen;
-  const activeName = [...THEMES, ...SEASONAL_THEMES].find(t => t.id === active)?.name;
+  const pickStyle = s => { setFestStyle(s); setStyle(s); };
+  const saveAuto = next => { setAuto(next); setFestAuto(next); };
+  const updateFest = (fid, patch) => saveAuto({ ...auto, festivals: { ...auto.festivals, [fid]: { ...auto.festivals[fid], ...patch } } });
+
+  const autoFest = activeFestivalByDate();
+  const overridden = autoFest && autoFest !== chosen;
+  const allNames = Object.fromEntries([...THEMES, ...FESTIVALS].map(t => [t.id, t.name]));
 
   return (
     <>
       <div>
         <h2>Appearance</h2>
-        <p className="st-lede">Pick a color scheme. Changes apply right away and don't need Save.</p>
+        <p className="st-lede">Pick a color scheme or a festival theme. Changes apply right away and don't need Save.</p>
       </div>
 
       {overridden && (
-        <div className="st-msg">{activeName} is showing because the seasonal auto-switch is on (until {fmtMonthDay(auto.end)}). Your pick comes back after that.</div>
+        <div className="st-msg">{allNames[active]} is showing because the festival auto-switch is on (until {fmtMonthDay(auto.festivals[autoFest].end)}). Your pick comes back after that.</div>
       )}
 
       <div className="st-field">
@@ -698,44 +704,56 @@ function AppearanceSection() {
       <div className="st-divider" />
 
       <div className="st-field">
-        <span className="st-label">SEASONAL THEMES</span>
-        <p className="st-help dim">Pick one to use it now, or let it switch on by itself during the festival below.</p>
-        <div className="ap-grid seasonal">
-          {SEASONAL_THEMES.map(t => (
-            <button key={t.id} className={`ap-tile ${chosen === t.id ? "on" : ""}`} aria-pressed={chosen === t.id} onClick={() => pick(t.id)}>
-              <span className="ap-thumb"><img src={SEASON_THUMBS[t.id]} alt="" /></span>
-              <span className="ap-name">{t.name}</span>
-              <span className="ap-desc">{t.desc}</span>
-              {chosen === t.id && <span className="ap-on">● SELECTED</span>}
+        <span className="st-label">FESTIVAL THEMES</span>
+        <div className="ap-grid festivals">
+          {FESTIVALS.map(f => (
+            <button key={f.id} className={`ap-tile ${chosen === f.id ? "on" : ""}`} aria-pressed={chosen === f.id} onClick={() => pick(f.id)}>
+              <span className="ap-thumb"><img src={FESTIVAL_THUMBS[f.id]} alt="" /></span>
+              <span className="ap-name">{f.name}</span>
+              {chosen === f.id && <span className="ap-on">● SELECTED</span>}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="st-field">
+        <span className="st-label">FESTIVAL ART STYLE</span>
+        <div className="ap-styles" role="radiogroup" aria-label="Festival art style">
+          {FEST_STYLES.map(s => (
+            <button key={s.id} role="radio" aria-checked={style === s.id} className={`ap-style ${style === s.id ? "on" : ""}`} onClick={() => pickStyle(s.id)}>
+              <span className={`ap-style-pic ${s.id}`} aria-hidden="true"><span /><span /><span /></span>
+              <span className="ap-style-text">
+                <span className="ap-name">{s.name}</span>
+                <span className="ap-desc">{s.desc}</span>
+              </span>
             </button>
           ))}
         </div>
       </div>
 
       <div className="st-card">
-        <div className="st-card-title">HALLOWEEN AUTO-SWITCH</div>
+        <div className="st-card-title">FESTIVAL AUTO-SWITCH</div>
         <label className="ap-toggle">
-          <input type="checkbox" checked={auto.enabled} onChange={e => updateAuto({ enabled: e.target.checked })} />
-          <span>Switch to a Halloween theme automatically between these dates, then back to my color scheme</span>
+          <input type="checkbox" checked={auto.enabled} onChange={e => saveAuto({ ...auto, enabled: e.target.checked })} />
+          <span>Switch to each festival's theme automatically during its dates, then back to my pick</span>
         </label>
-        <div className="st-row">
-          <label className="ap-inline">Theme
-            <select className="st-select" value={auto.theme} onChange={e => updateAuto({ theme: e.target.value })} disabled={!auto.enabled}>
-              {SEASONAL_THEMES.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </select>
-          </label>
-          <label className="ap-inline">Starts
-            <input className="st-input ap-date" value={startTxt} placeholder="MM-DD" disabled={!auto.enabled} aria-invalid={startBad}
-              onChange={e => { setStartTxt(e.target.value); commitDate("start", e.target.value); }} />
-          </label>
-          <label className="ap-inline">Ends
-            <input className="st-input ap-date" value={endTxt} placeholder="MM-DD" disabled={!auto.enabled} aria-invalid={endBad}
-              onChange={e => { setEndTxt(e.target.value); commitDate("end", e.target.value); }} />
-          </label>
+        <div className="ap-sched" aria-disabled={!auto.enabled}>
+          {FESTIVALS.map(f => {
+            const r = auto.festivals[f.id];
+            return (
+              <div key={f.id} className="ap-sched-row">
+                <label className="ap-toggle small">
+                  <input type="checkbox" checked={r.on} disabled={!auto.enabled} onChange={e => updateFest(f.id, { on: e.target.checked })} />
+                  <span>{f.name}</span>
+                </label>
+                <DateField label={`${f.name} start date`} value={r.start} disabled={!auto.enabled || !r.on} onCommit={v => updateFest(f.id, { start: v })} />
+                <span className="ap-dash">to</span>
+                <DateField label={`${f.name} end date`} value={r.end} disabled={!auto.enabled || !r.on} onCommit={v => updateFest(f.id, { end: v })} />
+              </div>
+            );
+          })}
         </div>
-        {(startBad || endBad) && auto.enabled
-          ? <div className="st-msg bad">Use month-day, like 10-15 for Oct 15.</div>
-          : <div className="st-help dim">Festival dates change each year, so set them to match. Currently {fmtMonthDay(auto.start)} – {fmtMonthDay(auto.end)}.</div>}
+        <div className="st-help dim">Dates are month-day (10-15 is Oct 15). ArenaNet moves festivals every year, so check them when one is announced.</div>
       </div>
     </>
   );
