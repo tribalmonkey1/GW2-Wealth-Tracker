@@ -8,6 +8,9 @@ import { LEGENDARY_RECIPES_GEN3 } from "./legendary-data-gen3.js";
 import { LEGENDARY_RECIPES_NEWER } from "./legendary-data-newer.js";
 import { LEGENDARY_ARMOR_RECIPES } from "./legendary-data-armor.js";
 import { LEGENDARY_OTHER_RECIPES } from "./legendary-data-other.js";
+// Side effect: fills item IDs / currency icons on name-only legendary nodes before the
+// icon prefetch and price list below are collected from the data.
+import "./legendary-item-ids.js";
 import { collectAchievementIds, collectAchievementBitCounts, collectLegendaryItemIds } from "./legendary-cost.js";
 
 // Every achievementId referenced by the legendary data, plus the ones App always tracked.

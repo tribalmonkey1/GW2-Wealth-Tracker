@@ -267,3 +267,8 @@ tbody td { padding:11px 14px; color:var(--text2); vertical-align:middle; }
 .tl-sticky-scroll::-webkit-scrollbar-track { background: var(--bg3); border-radius: 6px; }
 .tl-sticky-scroll::-webkit-scrollbar-thumb { background: var(--gold3,#7a5c1e); border-radius: 6px; border: 2px solid var(--bg3); }
 .tl-sticky-scroll::-webkit-scrollbar-thumb:hover { background: var(--gold2); }
+
+/* Legendary tree: badges that open the GW2 wiki (collection tags, achievement chips) */
+.lg-wiki-link { transition: filter .12s, box-shadow .12s; }
+.lg-wiki-link:hover { filter: brightness(1.25); box-shadow: 0 0 0 1px currentColor inset; text-decoration: underline; }
+.lg-wiki-link:focus-visible { outline: 1px solid currentColor; outline-offset: 1px; }

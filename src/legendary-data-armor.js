@@ -19,11 +19,23 @@
 import { MYSTIC_TRIBUTE } from "./legendary-data.js";
 import { GIFT_OF_THE_MISTS } from "./legendary-data-gen2.js";
 import { GIFT_OF_RESEARCH } from "./legendary-data-gen3.js";
+import { GIFT_OF_THE_SURVIVORS, GIFT_OF_THE_PEOPLE } from "./legendary-data-voe-gifts.js";
 
 const CONDENSED_MAGIC = { ...MYSTIC_TRIBUTE.inputs.find(i => i.name === 'Gift of Condensed Magic'), count: 1 };
 const CONDENSED_MIGHT = { ...MYSTIC_TRIBUTE.inputs.find(i => i.name === 'Gift of Condensed Might'), count: 1 };
 const CUBE = GIFT_OF_THE_MISTS.inputs.find(i => i.name === 'Cube of Stabilized Dark Energy');
 
+const VISION_CRYSTAL_ARMOR = { itemId: 46746, name: 'Vision Crystal', count: 1, source: 'forge', accountBound: true,
+  note: 'Crafted (400+): 5 Dragonite Ingot + 5 Empyreal Star + Augur’s Stone + 5 Bloodstone Brick',
+  inputs: [
+    { itemId: 46732, name: 'Dragonite Ingot', count: 5, source: 'currency', accountBound: true, note: 'Refined from Dragonite Ore', inputs: [] },
+    { itemId: 46734, name: 'Empyreal Star', count: 5, source: 'currency', accountBound: true, note: 'Refined from Empyreal Fragments', inputs: [] },
+    { itemId: 46752, name: "Augur's Stone", count: 1, source: 'spirit_shard', accountBound: true, note: '20 Spirit Shards from Miyani', inputs: [] },
+    { itemId: 46730, name: 'Bloodstone Brick', count: 5, source: 'forge', accountBound: true, note: 'Crafted (450): 100 Pile of Bloodstone Dust + 2 Obsidian Shard + 10 Thermocatalytic Reagent', inputs: [
+      { itemId: 46731, name: 'Pile of Bloodstone Dust', count: 100, source: 'currency', accountBound: true, note: 'Salvaged from ascended gear / fractal rewards', inputs: [] },
+      { itemId: 19925, name: 'Obsidian Shard', count: 2, source: 'karma', note: '1,050 Karma each', inputs: [] },
+      { itemId: 46747, name: 'Thermocatalytic Reagent', count: 10, source: 'vendor', note: '1s 50c from master craftsmen', inputs: [] } ] },
+  ] };
 const clover = (n) => ({ itemId: 19675, name: 'Mystic Clover', count: n, source: 'tp', inputs: [] });
 const obsidian = (n) => ({ itemId: 19925, name: 'Obsidian Shard', count: n, source: 'karma', note: '1,050 Karma each (or Volatile/Unbound Magic + 96c)', inputs: [] });
 const ELDRITCH = { itemId: 20852, name: 'Eldritch Scroll', count: 1, source: 'spirit_shard', accountBound: true, note: '50 Spirit Shards from Miyani', inputs: [] };
@@ -66,9 +78,11 @@ const GIFT_OF_WAR_DEDICATION = { itemId: 83259, name: 'Gift of War Dedication', 
 const GIFT_OF_COMPETITIVE_PROSPERITY = { itemId: 84174, name: 'Gift of Competitive Prosperity', count: 1, source: 'forge', accountBound: true,
   note: 'Mystic Forge: Mist Core Fragment + 15 Mystic Clover + Gift of Condensed Might + Gift of Condensed Magic [wiki verified Oct 2026]',
   inputs: [ cur('Mist Core Fragment', 1, 'PvP reward'), clover(15), { ...CONDENSED_MIGHT }, { ...CONDENSED_MAGIC } ] };
-const GIFT_OF_COMPETITIVE_PROWESS = { itemId: null, idName: 'Gift of Competitive Prowess', name: 'Gift of Competitive Prowess', count: 1, source: 'forge', accountBound: true,
-  note: 'PARTIAL — same pattern as Gift of War Prowess (league insight item from 30 League Tickets + Eldritch Scroll + 50 Obsidian + Cube); wiki page did not load',
-  inputs: [ cur('PvP League insight item', 1, 'Ascended Armor League Vendor — 30 PvP League Tickets'), { ...ELDRITCH }, obsidian(50), { ...CUBE } ] };
+const GIFT_OF_COMPETITIVE_PROWESS = { itemId: 82350, name: 'Gift of Competitive Prowess', count: 1, source: 'forge', accountBound: true,
+  note: 'Mystic Forge: Record of League Victories + Eldritch Scroll + 50 Obsidian Shard + Cube of Stabilized Dark Energy [wiki verified Oct 2026]',
+  inputs: [ { itemId: 82700, name: 'Record of League Victories', count: 1, source: 'currency', accountBound: true,
+              note: '30 PvP League Tickets — Ascended Armor League Vendor / League Armor Vendor (Hall of Memories)', inputs: [] },
+            { ...ELDRITCH }, obsidian(50), { ...CUBE } ] };
 const GIFT_OF_COMPETITIVE_DEDICATION = { itemId: 84203, name: 'Gift of Competitive Dedication', count: 1, source: 'forge', accountBound: true,
   note: 'Mystic Forge: Record of League Participation + Star of Glory + Glob of Condensed Spirit Energy + Jar of Distilled Glory [wiki verified Oct 2026]',
   inputs: [ cur('Record of League Participation', 1, 'Ascended Armor League Vendor (PvP League Tickets)'),
@@ -129,6 +143,67 @@ const OBSIDIAN = [
   ['Heavy','Gloves',101609,'Obsidian Heavy Gauntlets'],['Heavy','Leggings',101568,'Obsidian Heavy Cuisses'],['Heavy','Boots',101460,'Obsidian Heavy Greaves'],
 ];
 const DISCIPLINE = { Light: 'Tailor', Medium: 'Leatherworker', Heavy: 'Armorsmith' };
+// Refined Envoy recipes (/wiki recipe pages, IDs API verified Oct 2026): Lesser Vision Crystal + Envoy Insignia + 2 ascended parts (+ Vision Crystal for chests)
+const REFINED_ENVOY = {
+  "Refined Envoy Cowl": { disc: 'Tailor', vision: false, parts: [[45896, "Damask Helm Padding"], [45897, "Damask Helm Strap"]] },
+  "Refined Envoy Mantle": { disc: 'Tailor', vision: false, parts: [[45901, "Damask Epaulet Panel"], [45893, "Damask Epaulet Padding"]] },
+  "Refined Envoy Vestments": { disc: 'Tailor', vision: true, parts: [[45891, "Damask Coat Lining"], [45892, "Damask Coat Panel"]] },
+  "Refined Envoy Gloves": { disc: 'Tailor', vision: false, parts: [[45894, "Damask Gloves Padding"], [45895, "Damask Gloves Panel"]] },
+  "Refined Envoy Pants": { disc: 'Tailor', vision: false, parts: [[45898, "Damask Pants Lining"], [45899, "Damask Pants Panel"]] },
+  "Refined Envoy Shoes": { disc: 'Tailor', vision: false, parts: [[45900, "Damask Shoe Upper"], [45902, "Damask Shoe Sole"]] },
+  "Refined Envoy Mask": { disc: 'Leatherworker', vision: false, parts: [[45860, "Elonian Helmet Padding"], [45867, "Elonian Helmet Strap"]] },
+  "Refined Envoy Shoulderpads": { disc: 'Leatherworker', vision: false, parts: [[45862, "Elonian Shoulderguard Padding"], [45869, "Elonian Shoulderguard Panel"]] },
+  "Refined Envoy Jerkin": { disc: 'Leatherworker', vision: true, parts: [[45861, "Elonian Longcoat Padding"], [45868, "Elonian Longcoat Panel"]] },
+  "Refined Envoy Vambraces": { disc: 'Leatherworker', vision: false, parts: [[45859, "Elonian Glove Lining"], [45866, "Elonian Glove Panel"]] },
+  "Refined Envoy Leggings": { disc: 'Leatherworker', vision: false, parts: [[45863, "Elonian Trouser Padding"], [45870, "Elonian Trouser Panel"]] },
+  "Refined Envoy Boots": { disc: 'Leatherworker', vision: false, parts: [[45864, "Elonian Boot Sole"], [45865, "Elonian Boot Upper"]] },
+  "Refined Envoy Helmet": { disc: 'Armorsmith', vision: false, parts: [[45874, "Deldrimor Steel Helmet Lining"], [45880, "Deldrimor Steel Helmet Casing"]] },
+  "Refined Envoy Pauldrons": { disc: 'Armorsmith', vision: false, parts: [[45876, "Deldrimor Steel Pauldron Lining"], [45882, "Deldrimor Steel Pauldron Casing"]] },
+  "Refined Envoy Breastplate": { disc: 'Armorsmith', vision: true, parts: [[45872, "Deldrimor Steel Chestplate Padding"], [45878, "Deldrimor Steel Chestplate Panel"]] },
+  "Refined Envoy Gauntlets": { disc: 'Armorsmith', vision: false, parts: [[45873, "Deldrimor Steel Gauntlet Lining"], [45879, "Deldrimor Steel Gauntlet Plates"]] },
+  "Refined Envoy Tassets": { disc: 'Armorsmith', vision: false, parts: [[45875, "Deldrimor Steel Legging Lining"], [45881, "Deldrimor Steel Legging Panel"]] },
+  "Refined Envoy Greaves": { disc: 'Armorsmith', vision: false, parts: [[45871, "Deldrimor Steel Boot Lining"], [45877, "Deldrimor Steel Boot Casing"]] },
+};
+const LESSER_VISION_CRYSTAL = { itemId: 49523, name: 'Lesser Vision Crystal', count: 1, source: 'craft', accountBound: true,
+  note: 'Crafted (Armorsmith / Leatherworker / Tailor 500): 2 Bloodstone Brick + 2 Dragonite Ingot + 2 Empyreal Star + Augur’s Stone',
+  inputs: [
+    { ...VISION_CRYSTAL_ARMOR.inputs[3], count: 2 },
+    { ...VISION_CRYSTAL_ARMOR.inputs[0], count: 2 },
+    { ...VISION_CRYSTAL_ARMOR.inputs[1], count: 2 },
+    { ...VISION_CRYSTAL_ARMOR.inputs[2], count: 1 },
+  ] };
+const ENVOY_INSIGNIA = { itemId: 80516, name: 'Envoy Insignia', count: 1, source: 'vendor', accountBound: true,
+  note: 'Raid Magnetite Shard Exchange: 5 gold + 25 Legendary Insight',
+  inputs: [
+    { itemId: null, name: 'Gold', count: 5, source: 'vendor', vendorPrice: 10000, accountBound: true, inputs: [] },
+    { itemId: null, name: 'Legendary Insight', count: 25, source: 'currency', accountBound: true, note: 'Raid / Strike reward currency', inputs: [] },
+  ] };
+const refinedEnvoy = (name) => {
+  const r = REFINED_ENVOY[name];
+  return { itemId: null, name, count: 1, source: 'craft', accountBound: true,
+    note: `Crafted (${r.disc} 500): Lesser Vision Crystal + Envoy Insignia + 2 ascended armor parts${r.vision ? ' + Vision Crystal' : ''} — or from a Chest of Refined Envoy Armor (raid collections)`,
+    inputs: [ { ...LESSER_VISION_CRYSTAL }, { ...ENVOY_INSIGNIA },
+      ...r.parts.map(([id, n]) => ({ itemId: id, name: n, count: 1, source: 'tp', inputs: [] })),
+      ...(r.vision ? [{ ...VISION_CRYSTAL_ARMOR }] : []) ] };
+};
+
+// Ascended precursor piece for each WvW / PvP legendary (same name, ascended rarity).
+// Item IDs from /v2/items, API verified Oct 2026 — before this the rows had no ID, so no icon
+// and owned copies weren't credited.
+const ASCENDED_PRECURSOR_IDS = {
+  "Triumphant Hero's Masque": 81476, "Triumphant Hero's Epaulets": 81285, "Triumphant Hero's Raiment": 81338,
+  "Triumphant Hero's Armguards": 81428, "Triumphant Hero's Leggings": 81279, "Triumphant Hero's Footgear": 81500,
+  "Triumphant Hero's Faceguard": 81315, "Triumphant Hero's Shoulderguards": 81446, "Triumphant Hero's Brigandine": 81434,
+  "Triumphant Hero's Wristplates": 81489, "Triumphant Hero's Legguards": 81386, "Triumphant Hero's Shinplates": 81420,
+  "Triumphant Hero's Warhelm": 81330, "Triumphant Hero's Pauldrons": 81333, "Triumphant Hero's Breastplate": 81304,
+  "Triumphant Hero's Gauntlets": 81349, "Triumphant Hero's Legplates": 81418, "Triumphant Hero's Wargreaves": 81336,
+  "Glorious Hero's Crown": 67126, "Glorious Hero's Epaulets": 67124, "Glorious Hero's Raiment": 67129,
+  "Glorious Hero's Armguards": 67127, "Glorious Hero's Leggings": 67125, "Glorious Hero's Footgear": 67130,
+  "Glorious Hero's Cap": 67116, "Glorious Hero's Shoulderguards": 67120, "Glorious Hero's Brigandine": 67122,
+  "Glorious Hero's Wristplates": 67121, "Glorious Hero's Legguards": 67119, "Glorious Hero's Shinplates": 67123,
+  "Glorious Hero's Plate Helm": 67153, "Glorious Hero's Pauldrons": 67149, "Glorious Hero's Breastplate": 67133,
+  "Glorious Hero's Gauntlets": 67132, "Glorious Hero's Legplates": 67154, "Glorious Hero's Wargreaves": 67134,
+};
 
 const piece = (setKey, gen, badge, expansion, [weight, slot, itemId, name], inputs, note) => ({
   id: `legendary_armor_${setKey}_${weight.toLowerCase()}_${slot.toLowerCase()}`,
@@ -137,19 +212,18 @@ const piece = (setKey, gen, badge, expansion, [weight, slot, itemId, name], inpu
 });
 
 const RAID_ARMOR = ENVOY.map(p => piece('raid', 1, 'Raids', 'Raids', p, [
-  { itemId: null, name: p[3].replace('Perfected', 'Refined'), count: 1, source: 'forge', accountBound: true,
-    note: `Crafted (${DISCIPLINE[p[0]]} 500) from Envoy Insignia + Lesser Vision Crystal + 2 ascended armor parts, or from a Chest of ${p[0]} Refined Envoy Armor (raid collections)`, inputs: [] },
+  refinedEnvoy(p[3].replace('Perfected', 'Refined')),
   { ...GIFT_OF_PROSPERITY }, { ...GIFT_OF_PROWESS }, { ...GIFT_OF_DEDICATION },
 ], 'Mystic Forge: Refined Envoy piece + Gift of Prosperity + Gift of Prowess + Gift of Dedication'));
 
 const WVW_ARMOR = TRIUMPHANT.map(p => piece('wvw', 2, 'WvW', 'WvW', p, [
-  { itemId: null, name: `${p[3]} (Ascended)`, count: 1, source: 'wvw', accountBound: true,
+  { itemId: ASCENDED_PRECURSOR_IDS[p[3]] ?? null, wikiPage: p[3], name: `${p[3]} (Ascended)`, count: 1, source: 'wvw', accountBound: true,
     note: 'Ascended precursor — bought from WvW armor vendors (Grandmaster Armorsmith/Leatherworker/Tailor Marks + WvW Skirmish Claim Tickets + 250 Memory of Battle + 2 gold)', inputs: [] },
   { ...GIFT_OF_WAR_PROSPERITY }, { ...GIFT_OF_WAR_PROWESS }, { ...GIFT_OF_WAR_DEDICATION },
 ], 'Mystic Forge: ascended Triumphant piece + Gift of War Prosperity + Gift of War Prowess + Gift of War Dedication'));
 
 const PVP_ARMOR = GLORIOUS.map(p => piece('pvp', 3, 'PvP', 'PvP', p, [
-  { itemId: null, name: `${p[3]} (Ascended)`, count: 1, source: 'currency', accountBound: true,
+  { itemId: ASCENDED_PRECURSOR_IDS[p[3]] ?? null, wikiPage: p[3], name: `${p[3]} (Ascended)`, count: 1, source: 'currency', accountBound: true,
     note: 'Ascended precursor — Ascended Armor League Vendor (Ascended Shards of Glory + Shards of Glory + Grandmaster Marks + 2 gold)', inputs: [] },
   { ...GIFT_OF_COMPETITIVE_PROSPERITY }, { ...GIFT_OF_COMPETITIVE_PROWESS }, { ...GIFT_OF_COMPETITIVE_DEDICATION },
 ], 'Mystic Forge: ascended Glorious piece + Gift of Competitive Prosperity + Gift of Competitive Prowess + Gift of Competitive Dedication'));
@@ -168,22 +242,32 @@ const EIKASIA = [['Light', 105317], ['Medium', 105293], ['Heavy', 105171]].map((
     { itemId: null, idName: 'Fractalline Spark', name: 'Fractalline Spark', count: 1, source: 'collection', accountBound: true, note: 'Incursive Investigation: Infinite Recursion (150 Fractalline Dust from Quickplay Fractals)', inputs: [] },
     prosperityObsidian(true), prosperityObsidian(false),
     { itemId: 19676, name: 'Icy Runestone', count: 200, source: 'vendor', accountBound: true, note: '1 gold each', inputs: [] },
-  ], 'First weight class is free from the Incursive Investigation achievement; extra weights are bought from Mist Stranger for these items [wiki verified Oct 2026]'));
+  ], 'First weight class is free from the Incursive Investigation achievement (Eikasia, Mists-Grasper Choice); extra weights cost these items at Mist Stranger [wiki verified Oct 2026]'));
 
-const SELACHIMORPHA = [['Light', 105921], ['Medium', 106658], ['Heavy', 106178]].map(([w, id]) =>
+// [legendary id, Agaleus precursor id] per weight — Agaleus IDs API verified Oct 2026
+const SELACHIMORPHA = [['Light', 105921, 105438], ['Medium', 106658, 106400], ['Heavy', 106178, 105738]].map(([w, id, agaleusId]) =>
   piece('selachimorpha', 5, 'VoE', 'Visions of Eternity', [w, 'Aquatic Helm', id, 'Selachimorpha'], [
-    { itemId: null, idName: 'Agaleus', name: 'Agaleus', count: 1, source: 'collection', accountBound: true, note: 'Precursor — Legendary Armor achievement "Acquiring Agaleus" (24 steps)', inputs: [] },
-    { itemId: null, idName: 'Gift of the Survivors', name: 'Gift of the Survivors', count: 1, source: 'currency', accountBound: true, note: 'Castaway Agnes — Concentrated Chromatic Sap + Shipwreck Strand exploration gift + Survivor’s Enchanted Compass + 500 Aether-Rich Sap', inputs: [] },
-    { itemId: null, idName: 'Gift of the People', name: 'Gift of the People', count: 1, source: 'currency', accountBound: true, note: 'Canach — Patron of the Magical Arts Plaque + Starlit Weald exploration gift + Seer Wreath of Service + 500 Antiquated Ducat', inputs: [] },
-    { itemId: null, idName: 'Gift of Castoran Mastery', name: 'Gift of Castoran Mastery', count: 1, source: 'forge', accountBound: true, note: 'Gift of Adventure (2 Vision Crystal + 55 Mystic Clover + 100 Tale of Adventure + 500 Unusual Coin) + more', inputs: [] },
-    { itemId: null, idName: 'Gift of the Seas', name: 'Gift of the Seas', count: 1, source: 'forge', accountBound: true, note: 'Gift of the Tides (Path of Divinity story) + 2 Gift of Research + 2 Gift of Condensed Might/Magic', inputs: [] },
-  ], 'PARTIAL — structure from the wiki material list; exact nesting still being verified'));
+    { itemId: agaleusId, name: 'Agaleus', count: 1, source: 'collection', accountBound: true, wikiPage: 'Agaleus', note: 'Precursor — Legendary Armor achievement "Acquiring Agaleus"', inputs: [] },
+    { ...GIFT_OF_THE_SURVIVORS },
+    { ...GIFT_OF_THE_PEOPLE },
+    { itemId: 105649, name: 'Gift of Castoran Mastery', count: 1, source: 'forge', accountBound: true,
+      note: 'Mystic Forge: Gift of Adventure + Gift of the Seas + Bloodstone Shard + 250 Obsidian Shard',
+      inputs: [
+        { itemId: 105979, name: 'Gift of Adventure', count: 1, source: 'vendor', accountBound: true, note: 'Acolyte of Balance Dexx: 2 Vision Crystal + 55 Mystic Clover + 100 Tale of Adventure + 500 Unusual Coin',
+          inputs: [ { ...VISION_CRYSTAL_ARMOR, count: 2 }, clover(55),
+            { itemId: 96151, name: 'Tale of Adventure', count: 100, source: 'currency', accountBound: true, note: 'Story chapter rewards', inputs: [] },
+            { itemId: null, name: 'Unusual Coin', count: 500, source: 'currency', accountBound: true, note: 'Wallet currency', inputs: [] } ] },
+        { itemId: 106747, name: 'Gift of the Seas', count: 1, source: 'vendor', accountBound: true, note: 'Acolyte of Balance Dexx: Gift of the Tides + 2 Gift of Research + 2 Gift of Condensed Might + 2 Gift of Condensed Magic',
+          inputs: [ { itemId: 106275, name: 'Gift of the Tides', count: 1, source: 'collection', accountBound: true, note: 'Visions of Eternity story step Path of Divinity (extra copies: 50 gold + 300,000 Karma)', inputs: [] },
+            { ...GIFT_OF_RESEARCH, count: 2 }, { ...CONDENSED_MIGHT, count: 2 }, { ...CONDENSED_MAGIC, count: 2 } ] },
+        { itemId: 20797, name: 'Bloodstone Shard', count: 1, source: 'spirit_shard', accountBound: true, note: '200 Spirit Shards from Miyani', inputs: [] },
+        obsidian(250),
+      ] },
+  ], 'Mystic Forge (Selachimorpha Container): Gift of the Survivors + Gift of the People + Gift of Castoran Mastery + Agaleus of the matching weight [wiki verified Oct 2026]'));
 
 export const LEGENDARY_ARMOR_RECIPES = [
   ...RAID_ARMOR, ...WVW_ARMOR, ...PVP_ARMOR, ...OBSIDIAN_ARMOR, ...EIKASIA, ...SELACHIMORPHA,
 ];
-for (const r of [...EIKASIA, ...SELACHIMORPHA]) r.dataStatus = 'partial';
-for (const r of PVP_ARMOR) r.dataStatus = 'partial'; // Gift of Competitive Prowess still unverified
 
 const ARMOR_SLOTS = ['Helm', 'Shoulders', 'Chest', 'Gloves', 'Leggings', 'Boots', 'Aquatic Helm'];
 export const ARMOR_WEIGHT_CLASSES = ['All', 'Light', 'Medium', 'Heavy'];

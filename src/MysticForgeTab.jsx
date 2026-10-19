@@ -31,6 +31,8 @@ import {
   LEGENDARY_GEN3_EXPANSIONS,
 } from "./legendary-data-gen3.js";
 import { LEGENDARY_RECIPES_NEWER } from "./legendary-data-newer.js";
+import { legendaryWikiUrl } from "./legendary-item-ids.js";
+import { openExternal } from "./lib/openExternal.js";
 import {
   LEGENDARY_ARMOR_RECIPES,
   ARMOR_WEIGHT_CLASSES,
@@ -413,17 +415,35 @@ const SOURCE_BADGE = {
   spirit_shard:{ label: '🔮 Spirit Shards',      color: 'var(--blue2)', bg: 'rgba(90,160,210,.15)' },
 };
 
-function SourceBadge({ source, accountBound }) {
+// Click-through to the wiki. Stops propagation so clicking a badge doesn't also
+// expand/collapse the tree row it sits in.
+function wikiClickProps(href) {
+  if (!href) return {};
+  const go = (e) => { e.stopPropagation(); e.preventDefault(); openExternal(href); };
+  return {
+    role: 'link', tabIndex: 0, title: 'Open on the Guild Wars 2 wiki',
+    onClick: go,
+    onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') go(e); },
+    className: 'lg-wiki-link',
+  };
+}
+
+function SourceBadge({ source, accountBound, href }) {
   const s = SOURCE_BADGE[source];
   if (!s) return null;
   return (
-    <span style={{ fontSize: 10, color: s.color, background: s.bg,
+    <span {...wikiClickProps(href)}
+      style={{ fontSize: 10, color: s.color, background: s.bg,
       border: `1px solid ${s.color}55`, borderRadius: 3, padding: '1px 6px',
-      fontFamily: 'Cinzel,serif', letterSpacing: 0.5, whiteSpace: 'nowrap' }}>
-      {s.label}
+      fontFamily: 'Cinzel,serif', letterSpacing: 0.5, whiteSpace: 'nowrap',
+      cursor: href ? 'pointer' : undefined }}>
+      {s.label}{href && <span style={{ marginLeft: 4, opacity: 0.8 }}>↗</span>}
     </span>
   );
 }
+
+// Glyph shown when a row has no item icon (collections, achievements, placeholders).
+const SOURCE_GLYPH = { collection: '📜', wvw: '⚔', exploration: '🗺', heroics: '⚡', karma: '🔮', currency: '🪙', forge: '⚗', craft: '🔨', vendor: '🏪', spirit_shard: '🔮' };
 
 // ── Single ingredient node in the legendary tree ───────────────────────────────
 // Renders one node of the annotated tree from evaluateLegendaryTree() — no cost
@@ -464,9 +484,13 @@ function LegendaryIngredientNode({ n, depth = 0, legendaryAchievements = {} }) {
         onMouseLeave={e => { e.currentTarget.style.background = ''; }}
         onClick={() => hasChildren && setOpen(o => !o)}
       >
-        {n.icon
-          ? <img src={n.icon} style={{ width: 24, height: 24, borderRadius: 3, border: '1px solid var(--border2)', flexShrink: 0 }} alt="" />
-          : <div style={{ width: 24, height: 24, background: 'var(--bg4)', borderRadius: 3, border: '1px solid var(--border2)', flexShrink: 0 }} />
+        {(n.icon || n.iconUrl)
+          ? <img src={n.icon || n.iconUrl} style={{ width: 24, height: 24, borderRadius: 3, border: '1px solid var(--border2)', flexShrink: 0 }} alt="" />
+          : <div title={n.itemId ? 'Icon still loading' : undefined}
+              style={{ width: 24, height: 24, background: 'var(--bg4)', borderRadius: 3, border: '1px solid var(--border2)', flexShrink: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, lineHeight: 1 }}>
+              {SOURCE_GLYPH[n.source] || ''}
+            </div>
         }
 
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -483,13 +507,15 @@ function LegendaryIngredientNode({ n, depth = 0, legendaryAchievements = {} }) {
           {n.note && <span style={{ fontSize: 10, color: 'var(--text3)', marginLeft: 8, fontStyle: 'italic' }}>{n.note}</span>}
         </div>
 
-        <SourceBadge source={n.source} accountBound={n.accountBound} />
+        <SourceBadge source={n.source} accountBound={n.accountBound}
+          href={n.source === 'collection' ? legendaryWikiUrl(n) : undefined} />
 
-        {/* Precursor collection name (when no live achievement ID is wired up yet) */}
+        {/* Precursor collection name (when no live achievement ID is wired up yet) — links to the wiki */}
         {n.achievementName && !n.achievementId && (
-          <span style={{ fontSize:10, fontFamily:'Cinzel,serif', letterSpacing:1, padding:'1px 7px', borderRadius:3, background:'rgba(var(--gold-rgb),.1)', border:'1px solid rgba(var(--gold-rgb),.3)', color:'var(--gold2)', whiteSpace:'nowrap' }}
-            title="Precursor collection — open your Achievements panel to track it">
-            📜 {n.achievementName}
+          <span {...wikiClickProps(legendaryWikiUrl({ name: n.achievementName }))}
+            style={{ fontSize:10, fontFamily:'Cinzel,serif', letterSpacing:1, padding:'1px 7px', borderRadius:3, background:'rgba(var(--gold-rgb),.1)', border:'1px solid rgba(var(--gold-rgb),.3)', color:'var(--gold2)', whiteSpace:'nowrap', cursor:'pointer' }}
+            title="Precursor collection — click to open it on the wiki">
+            📜 {n.achievementName} ↗
           </span>
         )}
 
@@ -500,14 +526,16 @@ function LegendaryIngredientNode({ n, depth = 0, legendaryAchievements = {} }) {
           const current = ach?.current ?? null;
           const max = n.achievementBitCount || ach?.max || null;
           const label = n.achievementName ? `${n.achievementName} — ` : 'Achievement — ';
+          const wiki = wikiClickProps(legendaryWikiUrl({ name: n.achievementName || n.name }));
+          const linkCss = { cursor: 'pointer' };
           if (current === null && !done) return (
-            <span style={{ fontSize:10, fontFamily:'Cinzel,serif', letterSpacing:1, padding:'1px 7px', borderRadius:3, background:'rgba(var(--gold-rgb),.1)', border:'1px solid rgba(var(--gold-rgb),.3)', color:'var(--gold2)', whiteSpace:'nowrap' }}>
+            <span {...wiki} style={{ ...linkCss, fontSize:10, fontFamily:'Cinzel,serif', letterSpacing:1, padding:'1px 7px', borderRadius:3, background:'rgba(var(--gold-rgb),.1)', border:'1px solid rgba(var(--gold-rgb),.3)', color:'var(--gold2)', whiteSpace:'nowrap' }}>
               {label}{max ? `0/${max}` : 'progress unknown'}
             </span>
           );
           return done
-            ? <span style={{ fontSize:10, fontFamily:'Cinzel,serif', letterSpacing:1, padding:'1px 7px', borderRadius:3, background:'rgba(60,160,60,.15)', border:'1px solid rgba(60,160,60,.4)', color:'var(--green2)', whiteSpace:'nowrap' }}>✓ Achievement Done</span>
-            : <span style={{ fontSize:10, fontFamily:'Cinzel,serif', letterSpacing:1, padding:'1px 7px', borderRadius:3, background:'rgba(var(--gold-rgb),.1)', border:'1px solid rgba(var(--gold-rgb),.3)', color:'var(--gold2)', whiteSpace:'nowrap' }}>
+            ? <span {...wiki} style={{ ...linkCss, fontSize:10, fontFamily:'Cinzel,serif', letterSpacing:1, padding:'1px 7px', borderRadius:3, background:'rgba(60,160,60,.15)', border:'1px solid rgba(60,160,60,.4)', color:'var(--green2)', whiteSpace:'nowrap' }}>✓ Achievement Done</span>
+            : <span {...wiki} style={{ ...linkCss, fontSize:10, fontFamily:'Cinzel,serif', letterSpacing:1, padding:'1px 7px', borderRadius:3, background:'rgba(var(--gold-rgb),.1)', border:'1px solid rgba(var(--gold-rgb),.3)', color:'var(--gold2)', whiteSpace:'nowrap' }}>
                 Achievement: {current}/{max} — {max - current} more needed
               </span>;
         })()}

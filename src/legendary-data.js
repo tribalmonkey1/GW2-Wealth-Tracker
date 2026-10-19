@@ -468,8 +468,8 @@ const ID = {
   CHARGED_LODESTONE:        24305,
   GLACIAL_LODESTONE:        24320,
   CORRUPTED_LODESTONE:      24340,
-  MOLTEN_LODESTONE:         24302,
-  DESTROYER_LODESTONE:      24312,
+  MOLTEN_LODESTONE:         24315,  // was 24302 (Charged Fragment) — API verified Oct 2026
+  DESTROYER_LODESTONE:      24325,  // was 24312 (Molten Fragment) — API verified Oct 2026
 
   // Superior Sigils — used in weapon-specific gifts [wiki verified]
   SIGIL_OF_BLOOD:           24570,   // Twilight [API verified Oct 2026 — exotic sigil; previous ID was the account-bound legendary/wrong sigil]

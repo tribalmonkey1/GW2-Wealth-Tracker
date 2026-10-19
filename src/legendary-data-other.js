@@ -141,7 +141,7 @@ const AURORA = {
             { name: 'Silver Ingot',       itemId: 19687, count: 420, source: 'tp', inputs: [] },
             { name: 'Gold Ingot',         itemId: 19682, count: 210, source: 'tp', inputs: [] },
             { name: 'Platinum Ingot',     itemId: 19686, count: 420, source: 'tp', inputs: [] },
-            { name: 'Lump of Mithrillium',itemId: 46742, count: 21,  source: 'tp',
+            { name: 'Lump of Mithrillium',itemId: 46742, count: 21,  source: 'craft', accountBound: true,
               note: 'Time-gated — 1/day crafted from 50 Mithril Ingot + 1 Glob of Ectoplasm + 10 Thermocatalytic Reagent',
               inputs: [
                 { name: 'Mithril Ingot',            itemId: 19684, count: 1050, source: 'tp', inputs: [] },

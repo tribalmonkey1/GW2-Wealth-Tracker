@@ -27,7 +27,7 @@ export const DRACONIC_TRIBUTE = {
     { itemId: 92687, name: 'Amalgamated Draconic Lodestone', count: 5, source: 'tp',
       note: 'Buy on the TP or craft (any discipline 400) [API verified Oct 2026]',
       inputs: [
-        { itemId: 24330, name: 'Evergreen Lodestone', count: 10, source: 'tp', inputs: [] },
+        { itemId: 68942, name: 'Evergreen Lodestone', count: 10, source: 'tp', inputs: [] },
         { itemId: 24325, name: 'Destroyer Lodestone', count: 10, source: 'tp', inputs: [] },
         { itemId: 24340, name: 'Corrupted Lodestone', count: 10, source: 'tp', inputs: [] },
         { itemId: 70842, name: 'Mordrem Lodestone', count: 10, source: 'tp', inputs: [] },
@@ -811,7 +811,7 @@ export const LEGENDARY_RECIPES_GEN3 = [
     name: "Aurene's Voice",
     itemId: 97783,   // [API verified Oct 2026]
     rarity: 'Legendary', weaponType: 'Warhorn', generation: 3, expansion: 'End of Dragons',
-    note: "Mystic Forge: Dragon’s precursor + Gift of Aurene's Voice + Draconic Tribute + Gift of Jade Mastery",
+    note: "Mystic Forge: Dragon’s precursor + Gift of Aurene's Horn + Draconic Tribute + Gift of Jade Mastery",
     inputs: [
       { itemId: 97513, name: "Dragon's Voice", count: 1, source: 'tp', accountBound: false, isPrecursor: true,
         note: "Precursor — craft (Huntsman 500, Sheaf of Recipes from Leivas: 35,000 Karma + 10 Tales of Adventure), pick it from a Prismatic Precursor Selection Box, or buy on the TP",
@@ -859,7 +859,7 @@ export const LEGENDARY_RECIPES_GEN3 = [
           { itemId: 96088, name: "Memory of Aurene", count: 100, source: 'tp', note: "Memory of Aurene — EoD reward currency (also on the TP)", inputs: [] },
         ],
       },
-      { itemId: null, idName: "Gift of Aurene's Voice", name: "Gift of Aurene's Voice", count: 1, source: 'forge', accountBound: true,
+      { itemId: 96354, name: "Gift of Aurene's Horn", count: 1, source: 'forge', accountBound: true,  // in-game name is "Horn", not "Voice" [API verified Oct 2026]
         note: 'Mystic Forge: Poem + 100 Mystic Runestone + Gift of Research + Gift of the Mists [wiki verified Oct 2026]',
         inputs: [
             { itemId: null, idName: "Poem on Warhorns", name: "Poem on Warhorns", count: 1, source: 'forge', accountBound: true, note: 'Mystic Forge [wiki verified Oct 2026]',
