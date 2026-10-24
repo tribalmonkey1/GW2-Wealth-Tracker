@@ -571,6 +571,22 @@ pub fn get_tracked_item_ids() -> Result<Vec<i64>, String> {
 #[tauri::command]
 pub fn append_log(_message: String) -> Result<(), String> { Ok(()) }
 
+// AppImage builds export PYTHONHOME / PYTHONPATH / LD_LIBRARY_PATH pointing at
+// the bundle's own files. Child processes inherit them, which breaks any
+// system program that has its own runtime: a Python-based Piper can't find its
+// stdlib ("No module named 'encodings'"), and aplay/espeak-ng can pick up the
+// wrong shared libraries. Strip them, but only when actually running inside an
+// AppImage (APPDIR is set by the AppImage runtime), so a user's own values are
+// left alone everywhere else.
+fn sanitize_child_env(cmd: &mut std::process::Command) -> &mut std::process::Command {
+    if std::env::var_os("APPDIR").is_some() {
+        for var in ["PYTHONHOME", "PYTHONPATH", "LD_LIBRARY_PATH"] {
+            cmd.env_remove(var);
+        }
+    }
+    cmd
+}
+
 // ── Native TTS fallback (Linux/WebKitGTK) ──────────────────────────────────
 // window.speechSynthesis is undefined on stock webkit2gtk builds everywhere
 // (Arch included) — the Web Speech Synthesis API isn't compiled in unless
@@ -629,9 +645,10 @@ fn piper_voice_paths(voice_file: Option<&str>) -> Option<(std::path::PathBuf, st
 // falls back to bare "piper" in case it genuinely is on PATH (e.g. a manual
 // install elsewhere, or a different package that did add it to PATH).
 fn piper_binary_path() -> std::path::PathBuf {
-    const KNOWN_LOCATIONS: [&str; 2] = [
+    const KNOWN_LOCATIONS: [&str; 3] = [
         "/opt/piper-tts/piper", // AUR piper-tts-bin
-        "/usr/local/bin/piper", // manual installs following our earlier instructions
+        "/usr/local/bin/piper", // manual installs
+        "/usr/bin/piper-tts",   // AUR piper-tts (Python package)
     ];
     for candidate in KNOWN_LOCATIONS {
         if std::path::Path::new(candidate).exists() {
@@ -665,10 +682,13 @@ fn try_speak_with_piper(text: &str, voice_file: Option<&str>, speaker_id: Option
         args.push(id.to_string());
     }
 
-    let mut piper = std::process::Command::new(piper_binary_path())
+    let mut piper_cmd = std::process::Command::new(piper_binary_path());
+    piper_cmd
         .args(&args)
         .stdin(std::process::Stdio::piped())
-        .stdout(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped());
+    sanitize_child_env(&mut piper_cmd);
+    let mut piper = piper_cmd
         .spawn()
         .map_err(|e| format!("failed to launch piper: {e}"))?;
 
@@ -680,9 +700,12 @@ fn try_speak_with_piper(text: &str, voice_file: Option<&str>, speaker_id: Option
     // piping piper's stdout straight into aplay's stdin (the old approach),
     // we read the raw S16LE PCM ourselves, scale each sample by `volume`,
     // and write the scaled bytes to aplay's stdin on a background thread.
-    let mut aplay = std::process::Command::new("aplay")
+    let mut aplay_cmd = std::process::Command::new("aplay");
+    aplay_cmd
         .args(["-q", "-r", &sample_rate.to_string(), "-f", "S16_LE", "-t", "raw", "-"])
-        .stdin(std::process::Stdio::piped())
+        .stdin(std::process::Stdio::piped());
+    sanitize_child_env(&mut aplay_cmd);
+    let mut aplay = aplay_cmd
         .spawn()
         .map_err(|e| format!("failed to launch aplay: {e}. Is alsa-utils installed?"))?;
     let mut aplay_stdin = aplay.stdin.take().ok_or_else(|| "no aplay stdin".to_string())?;
@@ -752,9 +775,10 @@ pub fn speak_text(text: String, voice_file: Option<String>, speaker_id: Option<i
     // volume for an alert-loudness slider, even though it isn't a true
     // perceptual-loudness curve.
     let amplitude = (vol * 100.0).round() as i64;
-    std::process::Command::new("espeak-ng")
-        .args(["-a", &amplitude.to_string()])
-        .arg(&text)
+    let mut espeak = std::process::Command::new("espeak-ng");
+    espeak.args(["-a", &amplitude.to_string()]).arg(&text);
+    sanitize_child_env(&mut espeak);
+    espeak
         .spawn()
         .map_err(|e| format!("failed to launch espeak-ng: {e}. Is it installed and on PATH?"))?;
     Ok(())
