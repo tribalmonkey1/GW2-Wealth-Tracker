@@ -34,6 +34,9 @@
  *    (container) items are seen increasing first that occurrence.
  *  - Category 4 (DUAL_THRESHOLD_TRACKERS): a gold delta AND a wallet-currency delta
  *    must both cross their thresholds during the window (+ grace).
+ *  - Category 7 (DAILY_ACCUMULATOR_TRACKERS): DRF-only. Every positive DRF item delta is tallied
+ *    for the day (consumption ignored); the event is marked done once the tally hits a target.
+ *    Driven by raw DRF events (see subscribeDrfItemDeltas), not the 1s tick below.
  * All are best-effort heuristics, not guaranteed completion signals — see each
  * tracker's comment in bossTimerStorage.js for the specific tradeoffs accepted.
  *
@@ -53,12 +56,14 @@ import {
   getNextOccurrenceForName, getMostRecentOccurrenceForName, getEventDurationMin,
 } from "./bossTimerCalc.js";
 import { playAlertsSequentially } from "./alertSound.js";
+import { subscribeDrfItemDeltas } from "./drfClient.js";
 import {
   bossKey, loadBossTimerPrefs, saveAlerts, saveSoundSettings, saveCompletions,
   DEFAULT_SOUND_SETTINGS, migrateLocationKeyedMap, migrateAlertsShape, currentPeriod,
   AUTO_COMPLETION_ENABLED, ITEM_COMPLETION_TRACKERS, MAP_CHEST_ITEM_TRACKERS,
   MATERIAL_REWARD_TRACKERS, EXACT_COUNT_TRACKERS, DUAL_THRESHOLD_TRACKERS,
   PAIRED_ITEM_TRACKERS, RANGED_PAIR_TRACKERS,
+  DAILY_ACCUMULATOR_TRACKERS, loadDailyAccumulators, saveDailyAccumulators,
 } from "./bossTimerStorage.js";
 
 const TICK_MS = 1000;
@@ -138,6 +143,7 @@ export function useBossAlerts(customSoundPath, piperVoiceFile, piperSpeakerId, o
   const dualThresholdTrackerRef = useRef({});   // Category 4: eventName -> { occurrenceSpawnMs, baselineGold, baselineCurrency, goldHitAt, currencyHitAt, confirmed }
   const pairedItemTrackerRef = useRef({});      // Category 5: eventName -> { occurrenceSpawnMs, baselines:[count,...], confirmed }
   const rangedPairTrackerRef = useRef({});      // Category 6: eventName -> { occurrenceSpawnMs, baselines:[count,...], hitAt:[ms|null,...], confirmed }
+  const accumulatorRef = useRef({});            // Category 7: eventName -> { period, gained, done }
 
   useEffect(() => { alertsRef.current = alerts; }, [alerts]);
   useEffect(() => { soundRef.current = soundSettings; }, [soundSettings]);
@@ -180,6 +186,45 @@ export function useBossAlerts(customSoundPath, piperVoiceFile, piperSpeakerId, o
       return next;
     });
   };
+
+  // Category 7 — daily accumulators, driven by raw DRF item events (see DAILY_ACCUMULATOR_TRACKERS).
+  // Lives outside the 1s tick on purpose: a pickup that's consumed seconds later (key fragments
+  // combined into a key) must still count, and tick throttling must not be able to drop it.
+  useEffect(() => {
+    if (!AUTO_COMPLETION_ENABLED) return;
+    let cancelled = false;
+    let unsubscribe = null;
+
+    const onItems = (items) => {
+      const period = currentPeriod(Date.now());
+      let dirty = false;
+      for (const t of DAILY_ACCUMULATOR_TRACKERS) {
+        const delta = items[t.itemId];
+        if (!(delta > 0)) continue; // consumption / no change — never un-counts a pickup
+        let st = accumulatorRef.current[t.eventName];
+        if (!st || st.period !== period) {
+          st = accumulatorRef.current[t.eventName] = { period, gained: 0, done: false };
+        }
+        st.gained += delta;
+        dirty = true;
+        console.log("[autocomplete] accumulator", t.eventName, "+" + delta, "->", st.gained + "/" + t.requiredTotal);
+        if (!st.done && st.gained >= t.requiredTotal) {
+          st.done = true; // stays true even if the person later un-checks it manually
+          markAutoComplete(t.eventName, period);
+        }
+      }
+      if (dirty) saveDailyAccumulators(accumulatorRef.current);
+    };
+
+    // Load today's saved tally first, so a restart mid-day continues where it left off.
+    loadDailyAccumulators()
+      .then(m => { accumulatorRef.current = m || {}; })
+      .catch(() => {})
+      .then(() => { if (!cancelled) unsubscribe = subscribeDrfItemDeltas(onItems); });
+
+    return () => { cancelled = true; unsubscribe?.(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const interval = setInterval(() => {

@@ -44,6 +44,15 @@ const TRACKED_EXTRA_CURRENCY_IDS = new Set([60]);
 // pickups in under a second) into one worker recompute instead of one per event.
 const RECOMPUTE_DEBOUNCE_MS = 400;
 
+// Lets other modules see every raw DRF item delta (not the net ownedMap count). Used by the
+// daily-accumulator auto-completion in useBossAlerts.js, which has to count each pickup even
+// when the item is consumed seconds later (e.g. key fragments -> key).
+const itemDeltaListeners = new Set();
+export function subscribeDrfItemDeltas(fn) {
+  itemDeltaListeners.add(fn);
+  return () => itemDeltaListeners.delete(fn);
+}
+
 export function useDrfLiveFeed({ cacheRef, setData, setForgeWallet, token, enabled, activityRef }) {
   const [status, setStatus] = useState("disconnected"); // connecting | connected | reconnecting | disconnected | error
   const [statusDetail, setStatusDetail] = useState(null);
@@ -72,6 +81,11 @@ export function useDrfLiveFeed({ cacheRef, setData, setForgeWallet, token, enabl
   }, [cacheRef, setData]);
 
   const applyDrop = useCallback((evt) => {
+    if (evt.items && itemDeltaListeners.size > 0) {
+      for (const fn of itemDeltaListeners) {
+        try { fn(evt.items); } catch (e) { console.warn("[drf] item delta listener failed:", e); }
+      }
+    }
     const itemMap = cacheRef.current?.itemMap;
     const priceMap = cacheRef.current?.priceMap;
     if (!cacheRef.current) return;

@@ -74,6 +74,7 @@ import {
   loadApiFreshness, saveApiFreshness, currentPeriod, AUTO_COMPLETION_ENABLED,
   ITEM_COMPLETION_TRACKERS, MAP_CHEST_ITEM_TRACKERS, MATERIAL_REWARD_TRACKERS,
   EXACT_COUNT_TRACKERS, DUAL_THRESHOLD_TRACKERS, PAIRED_ITEM_TRACKERS, RANGED_PAIR_TRACKERS,
+  DAILY_ACCUMULATOR_TRACKERS,
 } from "../lib/bossTimerStorage.js";
 import { EXPANSION_ACCENT_COLORS, EXPANSION_ACCENT_FALLBACK, expansionSortKey } from "../lib/worldBossScheduleData.js";
 import { WORLD_BOSS_API_IDS, WORLD_BOSS_API_ID_TO_NAME } from "../lib/worldBossApiIds.js";
@@ -372,6 +373,8 @@ function findAutoTracker(name) {
   if (paired) return { kind: "paired", ...paired };
   const ranged = RANGED_PAIR_TRACKERS.find(t => t.eventName === name);
   if (ranged) return { kind: "ranged", ...ranged };
+  const accumulator = DAILY_ACCUMULATOR_TRACKERS.find(t => t.eventName === name);
+  if (accumulator) return { kind: "accumulator", ...accumulator };
   return null;
 }
 
@@ -404,6 +407,8 @@ function AutoTrackedBadge({ name, drfConnected = false }) {
     ? `Marked done automatically once ${tracker.items.map(i => i.itemName).join(" and ")} have both increased during this event's window (+${tracker.graceMinutes} min grace) — that pairing is unique to this event`
     : tracker.kind === "ranged"
     ? `Marked done automatically if ${tracker.items.map(i => `${i.itemName} (${i.minDelta === i.maxDelta ? i.minDelta : `${i.minDelta}–${i.maxDelta}`})`).join(" and ")} are both gained together (within ${tracker.correlationSeconds}s of each other) during this event's window (+${tracker.graceMinutes} min grace)`
+    : tracker.kind === "accumulator"
+    ? `Marked done automatically once ${tracker.requiredTotal} ${tracker.itemName}s have been received today — all at once or spread across the day, even if you've already combined them into a key. Needs your DRF token connected${drfConnected ? "" : " (not connected right now)"}`
     : `Marked done automatically if both gold and ${tracker.currencyName} increase together (by at least the reward's guaranteed amounts) during this event's window (+${tracker.graceMinutes} min grace)`;
   return <span title={title} style={{ fontSize: 9, opacity: .6, flexShrink: 0 }}>🔗</span>;
 }

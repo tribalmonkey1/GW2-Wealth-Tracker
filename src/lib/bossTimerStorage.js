@@ -21,6 +21,7 @@ export const CACHE_KEYS = {
   areasSelection: "bossTimerAreasSelection", // string[] of selected expansion names, or absent = all
   viewMode: "bossTimerViewMode",             // "countdown" | "timeline"
   apiFreshness: "bossTimerApiFreshness",     // { [source]: { period, names: string[], confirmed } } — see evaluateApiFreshness in BossTimersTab.jsx
+  dailyAccumulators: "bossTimerDailyAccumulators", // { [eventName]: { period, gained, done } } — see DAILY_ACCUMULATOR_TRACKERS
 };
 
 // Master switch for every automatic completion source (world-boss API poll, map-chest
@@ -226,6 +227,16 @@ export const RANGED_PAIR_TRACKERS = [
   },
 ];
 
+// Category 7 — running daily total, DRF-event-driven: every positive DRF delta for the item is
+// added to a per-day tally (consumption is ignored — e.g. combining 3 fragments into a key).
+// The event is marked done once the day's tally reaches requiredTotal, however spread out the
+// gains were. Needs a DRF token; the GW2 API is too slow to see items that get consumed within
+// minutes. The tally resets at the daily reset (see currentPeriod) and is persisted, so an app
+// restart mid-day doesn't lose progress. See useBossAlerts.js for the handler.
+export const DAILY_ACCUMULATOR_TRACKERS = [
+  { eventName: 'Your Mad King Says...', itemId: 73693, itemName: "Mad King's Chest Key Fragment", requiredTotal: 3 },
+];
+
 // piperVoiceFile: file stem (no .onnx extension) of a voice detected by the
 // list_piper_voices Tauri command, or null (native TTS falls back to the
 // legacy single piper-voice.onnx convention, and ultimately espeak-ng, if
@@ -287,6 +298,16 @@ export async function loadApiFreshness() {
 
 export function saveApiFreshness(freshnessMap) {
   return cacheSet(CACHE_KEYS.apiFreshness, freshnessMap);
+}
+
+// Per-day running tallies for DAILY_ACCUMULATOR_TRACKERS: { [eventName]: { period, gained, done } }.
+export async function loadDailyAccumulators() {
+  const entry = await cacheGet(CACHE_KEYS.dailyAccumulators);
+  return entry?.value || {};
+}
+
+export function saveDailyAccumulators(map) {
+  return cacheSet(CACHE_KEYS.dailyAccumulators, map);
 }
 
 export function saveSoundSettings(settings) {
